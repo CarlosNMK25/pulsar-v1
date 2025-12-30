@@ -10,6 +10,7 @@ import { GlitchModuleCompact } from '@/components/synth/GlitchModuleCompact';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDrumState } from '@/hooks/useDrumState';
 import { useSynthState } from '@/hooks/useSynthState';
 import { useTextureState } from '@/hooks/useTextureState';
@@ -44,6 +45,14 @@ const Index = () => {
     setBpm,
     setSwing,
   });
+
+  // Audio recorder hook
+  const {
+    isRecording,
+    recordingTime,
+    startRecording,
+    stopRecording,
+  } = useAudioRecorder();
 
   // Audio engine hook
   const { 
@@ -124,11 +133,15 @@ const Index = () => {
               bpm={bpm}
               swing={swing}
               humanize={humanize}
+              isRecording={isRecording}
+              recordingTime={recordingTime}
               onPlayPause={handlePlayPause}
               onStop={handleStop}
               onBpmChange={setBpm}
               onSwingChange={setSwing}
               onHumanizeChange={setHumanize}
+              onRecordStart={startRecording}
+              onRecordStop={stopRecording}
             />
             <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
           </div>

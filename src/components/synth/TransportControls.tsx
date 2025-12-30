@@ -1,18 +1,28 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Play, Pause, Square, SkipBack } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Knob } from './Knob';
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
 
 interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
   swing: number;
   humanize: number;
+  isRecording?: boolean;
+  recordingTime?: number;
   onPlayPause: () => void;
   onStop: () => void;
   onBpmChange: (bpm: number) => void;
   onSwingChange: (swing: number) => void;
   onHumanizeChange: (humanize: number) => void;
+  onRecordStart?: () => void;
+  onRecordStop?: () => void;
 }
 
 export const TransportControls = ({
@@ -20,11 +30,15 @@ export const TransportControls = ({
   bpm,
   swing,
   humanize,
+  isRecording = false,
+  recordingTime = 0,
   onPlayPause,
   onStop,
   onBpmChange,
   onSwingChange,
   onHumanizeChange,
+  onRecordStart,
+  onRecordStop,
 }: TransportControlsProps) => {
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -96,6 +110,33 @@ export const TransportControls = ({
         >
           <Square className="w-4 h-4" />
         </button>
+
+        {/* Record button */}
+        <button
+          onClick={isRecording ? onRecordStop : onRecordStart}
+          className={cn(
+            'transport-btn w-10 h-10 transition-colors',
+            isRecording && 'bg-destructive/20 border-destructive'
+          )}
+          title={isRecording ? 'Stop Recording' : 'Start Recording'}
+        >
+          <Circle 
+            className={cn(
+              'w-4 h-4 transition-colors',
+              isRecording ? 'fill-destructive text-destructive animate-pulse' : 'text-destructive'
+            )} 
+          />
+        </button>
+        
+        {/* Recording time display */}
+        {isRecording && (
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-destructive/10 border border-destructive/30">
+            <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+            <span className="text-sm font-mono text-destructive tabular-nums">
+              {formatTime(recordingTime)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Divider */}
