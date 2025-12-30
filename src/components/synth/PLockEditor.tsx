@@ -168,6 +168,45 @@ export const PLockEditor = ({
               )}
             </div>
           </div>
+          
+          {/* Micro-Timing Slider */}
+          <div className="pt-2 border-t border-border">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">Micro-Timing</span>
+              <span className="text-xs font-mono text-foreground">
+                {localPLocks.microTiming !== undefined 
+                  ? `${localPLocks.microTiming > 0 ? '+' : ''}${localPLocks.microTiming}ms` 
+                  : '0ms'}
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="range"
+                min={-50}
+                max={50}
+                step={1}
+                value={localPLocks.microTiming ?? 0}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (value === 0) {
+                    clearPLock('microTiming');
+                  } else {
+                    handlePLockChange('microTiming', value);
+                  }
+                }}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-muted"
+                style={{
+                  background: `linear-gradient(to right, 
+                    hsl(var(--muted)) 0%, 
+                    hsl(var(--muted)) 50%, 
+                    hsl(var(--muted)) 100%)`
+                }}
+              />
+              <div 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-3 bg-primary/50"
+              />
+            </div>
+          </div>
 
           {/* Acid 303 Toggles */}
           {showAcid && (

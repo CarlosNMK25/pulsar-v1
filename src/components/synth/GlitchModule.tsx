@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Zap, Radio, Square, Disc } from 'lucide-react';
+import { Zap, Radio, Square, Disc, Sparkles } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
   glitchEngine, 
-  GlitchParams, 
   StutterParams, 
   BitcrushParams 
 } from '@/audio/GlitchEngine';
@@ -18,6 +17,7 @@ interface GlitchModuleProps {
 export const GlitchModule = ({ className }: GlitchModuleProps) => {
   const [muted, setMuted] = useState(true);
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
+  const [chaosEnabled, setChaosEnabled] = useState(false);
   
   const [stutterParams, setStutterParams] = useState<StutterParams>({
     active: false,
@@ -32,11 +32,20 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
     bits: 8,
     sampleRate: 50,
   });
+  
+  const [chaosParams, setChaosParams] = useState({
+    density: 30,
+    intensity: 50,
+  });
 
   const handleMuteToggle = () => {
     const newMuted = !muted;
     setMuted(newMuted);
     glitchEngine.setBypass(newMuted);
+    if (newMuted && chaosEnabled) {
+      setChaosEnabled(false);
+      glitchEngine.stopChaos();
+    }
   };
 
   const handleStutterTrigger = () => {
@@ -58,6 +67,29 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
     setActiveEffect('freeze');
     glitchEngine.triggerGranularFreeze();
     setTimeout(() => setActiveEffect(null), 300);
+  };
+  
+  const handleBitcrushTrigger = () => {
+    if (muted) return;
+    setActiveEffect('crush');
+    glitchEngine.triggerBitcrush();
+    setTimeout(() => setActiveEffect(null), 500);
+  };
+  
+  const handleChaosToggle = () => {
+    if (muted) return;
+    const newEnabled = !chaosEnabled;
+    setChaosEnabled(newEnabled);
+    
+    if (newEnabled) {
+      glitchEngine.setChaosParams({
+        enabled: true,
+        density: chaosParams.density / 100,
+        intensity: chaosParams.intensity / 100,
+      });
+    } else {
+      glitchEngine.stopChaos();
+    }
   };
 
   const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
@@ -118,8 +150,12 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleBitcrushTrigger}
             disabled={muted}
-            className="h-10 flex flex-col items-center justify-center gap-1"
+            className={cn(
+              'h-10 flex flex-col items-center justify-center gap-1',
+              activeEffect === 'crush' && 'bg-primary/20 border-primary'
+            )}
           >
             <Zap className="w-4 h-4" />
             <span className="text-[10px]">Crush</span>
@@ -207,6 +243,59 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
               label="Crush"
               size="sm"
               variant={muted ? 'secondary' : 'accent'}
+            />
+          </div>
+        </div>
+        
+        {/* Chaos Mode Section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-label text-muted-foreground flex items-center gap-2">
+              <span className={cn(
+                'w-1.5 h-1.5 rounded-full',
+                chaosEnabled ? 'bg-destructive animate-pulse' : 'bg-muted-foreground/60'
+              )} />
+              Chaos Mode
+            </div>
+            <Button
+              variant={chaosEnabled ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={handleChaosToggle}
+              disabled={muted}
+              className={cn(
+                'h-7 px-3',
+                chaosEnabled && 'animate-pulse'
+              )}
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              {chaosEnabled ? 'Active' : 'Enable'}
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Knob
+              value={chaosParams.density}
+              onChange={(v) => {
+                setChaosParams(prev => ({ ...prev, density: v }));
+                if (chaosEnabled) {
+                  glitchEngine.setChaosParams({ density: v / 100 });
+                }
+              }}
+              label="Density"
+              size="sm"
+              variant={muted ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            />
+            <Knob
+              value={chaosParams.intensity}
+              onChange={(v) => {
+                setChaosParams(prev => ({ ...prev, intensity: v }));
+                if (chaosEnabled) {
+                  glitchEngine.setChaosParams({ intensity: v / 100 });
+                }
+              }}
+              label="Intensity"
+              size="sm"
+              variant={muted ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
             />
           </div>
         </div>
