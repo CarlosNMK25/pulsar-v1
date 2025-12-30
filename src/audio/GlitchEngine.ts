@@ -187,12 +187,12 @@ export class GlitchEngine {
 
   // Trigger effects (for momentary activation)
   triggerStutter(duration?: number): void {
-    if (this.bypass || !this.stutterGain) return;
+    if (this.bypass || !this.stutterGain || !this.wetNode || !this.dryNode) return;
     
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
-    // Get division in ms based on current BPM (assuming 120 BPM for now)
+    // Get division in seconds based on current BPM
     const bpm = 120; // TODO: Get from scheduler
     const divisionMap = {
       '1/4': 60 / bpm,
@@ -204,30 +204,92 @@ export class GlitchEngine {
     const stutterTime = divisionMap[this.params.stutter.division];
     
     // Create stutter effect
-    const stutterDuration = duration || stutterTime * 4;
+    const stutterDuration = duration || stutterTime * 8;
     const numStutters = Math.floor(stutterDuration / stutterTime);
     
+    // Activate wet signal for the effect
+    this.wetNode.gain.cancelScheduledValues(now);
+    this.dryNode.gain.cancelScheduledValues(now);
+    this.wetNode.gain.setValueAtTime(this.params.stutter.mix, now);
+    this.dryNode.gain.setValueAtTime(1 - this.params.stutter.mix * 0.5, now);
+    
+    // Schedule stutter gates
+    this.stutterGain.gain.cancelScheduledValues(now);
     for (let i = 0; i < numStutters; i++) {
       const time = now + (i * stutterTime);
-      this.stutterGain.gain.setValueAtTime(1, time);
-      this.stutterGain.gain.setValueAtTime(0, time + stutterTime * 0.1);
-      this.stutterGain.gain.linearRampToValueAtTime(
-        1 - (this.params.stutter.decay * i / numStutters),
-        time + stutterTime * 0.9
-      );
+      const decayFactor = 1 - (this.params.stutter.decay * i / numStutters);
+      
+      // Gate on
+      this.stutterGain.gain.setValueAtTime(decayFactor, time);
+      // Gate off (short silence)
+      this.stutterGain.gain.setValueAtTime(0, time + stutterTime * 0.15);
+      // Fade back in
+      this.stutterGain.gain.linearRampToValueAtTime(decayFactor * 0.8, time + stutterTime * 0.85);
     }
+    
+    // Return to dry after effect
+    const endTime = now + stutterDuration + 0.05;
+    this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
+    this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
+    this.stutterGain.gain.setValueAtTime(1, endTime);
+    
+    console.log('[GlitchEngine] Stutter triggered:', numStutters, 'stutters over', stutterDuration.toFixed(2), 's');
   }
 
   triggerTapeStop(): void {
-    if (this.bypass) return;
-    // Tape stop would need a more complex implementation with pitch shifting
-    console.log('[GlitchEngine] Tape stop triggered');
+    if (this.bypass || !this.outputNode) return;
+    
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const duration = 0.3 + (this.params.tapeStop.duration * 1.2);
+    
+    // Simulate tape stop with exponential fade out
+    this.outputNode.gain.cancelScheduledValues(now);
+    this.outputNode.gain.setValueAtTime(1, now);
+    this.outputNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    
+    // Restore after effect
+    this.outputNode.gain.setValueAtTime(0, now + duration);
+    this.outputNode.gain.linearRampToValueAtTime(1, now + duration + 0.15);
+    
+    console.log('[GlitchEngine] Tape stop triggered, duration:', duration.toFixed(2), 's');
   }
 
   triggerGranularFreeze(): void {
-    if (this.bypass) return;
-    // Granular freeze would need audio buffer recording
-    console.log('[GlitchEngine] Granular freeze triggered');
+    if (this.bypass || !this.wetNode || !this.dryNode || !this.stutterGain) return;
+    
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const freezeDuration = 0.5 + (this.params.granularFreeze.grainSize * 1.5);
+    
+    // Simulate freeze with rapid micro-stutters (granular-like)
+    const grainTime = 0.02 + (this.params.granularFreeze.grainSize * 0.08);
+    const numGrains = Math.floor(freezeDuration / grainTime);
+    
+    // Activate wet
+    this.wetNode.gain.cancelScheduledValues(now);
+    this.dryNode.gain.cancelScheduledValues(now);
+    this.wetNode.gain.setValueAtTime(this.params.granularFreeze.mix, now);
+    this.dryNode.gain.setValueAtTime(0.3, now);
+    
+    // Rapid grain-like gates
+    this.stutterGain.gain.cancelScheduledValues(now);
+    for (let i = 0; i < numGrains; i++) {
+      const time = now + (i * grainTime);
+      const spreadRandom = 1 - (Math.random() * this.params.granularFreeze.spread * 0.5);
+      
+      this.stutterGain.gain.setValueAtTime(spreadRandom, time);
+      this.stutterGain.gain.setValueAtTime(0, time + grainTime * 0.3);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + grainTime * 0.9);
+    }
+    
+    // Return to normal
+    const endTime = now + freezeDuration + 0.05;
+    this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
+    this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
+    this.stutterGain.gain.setValueAtTime(1, endTime);
+    
+    console.log('[GlitchEngine] Freeze triggered:', numGrains, 'grains over', freezeDuration.toFixed(2), 's');
   }
 
   private updateMix(): void {
