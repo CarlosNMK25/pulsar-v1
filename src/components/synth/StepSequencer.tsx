@@ -1,6 +1,8 @@
 import { cn } from '@/lib/utils';
+import { EuclideanControls } from './EuclideanControls';
+import { PatternLengthSelector } from './PatternLengthSelector';
 
-interface Step {
+export interface Step {
   active: boolean;
   velocity: number;
   probability: number;
@@ -11,6 +13,11 @@ interface StepSequencerProps {
   currentStep: number;
   onStepToggle: (index: number) => void;
   onStepVelocity?: (index: number, velocity: number) => void;
+  onPatternGenerate?: (steps: Step[]) => void;
+  onLengthChange?: (length: number) => void;
+  patternLength?: number;
+  showControls?: boolean;
+  showLengthSelector?: boolean;
   label?: string;
   variant?: 'primary' | 'secondary' | 'muted';
 }
@@ -19,34 +26,48 @@ export const StepSequencer = ({
   steps,
   currentStep,
   onStepToggle,
+  onPatternGenerate,
+  onLengthChange,
+  patternLength,
+  showControls = false,
+  showLengthSelector = false,
   label,
   variant = 'primary',
 }: StepSequencerProps) => {
-  const getStepColor = (step: Step, index: number) => {
-    if (!step.active) return 'bg-muted hover:bg-muted-foreground/20';
-    
-    const colors = {
-      primary: 'bg-primary',
-      secondary: 'bg-secondary',
-      muted: 'bg-muted-foreground',
-    };
-    
-    // Vary opacity by velocity
-    const opacity = 0.5 + (step.velocity / 127) * 0.5;
-    
-    return cn(colors[variant], `opacity-${Math.round(opacity * 100)}`);
-  };
+  // Use patternLength if provided, otherwise use steps.length
+  const displayLength = patternLength ?? steps.length;
+  const displaySteps = steps.slice(0, displayLength);
+  
+  // Calculate group indicators based on pattern length
+  const numGroups = Math.ceil(displayLength / 4);
+  const currentGroup = Math.floor(currentStep / 4);
 
   return (
     <div className="space-y-2">
       {label && (
         <div className="flex items-center justify-between">
-          <span className="text-label">{label}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-label">{label}</span>
+            {showLengthSelector && onLengthChange && (
+              <PatternLengthSelector
+                length={displayLength}
+                onChange={onLengthChange}
+                variant={variant}
+              />
+            )}
+            {showControls && onPatternGenerate && (
+              <EuclideanControls
+                onPatternGenerate={onPatternGenerate}
+                patternLength={displayLength}
+                variant={variant}
+              />
+            )}
+          </div>
           <div className="flex gap-1">
-            {[0, 1, 2, 3].map((group) => (
+            {Array.from({ length: Math.min(numGroups, 8) }).map((_, group) => (
               <div key={group} className={cn(
                 'w-1.5 h-1.5 rounded-full',
-                Math.floor(currentStep / 4) === group ? 'bg-primary' : 'bg-muted'
+                currentGroup === group && currentStep < displayLength ? 'bg-primary' : 'bg-muted'
               )} />
             ))}
           </div>
@@ -54,13 +75,14 @@ export const StepSequencer = ({
       )}
       
       <div className="flex gap-1">
-        {steps.map((step, index) => (
+        {displaySteps.map((step, index) => (
           <button
             key={index}
             onClick={() => onStepToggle(index)}
             className={cn(
               'relative flex-1 aspect-square rounded transition-all duration-75',
               'hover:scale-105 active:scale-95',
+              'min-w-0', // Allow steps to shrink for longer patterns
               step.active ? (
                 variant === 'primary' 
                   ? 'bg-primary shadow-glow-sm' 
@@ -68,7 +90,7 @@ export const StepSequencer = ({
                     ? 'bg-secondary'
                     : 'bg-muted-foreground'
               ) : 'bg-muted hover:bg-muted/80',
-              currentStep === index && 'ring-2 ring-foreground/50',
+              currentStep === index && currentStep < displayLength && 'ring-2 ring-foreground/50',
               // Accent every 4th step
               index % 4 === 0 && !step.active && 'bg-muted/80'
             )}
