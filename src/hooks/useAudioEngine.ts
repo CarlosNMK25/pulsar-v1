@@ -16,6 +16,7 @@ interface Step {
 interface UseAudioEngineProps {
   isPlaying: boolean;
   bpm: number;
+  swing: number;
   kickSteps: Step[];
   snareSteps: Step[];
   hatSteps: Step[];
@@ -27,7 +28,16 @@ interface UseAudioEngineProps {
     attack: number;
     release: number;
     detune: number;
+    lfoRate: number;
   };
+  synthMuted: boolean;
+  drumParams: {
+    pitch: number;
+    decay: number;
+    drive: number;
+    mix: number;
+  };
+  drumMuted: boolean;
   textureParams: {
     density: number;
     spread: number;
@@ -57,11 +67,15 @@ const synthNotes = [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82, 
 export const useAudioEngine = ({
   isPlaying,
   bpm,
+  swing,
   kickSteps,
   snareSteps,
   hatSteps,
   synthSteps,
   synthParams,
+  synthMuted,
+  drumParams,
+  drumMuted,
   textureParams,
   textureMuted,
   reverbParams,
@@ -152,6 +166,11 @@ export const useAudioEngine = ({
     }
   }, [bpm, isInitialized]);
 
+  // Update Swing
+  useEffect(() => {
+    scheduler.setSwing(swing / 100);
+  }, [swing]);
+
   // Update synth parameters
   useEffect(() => {
     if (!synthRef.current) return;
@@ -163,8 +182,27 @@ export const useAudioEngine = ({
       attack: 0.001 + (synthParams.attack / 100) * 0.5,
       release: 0.05 + (synthParams.release / 100) * 1,
       detune: (synthParams.detune / 100) * 50,
+      lfoRate: synthParams.lfoRate,
     });
   }, [synthParams]);
+
+  // Update synth mute
+  useEffect(() => {
+    if (!synthRef.current) return;
+    synthRef.current.setMuted(synthMuted);
+  }, [synthMuted]);
+
+  // Update drum parameters
+  useEffect(() => {
+    if (!drumRef.current) return;
+    drumRef.current.setParams(drumParams);
+  }, [drumParams]);
+
+  // Update drum mute
+  useEffect(() => {
+    if (!drumRef.current) return;
+    drumRef.current.setMuted(drumMuted);
+  }, [drumMuted]);
 
   // Update texture parameters
   useEffect(() => {

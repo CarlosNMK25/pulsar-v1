@@ -7,6 +7,9 @@ interface DrumSound {
 
 interface DrumParams {
   decay: number;  // 0-1, multiplies envelope duration
+  pitch: number;  // 0-100, affects base pitch
+  drive: number;  // 0-100, saturation
+  mix: number;    // 0-100, output mix
 }
 
 export class DrumEngine {
@@ -14,8 +17,9 @@ export class DrumEngine {
   private reverbSend: GainNode;
   private delaySend: GainNode;
   private sounds: Map<string, DrumSound> = new Map();
-  private params: DrumParams = { decay: 0.5 };
+  private params: DrumParams = { decay: 50, pitch: 50, drive: 30, mix: 75 };
   private fxConnected = false;
+  private muted = false;
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -45,6 +49,13 @@ export class DrumEngine {
 
   setParams(params: Partial<DrumParams>): void {
     this.params = { ...this.params, ...params };
+    // Update output gain based on mix parameter
+    const ctx = audioEngine.getContext();
+    this.outputGain.gain.setTargetAtTime((this.params.mix / 100) * 0.6, ctx.currentTime, 0.05);
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
   }
 
   setFXSend(reverb: number, delay: number): void {
@@ -209,9 +220,14 @@ export class DrumEngine {
   }
 
   trigger(sound: 'kick' | 'snare' | 'hat', velocity: number = 100): void {
+    if (this.muted) return;
     const drum = this.sounds.get(sound);
     if (drum) {
-      drum.play(velocity, this.params.decay);
+      // Apply pitch and drive modifiers
+      const pitchMod = 0.5 + (this.params.pitch / 100); // 0.5-1.5 multiplier
+      const driveMod = 1 + (this.params.drive / 100) * 0.5; // 1-1.5 velocity boost
+      const modVelocity = Math.min(127, velocity * driveMod);
+      drum.play(modVelocity, this.params.decay / 100);
     }
   }
 

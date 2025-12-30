@@ -43,16 +43,20 @@ const createInitialSteps = (pattern: number[]) =>
 const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
+  const [swing, setSwing] = useState(0);
   const [activeScene, setActiveScene] = useState('a');
   const [macros, setMacros] = useState(initialMacros);
 
-  // Drum steps
+  // Drum steps and params
   const [kickSteps, setKickSteps] = useState(() => createInitialSteps([0, 4, 8, 12]));
   const [snareSteps, setSnareSteps] = useState(() => createInitialSteps([4, 12]));
   const [hatSteps, setHatSteps] = useState(() => createInitialSteps([0, 2, 4, 6, 8, 10, 12, 14]));
+  const [drumParams, setDrumParams] = useState({ pitch: 50, decay: 60, drive: 30, mix: 75 });
+  const [drumMuted, setDrumMuted] = useState(false);
 
   // Synth steps and params
   const [synthSteps, setSynthSteps] = useState(() => createInitialSteps([0, 3, 6, 8, 10, 12, 14]));
+  const [synthMuted, setSynthMuted] = useState(false);
   const [synthParams, setSynthParams] = useState({
     waveform: 'saw' as WaveformType,
     cutoff: 65,
@@ -100,11 +104,15 @@ const Index = () => {
   } = useAudioEngine({
     isPlaying,
     bpm,
+    swing,
     kickSteps,
     snareSteps,
     hatSteps,
     synthSteps,
     synthParams,
+    synthMuted,
+    drumParams,
+    drumMuted,
     textureParams,
     textureMuted,
     reverbParams,
@@ -165,9 +173,11 @@ const Index = () => {
             <TransportControls
               isPlaying={isPlaying}
               bpm={bpm}
+              swing={swing}
               onPlayPause={handlePlayPause}
               onStop={handleStop}
               onBpmChange={setBpm}
+              onSwingChange={setSwing}
             />
             <div className="lg:col-span-2">
               <WaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
@@ -184,6 +194,10 @@ const Index = () => {
               onKickChange={setKickSteps}
               onSnareChange={setSnareSteps}
               onHatChange={setHatSteps}
+              params={drumParams}
+              onParamsChange={setDrumParams}
+              muted={drumMuted}
+              onMuteToggle={() => setDrumMuted(!drumMuted)}
             />
             <SynthModule 
               currentStep={currentStep}
@@ -191,6 +205,8 @@ const Index = () => {
               onStepsChange={setSynthSteps}
               params={synthParams}
               onParamsChange={setSynthParams}
+              muted={synthMuted}
+              onMuteToggle={() => setSynthMuted(!synthMuted)}
             />
             <TextureModule 
               isPlaying={isPlaying}

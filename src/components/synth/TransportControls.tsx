@@ -1,20 +1,25 @@
 import { Play, Pause, Square, SkipBack } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Knob } from './Knob';
 
 interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
+  swing: number;
   onPlayPause: () => void;
   onStop: () => void;
   onBpmChange: (bpm: number) => void;
+  onSwingChange: (swing: number) => void;
 }
 
 export const TransportControls = ({
   isPlaying,
   bpm,
+  swing,
   onPlayPause,
   onStop,
   onBpmChange,
+  onSwingChange,
 }: TransportControlsProps) => {
   return (
     <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-border bg-card">
@@ -79,6 +84,21 @@ export const TransportControls = ({
             +
           </button>
         </div>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px h-8 bg-border" />
+
+      {/* Swing Control */}
+      <div className="flex items-center gap-2">
+        <Knob
+          value={swing}
+          onChange={onSwingChange}
+          label="Swing"
+          size="sm"
+          showValue
+          unit="%"
+        />
       </div>
 
       {/* Play indicator */}
