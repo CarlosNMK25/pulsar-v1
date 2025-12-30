@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { CloudFog } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { cn } from '@/lib/utils';
+import { TextureMode } from '@/audio/TextureEngine';
 
 interface TextureModuleProps {
   isPlaying: boolean;
   muted: boolean;
   onMuteToggle: () => void;
+  mode: TextureMode;
+  onModeChange: (mode: TextureMode) => void;
   params: {
     density: number;
     spread: number;
@@ -23,10 +26,11 @@ export const TextureModule = ({
   isPlaying, 
   muted, 
   onMuteToggle,
+  mode,
+  onModeChange,
   params,
   onParamsChange,
 }: TextureModuleProps) => {
-  const [mode, setMode] = useState<'noise' | 'granular' | 'drone'>('granular');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
 
@@ -43,6 +47,13 @@ export const TextureModule = ({
 
     const particles: Array<{ x: number; y: number; vx: number; vy: number; life: number; size: number }> = [];
 
+    // Different colors for different modes
+    const modeColors: Record<TextureMode, string> = {
+      noise: '280, 70%, 50%',    // Purple for noise
+      granular: '180, 100%, 50%', // Cyan for granular
+      drone: '30, 90%, 55%',      // Orange for drone
+    };
+
     const draw = () => {
       const { width, height } = canvas;
       
@@ -50,14 +61,26 @@ export const TextureModule = ({
       ctx.fillRect(0, 0, width, height);
 
       if (isPlaying && !muted) {
-        if (Math.random() < params.density / 100) {
+        // Different particle behavior based on mode
+        const spawnRate = mode === 'granular' 
+          ? params.density / 50 
+          : mode === 'drone' 
+            ? 0.05 
+            : params.density / 100;
+
+        if (Math.random() < spawnRate) {
+          const baseVy = mode === 'drone' ? -0.3 : -1 - Math.random() * 2;
+          const baseSize = mode === 'drone' 
+            ? 2 + (params.size / 30) * Math.random() * 5
+            : 1 + (params.size / 50) * Math.random() * 3;
+
           particles.push({
             x: Math.random() * width,
             y: height,
             vx: (Math.random() - 0.5) * (params.spread / 25),
-            vy: -1 - Math.random() * 2,
+            vy: baseVy,
             life: 1,
-            size: 1 + (params.size / 50) * Math.random() * 3,
+            size: baseSize,
           });
         }
 
@@ -65,7 +88,7 @@ export const TextureModule = ({
           const p = particles[i];
           p.x += p.vx;
           p.y += p.vy;
-          p.life -= 0.01;
+          p.life -= mode === 'drone' ? 0.005 : 0.01;
 
           if (p.life <= 0 || p.y < 0) {
             particles.splice(i, 1);
@@ -74,7 +97,7 @@ export const TextureModule = ({
 
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = `hsla(180, 100%, 50%, ${p.life * 0.5})`;
+          ctx.fillStyle = `hsla(${modeColors[mode]}, ${p.life * 0.5})`;
           ctx.fill();
         }
       }
@@ -91,7 +114,7 @@ export const TextureModule = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, muted, params.density, params.spread, params.size]);
+  }, [isPlaying, muted, mode, params.density, params.spread, params.size]);
 
   return (
     <ModuleCard
@@ -106,7 +129,7 @@ export const TextureModule = ({
           {(['noise', 'granular', 'drone'] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => onModeChange(m)}
               className={cn(
                 'flex-1 py-1.5 text-xs uppercase tracking-wider rounded border transition-colors',
                 mode === m

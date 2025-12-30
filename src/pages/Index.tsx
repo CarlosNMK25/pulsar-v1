@@ -10,6 +10,7 @@ import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { WaveformType } from '@/audio/SynthVoice';
+import { TextureMode } from '@/audio/TextureEngine';
 
 const initialScenes = [
   { id: 'a', name: 'Init' },
@@ -69,6 +70,7 @@ const Index = () => {
 
   // Texture params
   const [textureMuted, setTextureMuted] = useState(false);
+  const [textureMode, setTextureMode] = useState<TextureMode>('granular');
   const [textureParams, setTextureParams] = useState({
     density: 45,
     spread: 60,
@@ -115,6 +117,7 @@ const Index = () => {
     drumMuted,
     textureParams,
     textureMuted,
+    textureMode,
     reverbParams,
     delayParams,
   });
@@ -212,6 +215,8 @@ const Index = () => {
               isPlaying={isPlaying}
               muted={textureMuted}
               onMuteToggle={() => setTextureMuted(!textureMuted)}
+              mode={textureMode}
+              onModeChange={setTextureMode}
               params={textureParams}
               onParamsChange={setTextureParams}
             />

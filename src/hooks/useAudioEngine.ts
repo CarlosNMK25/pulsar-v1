@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { audioEngine } from '@/audio/AudioEngine';
 import { SynthVoice, WaveformType } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
-import { TextureEngine } from '@/audio/TextureEngine';
+import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
 import { fxEngine } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
@@ -47,6 +47,7 @@ interface UseAudioEngineProps {
     mix: number;
   };
   textureMuted: boolean;
+  textureMode: TextureMode;
   reverbParams: {
     size: number;
     decay: number;
@@ -78,6 +79,7 @@ export const useAudioEngine = ({
   drumMuted,
   textureParams,
   textureMuted,
+  textureMode,
   reverbParams,
   delayParams,
 }: UseAudioEngineProps) => {
@@ -217,6 +219,12 @@ export const useAudioEngine = ({
       mix: textureParams.mix / 100,
     });
   }, [textureParams]);
+
+  // Update texture mode
+  useEffect(() => {
+    if (!textureRef.current) return;
+    textureRef.current.setMode(textureMode);
+  }, [textureMode]);
 
   // Update FX parameters
   useEffect(() => {
