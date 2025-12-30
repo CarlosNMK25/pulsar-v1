@@ -124,6 +124,24 @@ export const StepSequencer = ({
                 opacity: step.active ? 0.5 + (step.velocity / 127) * 0.5 : 1,
               }}
             >
+              {/* Micro-timing indicator - shows timing offset visually */}
+              {step.active && step.pLocks?.microTiming !== undefined && step.pLocks.microTiming !== 0 && (
+                <div 
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1 flex items-center justify-center"
+                  title={`Micro-timing: ${step.pLocks.microTiming > 0 ? '+' : ''}${step.pLocks.microTiming}ms`}
+                >
+                  <div 
+                    className="h-0.5 bg-cyan-400 rounded-full transition-all"
+                    style={{
+                      width: `${Math.abs(step.pLocks.microTiming)}%`,
+                      marginLeft: step.pLocks.microTiming > 0 ? '50%' : undefined,
+                      marginRight: step.pLocks.microTiming < 0 ? '50%' : undefined,
+                      transformOrigin: step.pLocks.microTiming > 0 ? 'left' : 'right',
+                    }}
+                  />
+                </div>
+              )}
+              
               {/* P-Lock indicator */}
               {step.active && hasPLocks(step) && (
                 <div 
