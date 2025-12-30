@@ -8,10 +8,16 @@ interface KnobProps {
   onChange: (value: number) => void;
   label?: string;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'accent';
   showValue?: boolean;
   unit?: string;
 }
+
+const variantColors = {
+  primary: 'hsl(var(--primary))',
+  secondary: 'hsl(var(--secondary))',
+  accent: 'hsl(var(--accent))',
+};
 
 const sizeClasses = {
   sm: 'w-10 h-10',
@@ -76,7 +82,8 @@ export function Knob({
           sizeClasses[size],
           isDragging && 'cursor-grabbing scale-105',
           isDragging && variant === 'primary' && 'ring-2 ring-primary/50',
-          isDragging && variant === 'secondary' && 'ring-2 ring-secondary/50'
+          isDragging && variant === 'secondary' && 'ring-2 ring-secondary/50',
+          isDragging && variant === 'accent' && 'ring-2 ring-accent/50'
         )}
         onMouseDown={handleMouseDown}
       >
@@ -100,17 +107,13 @@ export function Knob({
             cy="50%"
             r="45%"
             fill="none"
-            stroke={variant === 'primary' ? 'hsl(var(--primary))' : 'hsl(var(--secondary))'}
+            stroke={variantColors[variant]}
             strokeWidth="2"
             strokeDasharray={`${((value - min) / (max - min)) * 270 * 0.9} 360`}
             strokeLinecap="round"
             className="transition-all duration-75"
             style={{
-              filter: isDragging 
-                ? variant === 'primary' 
-                  ? 'drop-shadow(0 0 4px hsl(var(--primary)))' 
-                  : 'drop-shadow(0 0 4px hsl(var(--secondary)))'
-                : 'none'
+              filter: isDragging ? `drop-shadow(0 0 4px ${variantColors[variant]})` : 'none'
             }}
           />
         </svg>
@@ -120,17 +123,15 @@ export function Knob({
           className={cn(
             'absolute rounded-full transition-all duration-75',
             indicatorSizes[size],
-            variant === 'primary' ? 'bg-primary' : 'bg-secondary'
+            variant === 'primary' && 'bg-primary',
+            variant === 'secondary' && 'bg-secondary',
+            variant === 'accent' && 'bg-accent'
           )}
           style={{
             transform: `rotate(${normalizedValue}deg)`,
             transformOrigin: 'center 200%',
             top: '15%',
-            boxShadow: isDragging 
-              ? variant === 'primary'
-                ? '0 0 8px hsl(var(--primary))'
-                : '0 0 8px hsl(var(--secondary))'
-              : 'none'
+            boxShadow: isDragging ? `0 0 8px ${variantColors[variant]}` : 'none'
           }}
         />
       </div>
