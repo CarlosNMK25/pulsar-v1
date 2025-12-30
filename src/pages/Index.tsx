@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from '@/components/synth/Header';
 import { TransportControls } from '@/components/synth/TransportControls';
-import { WaveformDisplay } from '@/components/synth/WaveformDisplay';
+import { GlitchWaveformDisplay } from '@/components/synth/GlitchWaveformDisplay';
 import { DrumModule } from '@/components/synth/DrumModule';
 import { SynthModule } from '@/components/synth/SynthModule';
 import { TextureModule } from '@/components/synth/TextureModule';
@@ -539,7 +539,7 @@ const Index = () => {
               onHumanizeChange={setHumanize}
             />
             <div className="lg:col-span-2">
-              <WaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
+              <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
             </div>
           </div>
 
