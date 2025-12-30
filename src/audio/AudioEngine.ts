@@ -1,5 +1,5 @@
 // Core audio engine singleton
-export type GlitchTarget = 'master' | 'drums' | 'synth' | 'texture';
+export type GlitchTarget = 'master' | 'drums' | 'synth' | 'texture' | 'sample';
 
 class AudioEngine {
   private static instance: AudioEngine;
@@ -15,6 +15,7 @@ class AudioEngine {
   private drumsGlitchBus: GainNode | null = null;
   private synthGlitchBus: GainNode | null = null;
   private textureGlitchBus: GainNode | null = null;
+  private sampleGlitchBus: GainNode | null = null;
 
   private constructor() {}
 
@@ -40,6 +41,9 @@ class AudioEngine {
     this.textureGlitchBus = this.audioContext.createGain();
     this.textureGlitchBus.gain.value = 1;
     
+    this.sampleGlitchBus = this.audioContext.createGain();
+    this.sampleGlitchBus.gain.value = 1;
+    
     // Create master chain: trackBuses -> masterGain -> limiter -> analyser -> destination
     this.masterGain = this.audioContext.createGain();
     this.masterGain.gain.value = 0.8;
@@ -48,6 +52,7 @@ class AudioEngine {
     this.drumsGlitchBus.connect(this.masterGain);
     this.synthGlitchBus.connect(this.masterGain);
     this.textureGlitchBus.connect(this.masterGain);
+    this.sampleGlitchBus.connect(this.masterGain);
 
     // Limiter to prevent clipping
     this.masterLimiter = this.audioContext.createDynamicsCompressor();
@@ -86,8 +91,8 @@ class AudioEngine {
     console.log('[AudioEngine] Glitch engine inserted into master chain');
   }
 
-  // Get track bus for routing (drums, synth, texture connect here instead of masterGain)
-  getTrackBus(track: 'drums' | 'synth' | 'texture'): GainNode {
+  // Get track bus for routing (drums, synth, texture, sample connect here instead of masterGain)
+  getTrackBus(track: 'drums' | 'synth' | 'texture' | 'sample'): GainNode {
     if (!this.isInitialized) {
       throw new Error('AudioEngine not initialized. Call init() first.');
     }
@@ -98,11 +103,13 @@ class AudioEngine {
         return this.synthGlitchBus!;
       case 'texture':
         return this.textureGlitchBus!;
+      case 'sample':
+        return this.sampleGlitchBus!;
     }
   }
 
   // Insert track-specific glitch engine
-  insertTrackGlitch(track: 'drums' | 'synth' | 'texture', glitchInput: GainNode, glitchOutput: GainNode): void {
+  insertTrackGlitch(track: 'drums' | 'synth' | 'texture' | 'sample', glitchInput: GainNode, glitchOutput: GainNode): void {
     if (!this.masterGain) return;
     
     const trackBus = this.getTrackBus(track);

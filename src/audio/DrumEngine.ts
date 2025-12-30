@@ -17,6 +17,7 @@ export class DrumEngine {
   private reverbSend: GainNode;
   private delaySend: GainNode;
   private sounds: Map<string, DrumSound> = new Map();
+  private loadedSamples: Map<string, AudioBuffer> = new Map();
   private params: DrumParams = { decay: 50, pitch: 50, drive: 30, mix: 75 };
   private fxConnected = false;
   private muted = false;
@@ -222,6 +223,15 @@ export class DrumEngine {
 
   trigger(sound: 'kick' | 'snare' | 'hat', velocity: number = 100): void {
     if (this.muted) return;
+    
+    // Check for loaded sample first
+    const sampleBuffer = this.loadedSamples.get(sound);
+    if (sampleBuffer) {
+      this.playSample(sampleBuffer, velocity);
+      return;
+    }
+    
+    // Fall back to synthesis
     const drum = this.sounds.get(sound);
     if (drum) {
       // Apply pitch and drive modifiers
@@ -230,6 +240,48 @@ export class DrumEngine {
       const modVelocity = Math.min(127, velocity * driveMod);
       drum.play(modVelocity, this.params.decay / 100);
     }
+  }
+
+  private playSample(buffer: AudioBuffer, velocity: number): void {
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const vel = velocity / 127;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    
+    // Apply pitch modifier
+    source.playbackRate.value = 0.5 + (this.params.pitch / 100);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel * 0.8, now);
+    
+    // Apply decay envelope
+    const decayTime = 0.1 + (this.params.decay / 100) * 0.9;
+    gain.gain.setTargetAtTime(0.001, now + decayTime * 0.5, decayTime * 0.3);
+
+    source.connect(gain);
+    gain.connect(this.outputGain);
+    gain.connect(this.reverbSend);
+    gain.connect(this.delaySend);
+
+    source.start(now);
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+    };
+  }
+
+  loadSample(drumType: 'kick' | 'snare' | 'hat', buffer: AudioBuffer): void {
+    this.loadedSamples.set(drumType, buffer);
+  }
+
+  clearSample(drumType: 'kick' | 'snare' | 'hat'): void {
+    this.loadedSamples.delete(drumType);
+  }
+
+  hasSample(drumType: 'kick' | 'snare' | 'hat'): boolean {
+    return this.loadedSamples.has(drumType);
   }
 
   disconnect(): void {
