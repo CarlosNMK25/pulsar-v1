@@ -7,6 +7,7 @@ class AudioEngine {
   private masterGain: GainNode | null = null;
   private masterLimiter: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
+  private mediaStreamDestination: MediaStreamAudioDestinationNode | null = null;
   private isInitialized = false;
   private glitchInserted = false;
 
@@ -171,6 +172,26 @@ class AudioEngine {
 
   get state(): AudioContextState | 'uninitialized' {
     return this.audioContext?.state ?? 'uninitialized';
+  }
+
+  // Get MediaStreamDestination for recording
+  getMediaStreamDestination(): MediaStreamAudioDestinationNode {
+    if (!this.audioContext || !this.masterLimiter) {
+      throw new Error('AudioEngine not initialized. Call init() first.');
+    }
+    
+    if (!this.mediaStreamDestination) {
+      this.mediaStreamDestination = this.audioContext.createMediaStreamDestination();
+      // Connect after limiter to capture final output
+      this.masterLimiter.connect(this.mediaStreamDestination);
+      console.log('[AudioEngine] MediaStreamDestination created for recording');
+    }
+    
+    return this.mediaStreamDestination;
+  }
+
+  getSampleRate(): number {
+    return this.audioContext?.sampleRate ?? 44100;
   }
 }
 
