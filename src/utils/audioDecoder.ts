@@ -10,6 +10,14 @@ export interface AudioFileValidation {
   error?: string;
 }
 
+// Get a context for decoding - uses AudioEngine if initialized, otherwise creates temporary
+function getDecodingContext(): { ctx: AudioContext; isTemporary: boolean } {
+  if (audioEngine.state !== 'uninitialized') {
+    return { ctx: audioEngine.getContext(), isTemporary: false };
+  }
+  return { ctx: new AudioContext(), isTemporary: true };
+}
+
 export function validateAudioFile(file: File): AudioFileValidation {
   // Check file type
   const isValidType = SUPPORTED_TYPES.some(type => 
@@ -37,8 +45,13 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
   }
   
   const arrayBuffer = await file.arrayBuffer();
-  const ctx = audioEngine.getContext();
+  const { ctx, isTemporary } = getDecodingContext();
   const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  
+  // Close temporary context if we created one
+  if (isTemporary) {
+    ctx.close();
+  }
   
   // Trim to max duration if needed
   if (audioBuffer.duration > MAX_DURATION) {
@@ -49,7 +62,7 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
 }
 
 export function trimAudioBuffer(buffer: AudioBuffer, maxDuration: number): AudioBuffer {
-  const ctx = audioEngine.getContext();
+  const { ctx } = getDecodingContext();
   const sampleRate = buffer.sampleRate;
   const maxSamples = Math.floor(maxDuration * sampleRate);
   const channels = buffer.numberOfChannels;
@@ -67,7 +80,7 @@ export function trimAudioBuffer(buffer: AudioBuffer, maxDuration: number): Audio
 
 // Normalize audio buffer to prevent clipping
 export function normalizeBuffer(buffer: AudioBuffer): AudioBuffer {
-  const ctx = audioEngine.getContext();
+  const { ctx } = getDecodingContext();
   const channels = buffer.numberOfChannels;
   const length = buffer.length;
   
