@@ -16,19 +16,20 @@ interface DelayParams {
 }
 
 export class FXEngine {
-  private static instance: FXEngine;
+  private static instance: FXEngine | null = null;
+  private initialized = false;
   
   // Reverb nodes
   private reverbConvolver: ConvolverNode | null = null;
-  private reverbGain: GainNode;
-  private reverbInput: GainNode;
+  private reverbGain: GainNode | null = null;
+  private reverbInput: GainNode | null = null;
   
   // Delay nodes
-  private delayNode: DelayNode;
-  private delayFeedback: GainNode;
-  private delayFilter: BiquadFilterNode;
-  private delayGain: GainNode;
-  private delayInput: GainNode;
+  private delayNode: DelayNode | null = null;
+  private delayFeedback: GainNode | null = null;
+  private delayFilter: BiquadFilterNode | null = null;
+  private delayGain: GainNode | null = null;
+  private delayInput: GainNode | null = null;
   
   // Parameters
   private reverbParams: ReverbParams = {
@@ -46,6 +47,19 @@ export class FXEngine {
   };
 
   private constructor() {
+    // Don't initialize audio here - wait for init() call
+  }
+
+  static getInstance(): FXEngine {
+    if (!FXEngine.instance) {
+      FXEngine.instance = new FXEngine();
+    }
+    return FXEngine.instance;
+  }
+
+  private ensureInitialized(): void {
+    if (this.initialized) return;
+    
     const ctx = audioEngine.getContext();
     
     // === REVERB SETUP ===
@@ -80,14 +94,8 @@ export class FXEngine {
     this.delayFilter.connect(this.delayGain);
     this.delayGain.connect(audioEngine.getMasterGain());
     
+    this.initialized = true;
     console.log('[FXEngine] Initialized');
-  }
-
-  static getInstance(): FXEngine {
-    if (!FXEngine.instance) {
-      FXEngine.instance = new FXEngine();
-    }
-    return FXEngine.instance;
   }
 
   private createReverbImpulse(): void {
@@ -136,14 +144,17 @@ export class FXEngine {
 
   // Get send nodes for instruments to connect to
   getReverbSend(): GainNode {
-    return this.reverbInput;
+    this.ensureInitialized();
+    return this.reverbInput!;
   }
 
   getDelaySend(): GainNode {
-    return this.delayInput;
+    this.ensureInitialized();
+    return this.delayInput!;
   }
 
   setReverbParams(params: Partial<ReverbParams>): void {
+    if (!this.initialized) return;
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     const needsNewImpulse = 
@@ -154,7 +165,7 @@ export class FXEngine {
     this.reverbParams = { ...this.reverbParams, ...params };
     
     // Update mix immediately
-    if (params.mix !== undefined) {
+    if (params.mix !== undefined && this.reverbGain) {
       this.reverbGain.gain.setTargetAtTime(params.mix * 0.5, now, 0.05);
     }
     
@@ -166,29 +177,30 @@ export class FXEngine {
   }
 
   setDelayParams(params: Partial<DelayParams>): void {
+    if (!this.initialized) return;
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
     this.delayParams = { ...this.delayParams, ...params };
     
-    if (params.time !== undefined) {
+    if (params.time !== undefined && this.delayNode) {
       // Map 0-1 to 0.05-1.0 seconds
       const delayTime = 0.05 + params.time * 0.95;
       this.delayNode.delayTime.setTargetAtTime(delayTime, now, 0.05);
     }
     
-    if (params.feedback !== undefined) {
+    if (params.feedback !== undefined && this.delayFeedback) {
       // Clamp feedback to prevent runaway
       const safeFeedback = Math.min(params.feedback, 0.9);
       this.delayFeedback.gain.setTargetAtTime(safeFeedback, now, 0.05);
     }
     
-    if (params.filter !== undefined) {
+    if (params.filter !== undefined && this.delayFilter) {
       const freq = 500 + params.filter * 7500;
       this.delayFilter.frequency.setTargetAtTime(freq, now, 0.05);
     }
     
-    if (params.mix !== undefined) {
+    if (params.mix !== undefined && this.delayGain) {
       this.delayGain.gain.setTargetAtTime(params.mix * 0.5, now, 0.05);
     }
   }
@@ -203,6 +215,8 @@ export class FXEngine {
 
   // Sync delay time to BPM
   syncDelayToBpm(bpm: number, division: '1/4' | '1/8' | '1/16' | '3/16' = '3/16'): void {
+    if (!this.initialized || !this.delayNode) return;
+    
     const beatDuration = 60 / bpm;
     let delayTime: number;
     
@@ -223,27 +237,28 @@ export class FXEngine {
   }
 
   setBypass(effect: 'reverb' | 'delay' | 'all', bypass: boolean): void {
+    if (!this.initialized) return;
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
-    const value = bypass ? 0 : (effect === 'reverb' ? this.reverbParams.mix * 0.5 : this.delayParams.mix * 0.5);
     
-    if (effect === 'reverb' || effect === 'all') {
+    if ((effect === 'reverb' || effect === 'all') && this.reverbGain) {
       this.reverbGain.gain.setTargetAtTime(bypass ? 0 : this.reverbParams.mix * 0.5, now, 0.05);
     }
-    if (effect === 'delay' || effect === 'all') {
+    if ((effect === 'delay' || effect === 'all') && this.delayGain) {
       this.delayGain.gain.setTargetAtTime(bypass ? 0 : this.delayParams.mix * 0.5, now, 0.05);
     }
   }
 
   disconnect(): void {
-    this.reverbInput.disconnect();
-    this.reverbGain.disconnect();
+    if (!this.initialized) return;
+    this.reverbInput?.disconnect();
+    this.reverbGain?.disconnect();
     this.reverbConvolver?.disconnect();
-    this.delayInput.disconnect();
-    this.delayNode.disconnect();
-    this.delayFeedback.disconnect();
-    this.delayFilter.disconnect();
-    this.delayGain.disconnect();
+    this.delayInput?.disconnect();
+    this.delayNode?.disconnect();
+    this.delayFeedback?.disconnect();
+    this.delayFilter?.disconnect();
+    this.delayGain?.disconnect();
   }
 }
 
