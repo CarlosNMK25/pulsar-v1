@@ -14,6 +14,10 @@ export class TextureEngine {
   private fxConnected = false;
   private muted = false;
 
+  // Feedback routing
+  private feedbackDelay: DelayNode;
+  private feedbackGain: GainNode;
+
   // Mode-specific nodes
   private mode: TextureMode = 'noise';
   private noiseSource: AudioBufferSourceNode | null = null;
@@ -22,6 +26,7 @@ export class TextureEngine {
   private droneOscillators: OscillatorNode[] = [];
   private droneLFOs: OscillatorNode[] = [];
   private droneGains: GainNode[] = [];
+  private droneLFOGains: GainNode[] = [];
 
   private params = {
     density: 0.5,
@@ -46,11 +51,24 @@ export class TextureEngine {
     this.delaySend = ctx.createGain();
     this.delaySend.gain.value = 0.15;
 
+    // Feedback delay for resonance
+    this.feedbackDelay = ctx.createDelay(1);
+    this.feedbackDelay.delayTime.value = 0.05;
+    this.feedbackGain = ctx.createGain();
+    this.feedbackGain.gain.value = 0;
+
     // Filter for texture shaping
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'bandpass';
     this.filter.frequency.value = 1000;
     this.filter.Q.value = 2;
+
+    // Feedback loop: filter -> feedbackDelay -> feedbackGain -> filter
+    this.filter.connect(this.feedbackDelay);
+    this.feedbackDelay.connect(this.feedbackGain);
+    this.feedbackGain.connect(this.filter);
+
+    // Main outputs
     this.filter.connect(this.outputGain);
     this.filter.connect(this.reverbSend);
     this.filter.connect(this.delaySend);
@@ -160,17 +178,35 @@ export class TextureEngine {
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
 
-    // Common filter updates
-    this.filter.Q.setTargetAtTime(1 + this.params.feedback * 15, now, 0.1);
-    this.lfo.frequency.setTargetAtTime(0.1 + this.params.spread * 2, now, 0.1);
+    // Dynamic filter type based on density
+    if (this.params.density < 0.33) {
+      this.filter.type = 'lowpass';
+    } else if (this.params.density > 0.66) {
+      this.filter.type = 'highpass';
+    } else {
+      this.filter.type = 'bandpass';
+    }
 
-    const baseFreq = 200 + this.params.pitch * 3000;
-    this.filter.frequency.setTargetAtTime(baseFreq, now, 0.1);
-    this.lfoGain.gain.setTargetAtTime(200 + this.params.size * 800, now, 0.1);
+    // Filter frequency: wider range (80Hz - 8000Hz)
+    const baseFreq = 80 + this.params.pitch * 7920;
+    this.filter.frequency.setTargetAtTime(baseFreq, now, 0.05);
 
-    // Update output
+    // Filter Q based on feedback (more resonance)
+    this.filter.Q.setTargetAtTime(0.5 + this.params.feedback * 20, now, 0.05);
+
+    // Feedback gain for real resonance
+    this.feedbackGain.gain.setTargetAtTime(this.params.feedback * 0.6, now, 0.05);
+    this.feedbackDelay.delayTime.setTargetAtTime(0.01 + this.params.size * 0.1, now, 0.05);
+
+    // LFO speed based on spread
+    this.lfo.frequency.setTargetAtTime(0.05 + this.params.spread * 4, now, 0.05);
+    
+    // LFO depth based on size
+    this.lfoGain.gain.setTargetAtTime(100 + this.params.size * 2000, now, 0.05);
+
+    // Output volume: much louder (0.4 instead of 0.15)
     if (this.isPlaying && !this.muted) {
-      this.outputGain.gain.setTargetAtTime(this.params.mix * 0.15, now, 0.1);
+      this.outputGain.gain.setTargetAtTime(this.params.mix * 0.4, now, 0.05);
     }
 
     // Mode-specific updates
@@ -186,10 +222,15 @@ export class TextureEngine {
         this.updateDroneParams(now);
         break;
       case 'granular':
-        // Granular params are applied on grain creation
+        // Restart grain scheduler if density changed significantly
+        if (this.grainScheduler !== null) {
+          clearTimeout(this.grainScheduler);
+          this.grainScheduler = null;
+          this.startGranular();
+        }
         break;
       case 'noise':
-        // Noise uses the common filter params
+        // Noise responds through the dynamic filter
         break;
     }
   }
@@ -202,24 +243,22 @@ export class TextureEngine {
 
     this.droneOscillators.forEach((osc, i) => {
       // Frequency based on pitch
-      const detune = (i - 2.5) * this.params.spread * 30;
-      osc.frequency.setTargetAtTime(baseFreq, now, 0.3);
-      osc.detune.setTargetAtTime(detune, now, 0.2);
+      const detune = (i - 2.5) * this.params.spread * 50; // More spread
+      osc.frequency.setTargetAtTime(baseFreq, now, 0.2);
+      osc.detune.setTargetAtTime(detune, now, 0.1);
 
       // Activate/deactivate oscillators based on density
       const gain = this.droneGains[i];
       if (gain) {
-        const targetGain = i < activeCount ? 0.08 : 0;
-        gain.gain.setTargetAtTime(targetGain, now, 0.3);
+        const targetGain = i < activeCount ? 0.12 : 0; // Louder
+        gain.gain.setTargetAtTime(targetGain, now, 0.2);
       }
     });
 
-    // Update drone LFO depths
-    this.droneLFOs.forEach((lfo, i) => {
-      if (lfo.frequency) {
-        const depth = 5 + this.params.size * 20;
-        // LFO modulates detune, depth is controlled by connecting gain
-      }
+    // Update drone LFO depths based on size
+    this.droneLFOGains.forEach((lfoGain) => {
+      const depth = 5 + this.params.size * 40; // More modulation
+      lfoGain.gain.setTargetAtTime(depth, now, 0.1);
     });
   }
 
@@ -259,8 +298,8 @@ export class TextureEngine {
         break;
     }
 
-    // Fade in
-    this.outputGain.gain.setTargetAtTime(this.params.mix * 0.15, ctx.currentTime, 0.5);
+    // Fade in with louder volume
+    this.outputGain.gain.setTargetAtTime(this.params.mix * 0.4, ctx.currentTime, 0.3);
   }
 
   private stopCurrentMode(): void {
@@ -275,7 +314,7 @@ export class TextureEngine {
 
     // Stop granular
     if (this.grainScheduler !== null) {
-      clearInterval(this.grainScheduler);
+      clearTimeout(this.grainScheduler);
       this.grainScheduler = null;
     }
 
@@ -293,9 +332,11 @@ export class TextureEngine {
       lfo.disconnect();
     });
     this.droneGains.forEach((gain) => gain.disconnect());
+    this.droneLFOGains.forEach((gain) => gain.disconnect());
     this.droneOscillators = [];
     this.droneLFOs = [];
     this.droneGains = [];
+    this.droneLFOGains = [];
   }
 
   // ========== NOISE MODE ==========
@@ -325,9 +366,8 @@ export class TextureEngine {
         lastOut = (lastOut + (0.02 * white)) / 1.02;
         const brown = lastOut * 3.5;
 
-        // Mix based on density: low = brown (warm), high = pink (bright)
-        const mix = this.params.density;
-        data[i] = brown * (1 - mix) + pink * mix;
+        // Mix: both noise types for richer texture
+        data[i] = brown * 0.5 + pink * 0.5;
       }
     }
 
@@ -348,8 +388,8 @@ export class TextureEngine {
 
       this.createGrain();
 
-      // Next grain timing: 20ms - 200ms based on density
-      const interval = 200 - this.params.density * 180;
+      // Next grain timing: 10ms - 150ms based on density (faster response)
+      const interval = 10 + (1 - this.params.density) * 140;
       this.grainScheduler = window.setTimeout(scheduleGrain, interval);
     };
 
@@ -365,26 +405,27 @@ export class TextureEngine {
     const grain = ctx.createBufferSource();
     grain.buffer = this.grainBuffer;
 
-    // Playback rate based on pitch (0.5x - 2x)
-    grain.playbackRate.value = 0.5 + this.params.pitch * 1.5;
+    // Playback rate based on pitch (0.25x - 3x for more dramatic effect)
+    grain.playbackRate.value = 0.25 + this.params.pitch * 2.75;
 
     // Start position based on spread
     const bufferDuration = this.grainBuffer.duration;
-    const startOffset = this.params.spread * (bufferDuration - 0.5);
+    const randomOffset = Math.random() * this.params.spread;
+    const startOffset = randomOffset * (bufferDuration - 0.5);
 
-    // Grain duration based on size (20ms - 400ms)
-    const grainDuration = 0.02 + this.params.size * 0.38;
+    // Grain duration based on size (10ms - 500ms)
+    const grainDuration = 0.01 + this.params.size * 0.49;
 
     // Envelope to avoid clicks
     const envelope = ctx.createGain();
     envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(0.8, now + grainDuration * 0.15);
-    envelope.gain.setValueAtTime(0.8, now + grainDuration * 0.7);
+    envelope.gain.linearRampToValueAtTime(1, now + grainDuration * 0.1);
+    envelope.gain.setValueAtTime(1, now + grainDuration * 0.6);
     envelope.gain.linearRampToValueAtTime(0, now + grainDuration);
 
-    // Slight random pan for stereo spread
+    // Wider stereo spread
     const panner = ctx.createStereoPanner();
-    panner.pan.value = (Math.random() - 0.5) * this.params.spread;
+    panner.pan.value = (Math.random() - 0.5) * this.params.spread * 2;
 
     grain.connect(envelope);
     envelope.connect(panner);
@@ -414,22 +455,22 @@ export class TextureEngine {
       osc.frequency.value = baseFreq;
 
       // Detune for spread
-      const detuneAmount = (i - 2.5) * this.params.spread * 30;
+      const detuneAmount = (i - 2.5) * this.params.spread * 50;
       osc.detune.value = detuneAmount;
 
       // Individual gain for density control
       const gain = ctx.createGain();
       const activeCount = Math.floor(2 + this.params.density * 4);
-      gain.gain.value = i < activeCount ? 0 : 0;
-      gain.gain.setTargetAtTime(i < activeCount ? 0.08 : 0, now, 0.5);
+      gain.gain.value = 0;
+      gain.gain.setTargetAtTime(i < activeCount ? 0.12 : 0, now, 0.3);
 
       // Slow LFO for organic movement
       const lfo = ctx.createOscillator();
       lfo.type = 'sine';
-      lfo.frequency.value = 0.03 + Math.random() * 0.08;
+      lfo.frequency.value = 0.02 + Math.random() * 0.1;
 
       const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 5 + this.params.size * 20;
+      lfoGain.gain.value = 5 + this.params.size * 40;
 
       lfo.connect(lfoGain);
       lfoGain.connect(osc.detune);
@@ -443,6 +484,7 @@ export class TextureEngine {
       this.droneOscillators.push(osc);
       this.droneLFOs.push(lfo);
       this.droneGains.push(gain);
+      this.droneLFOGains.push(lfoGain);
     }
   }
 
@@ -454,6 +496,8 @@ export class TextureEngine {
     this.lfo.disconnect();
     this.lfoGain.disconnect();
     this.filter.disconnect();
+    this.feedbackDelay.disconnect();
+    this.feedbackGain.disconnect();
     this.outputGain.disconnect();
     this.reverbSend.disconnect();
     this.delaySend.disconnect();
