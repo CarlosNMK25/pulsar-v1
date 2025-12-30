@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface Scene {
@@ -12,7 +13,7 @@ interface SceneSlotsProps {
   onSceneSelect: (id: string) => void;
 }
 
-export const SceneSlots = ({ scenes, activeScene, onSceneSelect }: SceneSlotsProps) => {
+export const SceneSlots = forwardRef<HTMLDivElement, SceneSlotsProps>(({ scenes, activeScene, onSceneSelect }, ref) => {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -39,4 +40,6 @@ export const SceneSlots = ({ scenes, activeScene, onSceneSelect }: SceneSlotsPro
       </div>
     </div>
   );
-};
+});
+
+SceneSlots.displayName = 'SceneSlots';

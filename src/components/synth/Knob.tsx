@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface KnobProps {
@@ -25,7 +25,7 @@ const indicatorSizes = {
   lg: 'w-1 h-4',
 };
 
-export const Knob = ({
+export const Knob = forwardRef<HTMLDivElement, KnobProps>(({
   value,
   min = 0,
   max = 100,
@@ -35,7 +35,7 @@ export const Knob = ({
   variant = 'primary',
   showValue = true,
   unit = '',
-}: KnobProps) => {
+}, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const knobRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
@@ -146,4 +146,6 @@ export const Knob = ({
       )}
     </div>
   );
-};
+});
+
+Knob.displayName = 'Knob';
