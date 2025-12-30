@@ -516,6 +516,44 @@ export const useAudioEngine = ({
     textureGlitchRef.current?.setBitcrushParams(params);
   }, []);
 
+  // Chaos mode control - applies to active targets
+  const setChaosEnabled = useCallback((enabled: boolean, params?: { density?: number; intensity?: number }) => {
+    if (params) {
+      glitchEngine.setChaosParams(params);
+      drumsGlitchRef.current?.setChaosParams(params);
+      synthGlitchRef.current?.setChaosParams(params);
+      textureGlitchRef.current?.setChaosParams(params);
+    }
+
+    if (enabled) {
+      if (glitchTargets.includes('master')) {
+        glitchEngine.setChaosParams({ enabled: true, ...(params || {}) });
+      }
+      if (glitchTargets.includes('drums')) {
+        drumsGlitchRef.current?.startChaos();
+      }
+      if (glitchTargets.includes('synth')) {
+        synthGlitchRef.current?.startChaos();
+      }
+      if (glitchTargets.includes('texture')) {
+        textureGlitchRef.current?.startChaos();
+      }
+    } else {
+      glitchEngine.stopChaos();
+      drumsGlitchRef.current?.stopChaos();
+      synthGlitchRef.current?.stopChaos();
+      textureGlitchRef.current?.stopChaos();
+    }
+  }, [glitchTargets]);
+
+  // Update chaos params on active targets
+  const setGlitchChaosParams = useCallback((params: { density?: number; intensity?: number }) => {
+    glitchEngine.setChaosParams(params);
+    drumsGlitchRef.current?.setChaosParams(params);
+    synthGlitchRef.current?.setChaosParams(params);
+    textureGlitchRef.current?.setChaosParams(params);
+  }, []);
+
   return {
     initAudio,
     isInitialized,
@@ -526,5 +564,7 @@ export const useAudioEngine = ({
     triggerGlitch,
     setGlitchStutterParams,
     setGlitchBitcrushParams,
+    setChaosEnabled,
+    setGlitchChaosParams,
   };
 };

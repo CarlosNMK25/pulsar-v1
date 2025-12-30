@@ -3,11 +3,7 @@ import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { 
-  glitchEngine, 
-  StutterParams, 
-  BitcrushParams 
-} from '@/audio/GlitchEngine';
+import { StutterParams, BitcrushParams } from '@/audio/GlitchEngine';
 import { GlitchTarget } from '@/audio/AudioEngine';
 
 type RoutingMode = 'master' | 'individual';
@@ -20,6 +16,8 @@ interface GlitchModuleCompactProps {
   onTriggerGlitch: (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse') => void;
   onStutterParamsChange: (params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
   onBitcrushParamsChange: (params: { bits?: number; sampleRate?: number; mix?: number }) => void;
+  onChaosToggle: (enabled: boolean, params: { density: number; intensity: number }) => void;
+  onChaosParamsChange: (params: { density?: number; intensity?: number }) => void;
 }
 
 export const GlitchModuleCompact = ({ 
@@ -29,6 +27,8 @@ export const GlitchModuleCompact = ({
   onTriggerGlitch,
   onStutterParamsChange,
   onBitcrushParamsChange,
+  onChaosToggle,
+  onChaosParamsChange,
 }: GlitchModuleCompactProps) => {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [chaosEnabled, setChaosEnabled] = useState(false);
@@ -72,6 +72,31 @@ export const GlitchModuleCompact = ({
       onGlitchTargetsChange(Array.from(individualTargets) as GlitchTarget[]);
     }
   }, [routingMode, individualTargets, onGlitchTargetsChange]);
+
+  // Sync local state with props when glitchTargets changes externally (e.g. preset load)
+  useEffect(() => {
+    const isMasterMode = glitchTargets.includes('master');
+    const currentMode = routingMode;
+    
+    if (isMasterMode && currentMode !== 'master') {
+      setRoutingMode('master');
+    } else if (!isMasterMode && currentMode !== 'individual') {
+      setRoutingMode('individual');
+      const newIndividual = new Set<IndividualTarget>();
+      if (glitchTargets.includes('drums')) newIndividual.add('drums');
+      if (glitchTargets.includes('synth')) newIndividual.add('synth');
+      if (glitchTargets.includes('texture')) newIndividual.add('texture');
+      setIndividualTargets(newIndividual);
+    } else if (!isMasterMode) {
+      // Update individual targets even if already in individual mode
+      const newIndividual = new Set<IndividualTarget>();
+      if (glitchTargets.includes('drums')) newIndividual.add('drums');
+      if (glitchTargets.includes('synth')) newIndividual.add('synth');
+      if (glitchTargets.includes('texture')) newIndividual.add('texture');
+      setIndividualTargets(newIndividual);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glitchTargets]);
 
   const isActive = glitchTargets.length > 0;
   const showNoTargetWarning = routingMode === 'individual' && individualTargets.size === 0;
@@ -132,15 +157,11 @@ export const GlitchModuleCompact = ({
     const newEnabled = !chaosEnabled;
     setChaosEnabled(newEnabled);
     
-    if (newEnabled) {
-      glitchEngine.setChaosParams({
-        enabled: true,
-        density: chaosParams.density / 100,
-        intensity: chaosParams.intensity / 100,
-      });
-    } else {
-      glitchEngine.stopChaos();
-    }
+    // Use parent callback to route chaos to correct targets
+    onChaosToggle(newEnabled, {
+      density: chaosParams.density / 100,
+      intensity: chaosParams.intensity / 100,
+    });
   };
 
   const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
@@ -396,7 +417,7 @@ export const GlitchModuleCompact = ({
             onChange={(v) => {
               setChaosParams(prev => ({ ...prev, density: v }));
               if (chaosEnabled) {
-                glitchEngine.setChaosParams({ density: v / 100 });
+                onChaosParamsChange({ density: v / 100 });
               }
             }}
             label="Dens"
@@ -408,7 +429,7 @@ export const GlitchModuleCompact = ({
             onChange={(v) => {
               setChaosParams(prev => ({ ...prev, intensity: v }));
               if (chaosEnabled) {
-                glitchEngine.setChaosParams({ intensity: v / 100 });
+                onChaosParamsChange({ intensity: v / 100 });
               }
             }}
             label="Int"
