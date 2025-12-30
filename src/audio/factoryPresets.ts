@@ -128,6 +128,35 @@ export const factoryPresets: Record<string, PresetData> = {
     bpm: 100,
     swing: 45,
   },
+
+  glitchDemo: {
+    name: 'Glitch Demo',
+    drumSteps: {
+      kick: createSteps([0, 4, 8, 12]),
+      snare: createSteps([4, 12]),
+      hat: createSteps([0, 2, 4, 6, 8, 10, 12, 14], 80),
+    },
+    drumParams: { pitch: 50, decay: 60, drive: 40, mix: 100 },
+    drumMuted: false,
+    synthSteps: createSteps([0, 4, 8, 12]),
+    synthParams: {
+      waveform: 'saw' as WaveformType,
+      cutoff: 60,
+      resonance: 30,
+      attack: 10,
+      release: 70,
+      detune: 10,
+      lfoRate: 20,
+    },
+    synthMuted: false,
+    textureMode: 'drone' as TextureMode,
+    textureParams: { density: 60, spread: 50, pitch: 50, size: 50, feedback: 30, mix: 50 },
+    textureMuted: false,
+    reverbParams: { size: 0.2, decay: 0.2, damping: 0.7, mix: 0.1 },
+    delayParams: { time: 0.25, feedback: 0.2, filter: 0.5, mix: 0.1 },
+    bpm: 110,
+    swing: 0,
+  },
 };
 
 export type FactoryPresetName = keyof typeof factoryPresets;
