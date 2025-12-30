@@ -1,11 +1,14 @@
 import { cn } from '@/lib/utils';
 import { EuclideanControls } from './EuclideanControls';
 import { PatternLengthSelector } from './PatternLengthSelector';
+import type { PLocks, AcidModifiers } from '@/hooks/useAudioEngine';
 
 export interface Step {
   active: boolean;
   velocity: number;
   probability: number;
+  pLocks?: PLocks;
+  acid?: AcidModifiers;
 }
 
 interface StepSequencerProps {
