@@ -32,6 +32,10 @@ export class GlitchBus {
   private bypass = true;
   private isConnected = false;
 
+  // Chaos mode state
+  private chaosInterval: number | null = null;
+  private chaosParams = { density: 0.3, intensity: 0.5 };
+
   private params = {
     stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5 },
     bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
@@ -335,7 +339,70 @@ export class GlitchBus {
     }
   }
 
+  // Chaos mode methods
+  startChaos(): void {
+    if (this.chaosInterval !== null || this.bypass) return;
+    
+    const scheduleNext = () => {
+      const baseInterval = 200 + (1 - this.chaosParams.density) * 800;
+      const randomness = baseInterval * 0.5;
+      const interval = baseInterval + (Math.random() - 0.5) * randomness;
+      
+      this.chaosInterval = window.setTimeout(() => {
+        if (this.bypass) {
+          this.stopChaos();
+          return;
+        }
+        
+        const effects = ['stutter', 'bitcrush', 'freeze'] as const;
+        const weights = [0.4, 0.3, 0.3];
+        
+        let rand = Math.random();
+        let effectIndex = 0;
+        for (let i = 0; i < weights.length; i++) {
+          rand -= weights[i];
+          if (rand <= 0) {
+            effectIndex = i;
+            break;
+          }
+        }
+        
+        const effect = effects[effectIndex];
+        const duration = 0.1 + this.chaosParams.intensity * 0.4;
+        
+        switch (effect) {
+          case 'stutter': this.triggerStutter(duration); break;
+          case 'bitcrush': this.triggerBitcrush(duration); break;
+          case 'freeze': this.triggerGranularFreeze(); break;
+        }
+        
+        scheduleNext();
+      }, interval);
+    };
+    
+    scheduleNext();
+    console.log(`[GlitchBus:${this.track}] Chaos started`);
+  }
+
+  stopChaos(): void {
+    if (this.chaosInterval !== null) {
+      window.clearTimeout(this.chaosInterval);
+      this.chaosInterval = null;
+      console.log(`[GlitchBus:${this.track}] Chaos stopped`);
+    }
+  }
+
+  setChaosParams(params: Partial<{ density: number; intensity: number }>): void {
+    if (params.density !== undefined) this.chaosParams.density = params.density;
+    if (params.intensity !== undefined) this.chaosParams.intensity = params.intensity;
+  }
+
+  isChaosEnabled(): boolean {
+    return this.chaosInterval !== null;
+  }
+
   disconnect(): void {
+    this.stopChaos();
     this.inputNode?.disconnect();
     this.outputNode?.disconnect();
     this.dryNode?.disconnect();

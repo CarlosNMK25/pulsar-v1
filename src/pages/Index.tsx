@@ -138,6 +138,8 @@ const Index = () => {
     triggerGlitch,
     setGlitchStutterParams,
     setGlitchBitcrushParams,
+    setChaosEnabled,
+    setGlitchChaosParams,
   } = useAudioEngine({
     isPlaying,
     bpm,
@@ -609,6 +611,8 @@ const Index = () => {
                 onTriggerGlitch={triggerGlitch}
                 onStutterParamsChange={setGlitchStutterParams}
                 onBitcrushParamsChange={setGlitchBitcrushParams}
+                onChaosToggle={setChaosEnabled}
+                onChaosParamsChange={setGlitchChaosParams}
               />
             </div>
             <div className="module">
