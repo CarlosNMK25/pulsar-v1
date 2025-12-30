@@ -526,7 +526,7 @@ const Index = () => {
       <main className="flex-1 p-6 overflow-auto scrollbar-thin">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Transport & Waveform */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             <TransportControls
               isPlaying={isPlaying}
               bpm={bpm}
@@ -538,9 +538,7 @@ const Index = () => {
               onSwingChange={setSwing}
               onHumanizeChange={setHumanize}
             />
-            <div className="lg:col-span-2">
-              <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
-            </div>
+            <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
           </div>
 
           {/* Instruments */}
