@@ -1,5 +1,5 @@
 // Core audio engine singleton
-export type GlitchTarget = 'master' | 'drums' | 'synth' | 'texture' | 'sample';
+export type GlitchTarget = 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
 
 class AudioEngine {
   private static instance: AudioEngine;
@@ -16,6 +16,7 @@ class AudioEngine {
   private synthGlitchBus: GainNode | null = null;
   private textureGlitchBus: GainNode | null = null;
   private sampleGlitchBus: GainNode | null = null;
+  private fxGlitchBus: GainNode | null = null;
 
   private constructor() {}
 
@@ -44,6 +45,9 @@ class AudioEngine {
     this.sampleGlitchBus = this.audioContext.createGain();
     this.sampleGlitchBus.gain.value = 1;
     
+    this.fxGlitchBus = this.audioContext.createGain();
+    this.fxGlitchBus.gain.value = 1;
+    
     // Create master chain: trackBuses -> masterGain -> limiter -> analyser -> destination
     this.masterGain = this.audioContext.createGain();
     this.masterGain.gain.value = 0.8;
@@ -53,6 +57,7 @@ class AudioEngine {
     this.synthGlitchBus.connect(this.masterGain);
     this.textureGlitchBus.connect(this.masterGain);
     this.sampleGlitchBus.connect(this.masterGain);
+    this.fxGlitchBus.connect(this.masterGain);
 
     // Limiter to prevent clipping
     this.masterLimiter = this.audioContext.createDynamicsCompressor();
@@ -122,6 +127,28 @@ class AudioEngine {
     glitchOutput.connect(this.masterGain);
     
     console.log(`[AudioEngine] Track glitch inserted for ${track}`);
+  }
+
+  // Get FX bus for routing (Reverb/Delay connect here instead of masterGain)
+  getFxBus(): GainNode {
+    if (!this.fxGlitchBus) {
+      throw new Error('AudioEngine not initialized. Call init() first.');
+    }
+    return this.fxGlitchBus;
+  }
+
+  // Insert FX-specific glitch engine
+  insertFxGlitch(glitchInput: GainNode, glitchOutput: GainNode): void {
+    if (!this.masterGain || !this.fxGlitchBus) return;
+    
+    // Disconnect fxBus from master
+    this.fxGlitchBus.disconnect(this.masterGain);
+    
+    // Insert: fxBus -> glitchInput ... glitchOutput -> masterGain
+    this.fxGlitchBus.connect(glitchInput);
+    glitchOutput.connect(this.masterGain);
+    
+    console.log('[AudioEngine] FX glitch inserted');
   }
 
   getContext(): AudioContext {

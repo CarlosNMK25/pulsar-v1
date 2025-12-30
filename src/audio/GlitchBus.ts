@@ -6,7 +6,7 @@ import { scheduler } from './Scheduler';
 import { StutterParams, BitcrushParams } from './GlitchEngine';
 
 export class GlitchBus {
-  private track: 'drums' | 'synth' | 'texture' | 'sample';
+  private track: 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
   private inputNode: GainNode | null = null;
   private outputNode: GainNode | null = null;
   private dryNode: GainNode | null = null;
@@ -42,7 +42,7 @@ export class GlitchBus {
     reverse: { duration: 0.5, mix: 0.7 },
   };
 
-  constructor(track: 'drums' | 'synth' | 'texture' | 'sample') {
+  constructor(track: 'drums' | 'synth' | 'texture' | 'sample' | 'fx') {
     this.track = track;
   }
 
@@ -92,8 +92,12 @@ export class GlitchBus {
     
     this.wetNode.connect(this.outputNode);
     
-    // Insert into audio chain
-    audioEngine.insertTrackGlitch(this.track, this.inputNode, this.outputNode);
+    // Insert into audio chain (FX uses special method)
+    if (this.track === 'fx') {
+      audioEngine.insertFxGlitch(this.inputNode, this.outputNode);
+    } else {
+      audioEngine.insertTrackGlitch(this.track, this.inputNode, this.outputNode);
+    }
     
     this.isConnected = true;
     console.log(`[GlitchBus:${this.track}] Initialized`);
