@@ -92,7 +92,7 @@ export class FXEngine {
     this.delayFilter.connect(this.delayFeedback);
     this.delayFeedback.connect(this.delayNode); // Feedback loop
     this.delayFilter.connect(this.delayGain);
-    this.delayGain.connect(audioEngine.getMasterGain());
+    this.delayGain.connect(audioEngine.getFxBus());
     
     this.initialized = true;
     console.log('[FXEngine] Initialized');
@@ -139,7 +139,7 @@ export class FXEngine {
     // Connect reverb chain
     this.reverbInput.connect(this.reverbConvolver);
     this.reverbConvolver.connect(this.reverbGain);
-    this.reverbGain.connect(audioEngine.getMasterGain());
+    this.reverbGain.connect(audioEngine.getFxBus());
   }
 
   // Get send nodes for instruments to connect to

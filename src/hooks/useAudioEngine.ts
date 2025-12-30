@@ -130,6 +130,7 @@ export const useAudioEngine = ({
   const synthGlitchRef = useRef<GlitchBus | null>(null);
   const textureGlitchRef = useRef<GlitchBus | null>(null);
   const sampleGlitchRef = useRef<GlitchBus | null>(null);
+  const fxGlitchRef = useRef<GlitchBus | null>(null);
   
   // Store step data in refs for scheduler callback access
   const stepsRef = useRef({ kickSteps, snareSteps, hatSteps, synthSteps });
@@ -173,6 +174,9 @@ export const useAudioEngine = ({
       
       sampleGlitchRef.current = new GlitchBus('sample');
       sampleGlitchRef.current.init();
+      
+      fxGlitchRef.current = new GlitchBus('fx');
+      fxGlitchRef.current.init();
       
       // Connect instruments to FX sends
       synthRef.current.connectFX();
@@ -491,6 +495,7 @@ export const useAudioEngine = ({
       synthGlitchRef.current?.disconnect();
       textureGlitchRef.current?.disconnect();
       sampleGlitchRef.current?.disconnect();
+      fxGlitchRef.current?.disconnect();
     };
   }, []);
 
@@ -506,6 +511,7 @@ export const useAudioEngine = ({
     synthGlitchRef.current?.setBypass(!glitchTargets.includes('synth'));
     textureGlitchRef.current?.setBypass(!glitchTargets.includes('texture'));
     sampleGlitchRef.current?.setBypass(!glitchTargets.includes('sample'));
+    fxGlitchRef.current?.setBypass(!glitchTargets.includes('fx'));
   }, [glitchTargets, isInitialized]);
 
   // Macro change handler
@@ -560,6 +566,15 @@ export const useAudioEngine = ({
         case 'reverse': sampleGlitchRef.current.triggerReverse(); break;
       }
     }
+    if (glitchTargets.includes('fx') && fxGlitchRef.current) {
+      switch (effect) {
+        case 'stutter': fxGlitchRef.current.triggerStutter(); break;
+        case 'tapestop': fxGlitchRef.current.triggerTapeStop(); break;
+        case 'freeze': fxGlitchRef.current.triggerGranularFreeze(); break;
+        case 'bitcrush': fxGlitchRef.current.triggerBitcrush(); break;
+        case 'reverse': fxGlitchRef.current.triggerReverse(); break;
+      }
+    }
   }, [glitchTargets]);
 
   // Update glitch params on all active targets
@@ -569,6 +584,7 @@ export const useAudioEngine = ({
     synthGlitchRef.current?.setStutterParams(params);
     textureGlitchRef.current?.setStutterParams(params);
     sampleGlitchRef.current?.setStutterParams(params);
+    fxGlitchRef.current?.setStutterParams(params);
   }, []);
 
   const setGlitchBitcrushParams = useCallback((params: { bits?: number; sampleRate?: number; mix?: number }) => {
@@ -577,6 +593,7 @@ export const useAudioEngine = ({
     synthGlitchRef.current?.setBitcrushParams(params);
     textureGlitchRef.current?.setBitcrushParams(params);
     sampleGlitchRef.current?.setBitcrushParams(params);
+    fxGlitchRef.current?.setBitcrushParams(params);
   }, []);
 
   // Chaos mode control - applies to active targets
@@ -587,6 +604,7 @@ export const useAudioEngine = ({
       synthGlitchRef.current?.setChaosParams(params);
       textureGlitchRef.current?.setChaosParams(params);
       sampleGlitchRef.current?.setChaosParams(params);
+      fxGlitchRef.current?.setChaosParams(params);
     }
 
     if (enabled) {
@@ -605,12 +623,16 @@ export const useAudioEngine = ({
       if (glitchTargets.includes('sample')) {
         sampleGlitchRef.current?.startChaos();
       }
+      if (glitchTargets.includes('fx')) {
+        fxGlitchRef.current?.startChaos();
+      }
     } else {
       glitchEngine.stopChaos();
       drumsGlitchRef.current?.stopChaos();
       synthGlitchRef.current?.stopChaos();
       textureGlitchRef.current?.stopChaos();
       sampleGlitchRef.current?.stopChaos();
+      fxGlitchRef.current?.stopChaos();
     }
   }, [glitchTargets]);
 
@@ -621,6 +643,7 @@ export const useAudioEngine = ({
     synthGlitchRef.current?.setChaosParams(params);
     textureGlitchRef.current?.setChaosParams(params);
     sampleGlitchRef.current?.setChaosParams(params);
+    fxGlitchRef.current?.setChaosParams(params);
   }, []);
 
   return {
