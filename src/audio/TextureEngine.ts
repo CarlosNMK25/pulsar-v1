@@ -1,12 +1,16 @@
 import { audioEngine } from './AudioEngine';
+import { fxEngine } from './FXEngine';
 
 export class TextureEngine {
   private outputGain: GainNode;
+  private reverbSend: GainNode;
+  private delaySend: GainNode;
   private noiseSource: AudioBufferSourceNode | null = null;
   private filter: BiquadFilterNode;
   private lfo: OscillatorNode;
   private lfoGain: GainNode;
   private isPlaying = false;
+  private fxConnected = false;
 
   private params = {
     density: 0.5,
@@ -24,12 +28,21 @@ export class TextureEngine {
     this.outputGain.gain.value = 0;
     this.outputGain.connect(audioEngine.getMasterGain());
 
+    // FX send nodes (texture benefits from heavy reverb)
+    this.reverbSend = ctx.createGain();
+    this.reverbSend.gain.value = 0.4;
+    
+    this.delaySend = ctx.createGain();
+    this.delaySend.gain.value = 0.15;
+
     // Filter for texture shaping
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'bandpass';
     this.filter.frequency.value = 1000;
     this.filter.Q.value = 2;
     this.filter.connect(this.outputGain);
+    this.filter.connect(this.reverbSend);
+    this.filter.connect(this.delaySend);
 
     // LFO for movement
     this.lfo = ctx.createOscillator();
@@ -42,6 +55,19 @@ export class TextureEngine {
     this.lfo.connect(this.lfoGain);
     this.lfoGain.connect(this.filter.frequency);
     this.lfo.start();
+  }
+
+  connectFX(): void {
+    if (this.fxConnected) return;
+    this.reverbSend.connect(fxEngine.getReverbSend());
+    this.delaySend.connect(fxEngine.getDelaySend());
+    this.fxConnected = true;
+  }
+
+  setFXSend(reverb: number, delay: number): void {
+    const ctx = audioEngine.getContext();
+    this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.05);
+    this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
   setParams(params: Partial<typeof this.params>): void {
@@ -124,5 +150,7 @@ export class TextureEngine {
     this.lfoGain.disconnect();
     this.filter.disconnect();
     this.outputGain.disconnect();
+    this.reverbSend.disconnect();
+    this.delaySend.disconnect();
   }
 }
