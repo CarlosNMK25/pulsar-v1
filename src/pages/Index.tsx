@@ -52,6 +52,7 @@ const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [swing, setSwing] = useState(0);
+  const [humanize, setHumanize] = useState(0);
   const [activeScene, setActiveScene] = useState('a');
   const [morphTargetScene, setMorphTargetScene] = useState<string | null>(null);
   const [savedSceneIds, setSavedSceneIds] = useState<string[]>([]);
@@ -524,10 +525,12 @@ const Index = () => {
               isPlaying={isPlaying}
               bpm={bpm}
               swing={swing}
+              humanize={humanize}
               onPlayPause={handlePlayPause}
               onStop={handleStop}
               onBpmChange={setBpm}
               onSwingChange={setSwing}
+              onHumanizeChange={setHumanize}
             />
             <div className="lg:col-span-2">
               <WaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />

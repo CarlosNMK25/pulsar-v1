@@ -13,6 +13,7 @@ export interface PLocks {
   resonance?: number;
   pitch?: number;
   decay?: number;
+  microTiming?: number; // -50 to +50 ms offset
 }
 
 // Acid 303 step modifiers

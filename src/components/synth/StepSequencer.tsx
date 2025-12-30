@@ -82,6 +82,7 @@ export const StepSequencer = ({
             {showControls && onPatternGenerate && (
               <EuclideanControls
                 onPatternGenerate={onPatternGenerate}
+                currentSteps={displaySteps}
                 patternLength={displayLength}
                 variant={variant}
               />

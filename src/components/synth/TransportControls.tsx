@@ -6,20 +6,24 @@ interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
   swing: number;
+  humanize: number;
   onPlayPause: () => void;
   onStop: () => void;
   onBpmChange: (bpm: number) => void;
   onSwingChange: (swing: number) => void;
+  onHumanizeChange: (humanize: number) => void;
 }
 
 export const TransportControls = ({
   isPlaying,
   bpm,
   swing,
+  humanize,
   onPlayPause,
   onStop,
   onBpmChange,
   onSwingChange,
+  onHumanizeChange,
 }: TransportControlsProps) => {
   return (
     <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-border bg-card">
@@ -98,6 +102,19 @@ export const TransportControls = ({
           size="sm"
           showValue
           unit="%"
+        />
+      </div>
+      
+      {/* Humanize Control */}
+      <div className="flex items-center gap-2">
+        <Knob
+          value={humanize}
+          onChange={onHumanizeChange}
+          label="Human"
+          size="sm"
+          showValue
+          unit="%"
+          variant="secondary"
         />
       </div>
 

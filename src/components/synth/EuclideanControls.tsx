@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shuffle, Target, Trash2, RotateCcw, ChevronDown } from 'lucide-react';
+import { Shuffle, Target, Trash2, RotateCcw, RotateCw, Dna } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { 
   generateEuclidean, 
   generateRandom, 
+  mutatePattern,
+  shiftPattern,
   euclideanPresets, 
   EuclideanPresetName 
 } from '@/audio/EuclideanGenerator';
@@ -23,12 +25,14 @@ interface Step {
 
 interface EuclideanControlsProps {
   onPatternGenerate: (steps: Step[]) => void;
+  currentSteps?: Step[];
   patternLength?: number;
   variant?: 'primary' | 'secondary' | 'muted';
 }
 
 export const EuclideanControls = ({
   onPatternGenerate,
+  currentSteps,
   patternLength = 16,
   variant = 'primary',
 }: EuclideanControlsProps) => {
@@ -36,6 +40,7 @@ export const EuclideanControls = ({
   const [pulses, setPulses] = useState(4);
   const [rotation, setRotation] = useState(0);
   const [randomDensity, setRandomDensity] = useState(0.5);
+  const [mutationRate, setMutationRate] = useState(0.2);
 
   const applyEuclidean = () => {
     const { steps } = generateEuclidean(pulses, patternLength, rotation);
@@ -77,6 +82,32 @@ export const EuclideanControls = ({
       active: false,
       velocity: 100,
       probability: 100,
+    }));
+    onPatternGenerate(newSteps);
+  };
+  
+  const applyMutate = () => {
+    if (!currentSteps || currentSteps.length === 0) return;
+    
+    const boolPattern = currentSteps.map(s => s.active);
+    const mutated = mutatePattern(boolPattern, mutationRate);
+    const newSteps: Step[] = mutated.map((active, i) => ({
+      active,
+      velocity: currentSteps[i]?.velocity ?? 80 + Math.random() * 40,
+      probability: currentSteps[i]?.probability ?? 100,
+    }));
+    onPatternGenerate(newSteps);
+  };
+  
+  const applyRotate = (direction: 'left' | 'right') => {
+    if (!currentSteps || currentSteps.length === 0) return;
+    
+    const boolPattern = currentSteps.map(s => s.active);
+    const shifted = shiftPattern(boolPattern, direction === 'left' ? -1 : 1);
+    const newSteps: Step[] = shifted.map((active, i) => ({
+      active,
+      velocity: currentSteps[i]?.velocity ?? 80 + Math.random() * 40,
+      probability: currentSteps[i]?.probability ?? 100,
     }));
     onPatternGenerate(newSteps);
   };
@@ -205,6 +236,73 @@ export const EuclideanControls = ({
           </div>
         </PopoverContent>
       </Popover>
+      
+      {/* Mutate */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn('h-6 px-1.5', variantColors[variant])}
+            title="Mutate Pattern"
+            disabled={!currentSteps || currentSteps.length === 0}
+          >
+            <Dna className="w-3 h-3" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-48 p-3" align="start">
+          <div className="space-y-3">
+            <div className="text-xs font-medium text-foreground">Mutate Pattern</div>
+            
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Mutation</span>
+                <span>{Math.round(mutationRate * 100)}%</span>
+              </div>
+              <Slider
+                value={[mutationRate * 100]}
+                onValueChange={([v]) => setMutationRate(v / 100)}
+                min={5}
+                max={50}
+                step={5}
+              />
+            </div>
+
+            <Button 
+              size="sm" 
+              onClick={applyMutate} 
+              className="w-full"
+              disabled={!currentSteps || currentSteps.length === 0}
+            >
+              Mutate
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      
+      {/* Rotate Left */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn('h-6 px-1.5', variantColors[variant])}
+        onClick={() => applyRotate('left')}
+        title="Rotate Left"
+        disabled={!currentSteps || currentSteps.length === 0}
+      >
+        <RotateCcw className="w-3 h-3" />
+      </Button>
+      
+      {/* Rotate Right */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn('h-6 px-1.5', variantColors[variant])}
+        onClick={() => applyRotate('right')}
+        title="Rotate Right"
+        disabled={!currentSteps || currentSteps.length === 0}
+      >
+        <RotateCw className="w-3 h-3" />
+      </Button>
 
       {/* Clear */}
       <Button

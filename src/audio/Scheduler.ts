@@ -9,6 +9,7 @@ export class Scheduler {
   
   private bpm = 120;
   private swing = 0; // 0-1, where 0.5 is 50% swing
+  private humanize = 0; // 0-1, amount of random timing offset
   private isRunning = false;
   private currentStep = 0;
   private nextStepTime = 0;
@@ -47,6 +48,14 @@ export class Scheduler {
 
   getSwing(): number {
     return this.swing;
+  }
+  
+  setHumanize(amount: number): void {
+    this.humanize = Math.max(0, Math.min(1, amount));
+  }
+  
+  getHumanize(): number {
+    return this.humanize;
   }
 
   getCurrentStep(): number {
@@ -91,6 +100,13 @@ export class Scheduler {
     return 60 / this.bpm / 4;
   }
 
+  private getHumanizeOffset(): number {
+    if (this.humanize <= 0) return 0;
+    // Random offset up to ±20ms based on humanize amount
+    const maxOffset = 0.02 * this.humanize;
+    return (Math.random() - 0.5) * 2 * maxOffset;
+  }
+
   private getSwingOffset(step: number): number {
     // Apply swing to off-beat steps (odd steps in 16th note grid)
     if (step % 2 === 1 && this.swing > 0) {
@@ -127,7 +143,8 @@ export class Scheduler {
     // Schedule all steps that fall within the lookahead window
     while (this.nextStepTime < ctx.currentTime + this.scheduleAheadTime) {
       const swingOffset = this.getSwingOffset(this.currentStep);
-      const scheduledTime = this.nextStepTime + swingOffset;
+      const humanizeOffset = this.getHumanizeOffset();
+      const scheduledTime = this.nextStepTime + swingOffset + humanizeOffset;
       
       this.scheduleStep(this.currentStep, scheduledTime);
       
