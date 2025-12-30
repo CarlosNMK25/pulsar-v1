@@ -34,11 +34,16 @@ export interface ChaosParams {
   intensity: number; // 0-1: effect intensity
 }
 
+export interface ReverseParams extends GlitchEffectParams {
+  duration: number; // 0-1: fragment duration to reverse (0.1 - 0.5s)
+}
+
 export interface GlitchParams {
   stutter: StutterParams;
   bitcrush: BitcrushParams;
   tapeStop: TapeStopParams;
   granularFreeze: GranularFreezeParams;
+  reverse: ReverseParams;
   chaos: ChaosParams;
 }
 
@@ -66,6 +71,15 @@ export class GlitchEngine {
   private bypass = true;
   private isConnected = false;
   
+  // Reverse effect state
+  private reverseBuffer: AudioBuffer | null = null;
+  private reverseProcessor: ScriptProcessorNode | null = null;
+  private reverseGain: GainNode | null = null;
+  private reverseRecording = false;
+  private reversePlayback = false;
+  private reverseSamples: Float32Array[] = [];
+  private reversePlaybackIndex = 0;
+
   private params: GlitchParams = {
     stutter: {
       active: false,
@@ -91,6 +105,11 @@ export class GlitchEngine {
       grainSize: 0.5,
       pitch: 0.5,
       spread: 0.5,
+    },
+    reverse: {
+      active: false,
+      mix: 0.7,
+      duration: 0.5,
     },
     chaos: {
       enabled: false,
@@ -150,10 +169,19 @@ export class GlitchEngine {
     this.bitcrusher.connect(this.bitcrushGain);
     this.bitcrushGain.connect(this.wetNode);
     
+    // Reverse effect path
+    this.reverseGain = ctx.createGain();
+    this.reverseGain.gain.value = 0;
+    this.reverseProcessor = ctx.createScriptProcessor(2048, 2, 2);
+    this.reverseProcessor.onaudioprocess = this.processReverse.bind(this);
+    this.inputNode.connect(this.reverseProcessor);
+    this.reverseProcessor.connect(this.reverseGain);
+    this.reverseGain.connect(this.wetNode);
+    
     this.wetNode.connect(this.outputNode);
     
     this.isConnected = true;
-    console.log('[GlitchEngine] Initialized with Bitcrusher');
+    console.log('[GlitchEngine] Initialized with Bitcrusher and Reverse');
   }
 
   getInputNode(): GainNode {
@@ -214,6 +242,10 @@ export class GlitchEngine {
 
   setGranularFreezeParams(params: Partial<GranularFreezeParams>): void {
     this.params.granularFreeze = { ...this.params.granularFreeze, ...params };
+  }
+
+  setReverseParams(params: Partial<ReverseParams>): void {
+    this.params.reverse = { ...this.params.reverse, ...params };
   }
 
   // Trigger effects (for momentary activation)
@@ -383,6 +415,103 @@ export class GlitchEngine {
     console.log('[GlitchEngine] Freeze triggered:', numGrains, 'grains over', freezeDuration.toFixed(2), 's');
   }
 
+  triggerReverse(duration?: number): void {
+    if (this.bypass || !this.reverseGain || !this.wetNode || !this.dryNode) return;
+    
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const sampleRate = ctx.sampleRate;
+    
+    // Duration of fragment to capture and reverse (0.1 - 0.5 seconds)
+    const reverseDuration = duration || (0.1 + this.params.reverse.duration * 0.4);
+    const bufferSize = Math.floor(reverseDuration * sampleRate);
+    
+    // Start recording phase
+    this.reverseSamples = [new Float32Array(bufferSize), new Float32Array(bufferSize)];
+    this.reverseRecording = true;
+    this.reversePlayback = false;
+    this.reversePlaybackIndex = 0;
+    
+    // After capturing, switch to playback
+    setTimeout(() => {
+      this.reverseRecording = false;
+      
+      // Reverse the captured samples
+      for (let ch = 0; ch < this.reverseSamples.length; ch++) {
+        this.reverseSamples[ch].reverse();
+      }
+      
+      // Start reversed playback
+      this.reversePlayback = true;
+      this.reversePlaybackIndex = 0;
+      
+      // Activate wet signal
+      if (this.wetNode && this.dryNode && this.reverseGain) {
+        this.wetNode.gain.setValueAtTime(this.params.reverse.mix, ctx.currentTime);
+        this.dryNode.gain.setValueAtTime(1 - this.params.reverse.mix * 0.7, ctx.currentTime);
+        this.reverseGain.gain.setValueAtTime(1, ctx.currentTime);
+      }
+      
+      // Return to normal after playback
+      setTimeout(() => {
+        this.reversePlayback = false;
+        if (this.wetNode && this.dryNode && this.reverseGain) {
+          this.wetNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+          this.dryNode.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+          this.reverseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        }
+      }, reverseDuration * 1000);
+      
+    }, reverseDuration * 1000);
+    
+    console.log('[GlitchEngine] Reverse triggered, duration:', reverseDuration.toFixed(2), 's');
+  }
+
+  // Reverse audio processing
+  private processReverse(event: AudioProcessingEvent): void {
+    const inputL = event.inputBuffer.getChannelData(0);
+    const inputR = event.inputBuffer.getChannelData(1);
+    const outputL = event.outputBuffer.getChannelData(0);
+    const outputR = event.outputBuffer.getChannelData(1);
+    
+    if (this.reverseRecording && this.reverseSamples.length >= 2) {
+      // Record incoming audio
+      const remaining = this.reverseSamples[0].length - this.reversePlaybackIndex;
+      const toCopy = Math.min(remaining, inputL.length);
+      
+      for (let i = 0; i < toCopy; i++) {
+        this.reverseSamples[0][this.reversePlaybackIndex + i] = inputL[i];
+        this.reverseSamples[1][this.reversePlaybackIndex + i] = inputR[i];
+      }
+      this.reversePlaybackIndex += toCopy;
+      
+      // Output silence during recording
+      outputL.fill(0);
+      outputR.fill(0);
+    } else if (this.reversePlayback && this.reverseSamples.length >= 2) {
+      // Playback reversed audio
+      const remaining = this.reverseSamples[0].length - this.reversePlaybackIndex;
+      const toPlay = Math.min(remaining, outputL.length);
+      
+      for (let i = 0; i < toPlay; i++) {
+        outputL[i] = this.reverseSamples[0][this.reversePlaybackIndex + i];
+        outputR[i] = this.reverseSamples[1][this.reversePlaybackIndex + i];
+      }
+      
+      // Fill remaining with zeros if buffer ended
+      for (let i = toPlay; i < outputL.length; i++) {
+        outputL[i] = 0;
+        outputR[i] = 0;
+      }
+      
+      this.reversePlaybackIndex += toPlay;
+    } else {
+      // Pass through silence when not active
+      outputL.fill(0);
+      outputR.fill(0);
+    }
+  }
+
   private updateMix(): void {
     if (!this.dryNode || !this.wetNode) return;
     
@@ -436,8 +565,8 @@ export class GlitchEngine {
       // Check if we should trigger based on density
       if (Math.random() > this.params.chaos.density) return;
       
-      // Choose random effect
-      const effects = ['stutter', 'bitcrush', 'tapestop', 'freeze'] as const;
+      // Choose random effect (now includes reverse)
+      const effects = ['stutter', 'bitcrush', 'tapestop', 'freeze', 'reverse'] as const;
       const effect = effects[Math.floor(Math.random() * effects.length)];
       const intensity = this.params.chaos.intensity;
       
@@ -460,6 +589,11 @@ export class GlitchEngine {
         case 'freeze':
           this.params.granularFreeze.mix = 0.3 + intensity * 0.7;
           this.triggerGranularFreeze();
+          break;
+        case 'reverse':
+          this.params.reverse.mix = 0.4 + intensity * 0.5;
+          this.params.reverse.duration = 0.3 + Math.random() * 0.5 * intensity;
+          this.triggerReverse();
           break;
       }
     }, baseInterval);
@@ -514,6 +648,8 @@ export class GlitchEngine {
     this.stutterGain?.disconnect();
     this.bitcrusher?.disconnect();
     this.bitcrushGain?.disconnect();
+    this.reverseProcessor?.disconnect();
+    this.reverseGain?.disconnect();
     this.isConnected = false;
   }
 }
