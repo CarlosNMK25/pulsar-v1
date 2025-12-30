@@ -19,6 +19,8 @@ interface SynthModuleProps {
   currentStep: number;
   steps: Step[];
   onStepsChange: (steps: Step[]) => void;
+  patternLength: number;
+  onLengthChange: (length: number) => void;
   params: {
     waveform: WaveformType;
     cutoff: number;
@@ -39,6 +41,8 @@ export const SynthModule = ({
   currentStep, 
   steps,
   onStepsChange,
+  patternLength,
+  onLengthChange,
   params,
   onParamsChange,
   muted,
@@ -101,6 +105,9 @@ export const SynthModule = ({
           onStepAcid={handleStepAcid}
           onPatternGenerate={onStepsChange}
           showControls={true}
+          showLengthSelector={true}
+          patternLength={patternLength}
+          onLengthChange={onLengthChange}
           showPLocks={true}
           showAcid={true}
           label="Sequence"

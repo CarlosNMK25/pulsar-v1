@@ -6,6 +6,7 @@ class AudioEngine {
   private masterLimiter: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
   private isInitialized = false;
+  private glitchInserted = false;
 
   private constructor() {}
 
@@ -45,6 +46,21 @@ class AudioEngine {
 
     this.isInitialized = true;
     console.log('[AudioEngine] Initialized at', this.audioContext.sampleRate, 'Hz');
+  }
+
+  // Insert glitch engine between masterGain and masterLimiter
+  insertGlitchEngine(glitchInput: GainNode, glitchOutput: GainNode): void {
+    if (!this.masterGain || !this.masterLimiter || this.glitchInserted) return;
+    
+    // Disconnect masterGain from limiter
+    this.masterGain.disconnect(this.masterLimiter);
+    
+    // Insert glitch: masterGain -> glitchInput ... glitchOutput -> limiter
+    this.masterGain.connect(glitchInput);
+    glitchOutput.connect(this.masterLimiter);
+    
+    this.glitchInserted = true;
+    console.log('[AudioEngine] Glitch engine inserted into master chain');
   }
 
   getContext(): AudioContext {

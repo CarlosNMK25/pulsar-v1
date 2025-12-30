@@ -6,7 +6,7 @@ import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
 import { fxEngine } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
-
+import { glitchEngine } from '@/audio/GlitchEngine';
 // P-Lock parameters that can be locked per step
 export interface PLocks {
   cutoff?: number;
@@ -130,6 +130,13 @@ export const useAudioEngine = ({
       // Initialize FX engine (singleton, auto-init on first access)
       fxEngine.getReverbSend();
       fxEngine.getDelaySend();
+      
+      // Initialize and insert Glitch engine into master chain
+      glitchEngine.init();
+      audioEngine.insertGlitchEngine(
+        glitchEngine.getInputNode(),
+        glitchEngine.getOutputNode()
+      );
       
       // Connect instruments to FX sends
       synthRef.current.connectFX();
