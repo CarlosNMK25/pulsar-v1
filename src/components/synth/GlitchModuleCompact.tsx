@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,9 @@ import {
   BitcrushParams 
 } from '@/audio/GlitchEngine';
 import { GlitchTarget } from '@/audio/AudioEngine';
+
+type RoutingMode = 'master' | 'individual';
+type IndividualTarget = 'drums' | 'synth' | 'texture';
 
 interface GlitchModuleCompactProps {
   className?: string;
@@ -30,6 +33,18 @@ export const GlitchModuleCompact = ({
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   
+  // Routing mode: master vs individual tracks
+  const [routingMode, setRoutingMode] = useState<RoutingMode>(() => 
+    glitchTargets.includes('master') ? 'master' : 'individual'
+  );
+  const [individualTargets, setIndividualTargets] = useState<Set<IndividualTarget>>(() => {
+    const targets = new Set<IndividualTarget>();
+    if (glitchTargets.includes('drums')) targets.add('drums');
+    if (glitchTargets.includes('synth')) targets.add('synth');
+    if (glitchTargets.includes('texture')) targets.add('texture');
+    return targets;
+  });
+  
   const [stutterParams, setStutterParams] = useState<StutterParams>({
     active: false,
     mix: 50,
@@ -49,14 +64,32 @@ export const GlitchModuleCompact = ({
     intensity: 50,
   });
 
-  const isActive = glitchTargets.length > 0;
-
-  const toggleTarget = (target: GlitchTarget) => {
-    if (glitchTargets.includes(target)) {
-      onGlitchTargetsChange(glitchTargets.filter(t => t !== target));
+  // Sync routing mode changes to parent
+  useEffect(() => {
+    if (routingMode === 'master') {
+      onGlitchTargetsChange(['master']);
     } else {
-      onGlitchTargetsChange([...glitchTargets, target]);
+      onGlitchTargetsChange(Array.from(individualTargets) as GlitchTarget[]);
     }
+  }, [routingMode, individualTargets, onGlitchTargetsChange]);
+
+  const isActive = glitchTargets.length > 0;
+  const showNoTargetWarning = routingMode === 'individual' && individualTargets.size === 0;
+
+  const handleModeChange = (mode: RoutingMode) => {
+    setRoutingMode(mode);
+  };
+
+  const toggleIndividualTarget = (target: IndividualTarget) => {
+    setIndividualTargets(prev => {
+      const next = new Set(prev);
+      if (next.has(target)) {
+        next.delete(target);
+      } else {
+        next.add(target);
+      }
+      return next;
+    });
   };
 
   const handleStutterTrigger = () => {
@@ -111,38 +144,76 @@ export const GlitchModuleCompact = ({
   };
 
   const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
-  const targetButtons: { id: GlitchTarget; label: string }[] = [
-    { id: 'master', label: 'M' },
-    { id: 'drums', label: 'D' },
-    { id: 'synth', label: 'S' },
-    { id: 'texture', label: 'T' },
+  
+  const individualButtons: { id: IndividualTarget; label: string; color: string }[] = [
+    { id: 'drums', label: 'D', color: 'hsl(var(--primary))' },
+    { id: 'synth', label: 'S', color: 'hsl(var(--accent))' },
+    { id: 'texture', label: 'T', color: 'hsl(var(--secondary))' },
   ];
 
   return (
     <div className={cn('space-y-3', className)}>
-      {/* Header with target selector */}
-      <div className="flex items-center justify-between">
-        <span className="text-label text-muted-foreground flex items-center gap-2">
-          <Zap className="w-3 h-3" />
-          Glitch
-        </span>
-        <div className="flex gap-0.5">
-          {targetButtons.map(({ id, label }) => (
-            <Button
-              key={id}
-              variant={glitchTargets.includes(id) ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => toggleTarget(id)}
-              className={cn(
-                'h-5 w-5 p-0 text-[9px] font-mono',
-                glitchTargets.includes(id) && 'bg-primary text-primary-foreground'
-              )}
-              title={id.charAt(0).toUpperCase() + id.slice(1)}
-            >
-              {label}
-            </Button>
-          ))}
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Zap className="w-3 h-3 text-muted-foreground" />
+        <span className="text-label text-muted-foreground">Glitch</span>
+      </div>
+
+      {/* Routing Mode Selector */}
+      <div className="space-y-2">
+        <div className="flex gap-1">
+          <Button
+            variant={routingMode === 'master' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('master')}
+            className={cn(
+              'flex-1 h-7 text-[10px] font-medium',
+              routingMode === 'master' && 'bg-primary text-primary-foreground'
+            )}
+          >
+            MASTER
+          </Button>
+          <Button
+            variant={routingMode === 'individual' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleModeChange('individual')}
+            className={cn(
+              'flex-1 h-7 text-[10px] font-medium',
+              routingMode === 'individual' && 'bg-primary text-primary-foreground'
+            )}
+          >
+            TRACKS
+          </Button>
         </div>
+        
+        {/* Individual track selectors - only visible in individual mode */}
+        {routingMode === 'individual' && (
+          <div className="flex gap-1">
+            {individualButtons.map(({ id, label }) => (
+              <Button
+                key={id}
+                variant={individualTargets.has(id) ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => toggleIndividualTarget(id)}
+                className={cn(
+                  'flex-1 h-6 text-[10px] font-mono transition-all',
+                  individualTargets.has(id) 
+                    ? 'bg-primary/80 text-primary-foreground border-primary' 
+                    : 'opacity-60 hover:opacity-100'
+                )}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        )}
+        
+        {/* Warning when no target selected in individual mode */}
+        {showNoTargetWarning && (
+          <div className="text-[9px] text-muted-foreground/60 text-center italic">
+            Select a track
+          </div>
+        )}
       </div>
 
       {/* 5 Trigger Buttons - compact */}
