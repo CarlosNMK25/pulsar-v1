@@ -5,11 +5,14 @@ import { StepSequencer } from './StepSequencer';
 import { Knob } from './Knob';
 import { cn } from '@/lib/utils';
 import { WaveformType } from '@/audio/SynthVoice';
+import type { PLocks, AcidModifiers } from '@/hooks/useAudioEngine';
 
 interface Step {
   active: boolean;
   velocity: number;
   probability: number;
+  pLocks?: PLocks;
+  acid?: AcidModifiers;
 }
 
 interface SynthModuleProps {
@@ -51,6 +54,18 @@ export const SynthModule = ({
     onParamsChange({ ...params, [key]: value });
   };
 
+  const handleStepPLocks = (index: number, pLocks: PLocks | undefined) => {
+    onStepsChange(steps.map((step, i) => 
+      i === index ? { ...step, pLocks } : step
+    ));
+  };
+
+  const handleStepAcid = (index: number, acid: AcidModifiers | undefined) => {
+    onStepsChange(steps.map((step, i) => 
+      i === index ? { ...step, acid } : step
+    ));
+  };
+
   return (
     <ModuleCard
       title="Synth"
@@ -77,13 +92,17 @@ export const SynthModule = ({
           ))}
         </div>
 
-        {/* Sequencer */}
+        {/* Sequencer with P-Locks and Acid 303 */}
         <StepSequencer
           steps={steps}
           currentStep={currentStep}
           onStepToggle={toggleStep}
+          onStepPLocks={handleStepPLocks}
+          onStepAcid={handleStepAcid}
           onPatternGenerate={onStepsChange}
           showControls={true}
+          showPLocks={true}
+          showAcid={true}
           label="Sequence"
           variant="primary"
         />
