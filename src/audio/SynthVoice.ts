@@ -55,7 +55,8 @@ export class SynthVoice {
     const ctx = audioEngine.getContext();
     this.outputGain = ctx.createGain();
     this.outputGain.gain.value = 0.3;
-    this.outputGain.connect(audioEngine.getMasterGain());
+    // Connect to track bus instead of master gain for per-track glitch routing
+    this.outputGain.connect(audioEngine.getTrackBus('synth'));
 
     // FX send nodes
     this.reverbSend = ctx.createGain();

@@ -1,4 +1,6 @@
 // Core audio engine singleton
+export type GlitchTarget = 'master' | 'drums' | 'synth' | 'texture';
+
 class AudioEngine {
   private static instance: AudioEngine;
   private audioContext: AudioContext | null = null;
@@ -7,6 +9,11 @@ class AudioEngine {
   private analyser: AnalyserNode | null = null;
   private isInitialized = false;
   private glitchInserted = false;
+
+  // Track buses for per-track glitch routing
+  private drumsGlitchBus: GainNode | null = null;
+  private synthGlitchBus: GainNode | null = null;
+  private textureGlitchBus: GainNode | null = null;
 
   private constructor() {}
 
@@ -22,9 +29,24 @@ class AudioEngine {
 
     this.audioContext = new AudioContext();
     
-    // Create master chain: sources -> masterGain -> limiter -> analyser -> destination
+    // Create track glitch buses (audio passes through these before master)
+    this.drumsGlitchBus = this.audioContext.createGain();
+    this.drumsGlitchBus.gain.value = 1;
+    
+    this.synthGlitchBus = this.audioContext.createGain();
+    this.synthGlitchBus.gain.value = 1;
+    
+    this.textureGlitchBus = this.audioContext.createGain();
+    this.textureGlitchBus.gain.value = 1;
+    
+    // Create master chain: trackBuses -> masterGain -> limiter -> analyser -> destination
     this.masterGain = this.audioContext.createGain();
     this.masterGain.gain.value = 0.8;
+
+    // Connect track buses to master gain
+    this.drumsGlitchBus.connect(this.masterGain);
+    this.synthGlitchBus.connect(this.masterGain);
+    this.textureGlitchBus.connect(this.masterGain);
 
     // Limiter to prevent clipping
     this.masterLimiter = this.audioContext.createDynamicsCompressor();
@@ -45,10 +67,10 @@ class AudioEngine {
     this.analyser.connect(this.audioContext.destination);
 
     this.isInitialized = true;
-    console.log('[AudioEngine] Initialized at', this.audioContext.sampleRate, 'Hz');
+    console.log('[AudioEngine] Initialized with track buses at', this.audioContext.sampleRate, 'Hz');
   }
 
-  // Insert glitch engine between masterGain and masterLimiter
+  // Insert glitch engine between masterGain and masterLimiter (for master glitch)
   insertGlitchEngine(glitchInput: GainNode, glitchOutput: GainNode): void {
     if (!this.masterGain || !this.masterLimiter || this.glitchInserted) return;
     
@@ -61,6 +83,37 @@ class AudioEngine {
     
     this.glitchInserted = true;
     console.log('[AudioEngine] Glitch engine inserted into master chain');
+  }
+
+  // Get track bus for routing (drums, synth, texture connect here instead of masterGain)
+  getTrackBus(track: 'drums' | 'synth' | 'texture'): GainNode {
+    if (!this.isInitialized) {
+      throw new Error('AudioEngine not initialized. Call init() first.');
+    }
+    switch (track) {
+      case 'drums':
+        return this.drumsGlitchBus!;
+      case 'synth':
+        return this.synthGlitchBus!;
+      case 'texture':
+        return this.textureGlitchBus!;
+    }
+  }
+
+  // Insert track-specific glitch engine
+  insertTrackGlitch(track: 'drums' | 'synth' | 'texture', glitchInput: GainNode, glitchOutput: GainNode): void {
+    if (!this.masterGain) return;
+    
+    const trackBus = this.getTrackBus(track);
+    
+    // Disconnect track bus from master
+    trackBus.disconnect(this.masterGain);
+    
+    // Insert: trackBus -> glitchInput ... glitchOutput -> masterGain
+    trackBus.connect(glitchInput);
+    glitchOutput.connect(this.masterGain);
+    
+    console.log(`[AudioEngine] Track glitch inserted for ${track}`);
   }
 
   getContext(): AudioContext {

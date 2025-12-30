@@ -8,13 +8,25 @@ import {
   StutterParams, 
   BitcrushParams 
 } from '@/audio/GlitchEngine';
+import { GlitchTarget } from '@/audio/AudioEngine';
 
 interface GlitchModuleCompactProps {
   className?: string;
+  glitchTargets: GlitchTarget[];
+  onGlitchTargetsChange: (targets: GlitchTarget[]) => void;
+  onTriggerGlitch: (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse') => void;
+  onStutterParamsChange: (params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
+  onBitcrushParamsChange: (params: { bits?: number; sampleRate?: number; mix?: number }) => void;
 }
 
-export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => {
-  const [muted, setMuted] = useState(true);
+export const GlitchModuleCompact = ({ 
+  className, 
+  glitchTargets, 
+  onGlitchTargetsChange,
+  onTriggerGlitch,
+  onStutterParamsChange,
+  onBitcrushParamsChange,
+}: GlitchModuleCompactProps) => {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   
@@ -37,53 +49,53 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
     intensity: 50,
   });
 
-  const handleMuteToggle = () => {
-    const newMuted = !muted;
-    setMuted(newMuted);
-    glitchEngine.setBypass(newMuted);
-    if (newMuted && chaosEnabled) {
-      setChaosEnabled(false);
-      glitchEngine.stopChaos();
+  const isActive = glitchTargets.length > 0;
+
+  const toggleTarget = (target: GlitchTarget) => {
+    if (glitchTargets.includes(target)) {
+      onGlitchTargetsChange(glitchTargets.filter(t => t !== target));
+    } else {
+      onGlitchTargetsChange([...glitchTargets, target]);
     }
   };
 
   const handleStutterTrigger = () => {
-    if (muted) return;
+    if (!isActive) return;
     setActiveEffect('stutter');
-    glitchEngine.triggerStutter();
+    onTriggerGlitch('stutter');
     setTimeout(() => setActiveEffect(null), 200);
   };
 
   const handleTapeStopTrigger = () => {
-    if (muted) return;
+    if (!isActive) return;
     setActiveEffect('tapestop');
-    glitchEngine.triggerTapeStop();
+    onTriggerGlitch('tapestop');
     setTimeout(() => setActiveEffect(null), 500);
   };
 
   const handleFreezeTrigger = () => {
-    if (muted) return;
+    if (!isActive) return;
     setActiveEffect('freeze');
-    glitchEngine.triggerGranularFreeze();
+    onTriggerGlitch('freeze');
     setTimeout(() => setActiveEffect(null), 300);
   };
   
   const handleBitcrushTrigger = () => {
-    if (muted) return;
+    if (!isActive) return;
     setActiveEffect('crush');
-    glitchEngine.triggerBitcrush();
+    onTriggerGlitch('bitcrush');
     setTimeout(() => setActiveEffect(null), 500);
   };
 
   const handleReverseTrigger = () => {
-    if (muted) return;
+    if (!isActive) return;
     setActiveEffect('reverse');
-    glitchEngine.triggerReverse();
+    onTriggerGlitch('reverse');
     setTimeout(() => setActiveEffect(null), 400);
   };
   
   const handleChaosToggle = () => {
-    if (muted) return;
+    if (!isActive) return;
     const newEnabled = !chaosEnabled;
     setChaosEnabled(newEnabled);
     
@@ -99,23 +111,38 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
   };
 
   const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
+  const targetButtons: { id: GlitchTarget; label: string }[] = [
+    { id: 'master', label: 'M' },
+    { id: 'drums', label: 'D' },
+    { id: 'synth', label: 'S' },
+    { id: 'texture', label: 'T' },
+  ];
 
   return (
     <div className={cn('space-y-3', className)}>
-      {/* Header with mute toggle */}
+      {/* Header with target selector */}
       <div className="flex items-center justify-between">
         <span className="text-label text-muted-foreground flex items-center gap-2">
           <Zap className="w-3 h-3" />
           Glitch
         </span>
-        <Button
-          variant={muted ? 'outline' : 'default'}
-          size="sm"
-          onClick={handleMuteToggle}
-          className="h-6 px-2 text-[10px]"
-        >
-          {muted ? 'Off' : 'On'}
-        </Button>
+        <div className="flex gap-0.5">
+          {targetButtons.map(({ id, label }) => (
+            <Button
+              key={id}
+              variant={glitchTargets.includes(id) ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleTarget(id)}
+              className={cn(
+                'h-5 w-5 p-0 text-[9px] font-mono',
+                glitchTargets.includes(id) && 'bg-primary text-primary-foreground'
+              )}
+              title={id.charAt(0).toUpperCase() + id.slice(1)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* 5 Trigger Buttons - compact */}
@@ -124,7 +151,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
           variant="outline"
           size="sm"
           onClick={handleStutterTrigger}
-          disabled={muted}
+          disabled={!isActive}
           className={cn(
             'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
             activeEffect === 'stutter' && 'bg-primary/20 border-primary'
@@ -138,7 +165,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
           variant="outline"
           size="sm"
           onClick={handleTapeStopTrigger}
-          disabled={muted}
+          disabled={!isActive}
           className={cn(
             'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
             activeEffect === 'tapestop' && 'bg-primary/20 border-primary'
@@ -152,7 +179,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
           variant="outline"
           size="sm"
           onClick={handleFreezeTrigger}
-          disabled={muted}
+          disabled={!isActive}
           className={cn(
             'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
             activeEffect === 'freeze' && 'bg-primary/20 border-primary'
@@ -166,7 +193,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
           variant="outline"
           size="sm"
           onClick={handleBitcrushTrigger}
-          disabled={muted}
+          disabled={!isActive}
           className={cn(
             'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
             activeEffect === 'crush' && 'bg-primary/20 border-primary'
@@ -180,7 +207,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
           variant="outline"
           size="sm"
           onClick={handleReverseTrigger}
-          disabled={muted}
+          disabled={!isActive}
           className={cn(
             'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
             activeEffect === 'reverse' && 'bg-primary/20 border-primary'
@@ -200,15 +227,15 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
               key={div}
               onClick={() => {
                 setStutterParams(prev => ({ ...prev, division: div }));
-                glitchEngine.setStutterParams({ division: div });
+                onStutterParamsChange({ division: div });
               }}
-              disabled={muted}
+              disabled={!isActive}
               className={cn(
                 'flex-1 py-0.5 text-[9px] font-mono rounded border transition-colors',
                 stutterParams.division === div
                   ? 'border-primary bg-primary/20 text-primary'
                   : 'border-border text-muted-foreground hover:text-foreground',
-                muted && 'opacity-50'
+                !isActive && 'opacity-50'
               )}
             >
               {div}
@@ -220,21 +247,21 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
             value={stutterParams.decay}
             onChange={(v) => {
               setStutterParams(prev => ({ ...prev, decay: v }));
-              glitchEngine.setStutterParams({ decay: v / 100 });
+              onStutterParamsChange({ decay: v / 100 });
             }}
             label="Decay"
             size="sm"
-            variant={muted ? 'secondary' : 'primary'}
+            variant={!isActive ? 'secondary' : 'primary'}
           />
           <Knob
             value={stutterParams.mix}
             onChange={(v) => {
               setStutterParams(prev => ({ ...prev, mix: v }));
-              glitchEngine.setStutterParams({ mix: v / 100 });
+              onStutterParamsChange({ mix: v / 100 });
             }}
             label="Mix"
             size="sm"
-            variant={muted ? 'secondary' : 'accent'}
+            variant={!isActive ? 'secondary' : 'accent'}
           />
         </div>
       </div>
@@ -248,21 +275,21 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
             onChange={(v) => {
               const bits = Math.round(v / 6.25);
               setBitcrushParams(prev => ({ ...prev, bits: Math.max(1, Math.min(16, bits)) }));
-              glitchEngine.setBitcrushParams({ bits });
+              onBitcrushParamsChange({ bits });
             }}
             label={`${bitcrushParams.bits}bit`}
             size="sm"
-            variant={muted ? 'secondary' : 'primary'}
+            variant={!isActive ? 'secondary' : 'primary'}
           />
           <Knob
             value={bitcrushParams.sampleRate}
             onChange={(v) => {
               setBitcrushParams(prev => ({ ...prev, sampleRate: v }));
-              glitchEngine.setBitcrushParams({ sampleRate: v / 100 });
+              onBitcrushParamsChange({ sampleRate: v / 100 });
             }}
             label="Crush"
             size="sm"
-            variant={muted ? 'secondary' : 'accent'}
+            variant={!isActive ? 'secondary' : 'accent'}
           />
         </div>
       </div>
@@ -281,7 +308,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
             variant={chaosEnabled ? 'destructive' : 'outline'}
             size="sm"
             onClick={handleChaosToggle}
-            disabled={muted}
+            disabled={!isActive}
             className={cn(
               'h-5 px-2 text-[9px] ml-auto',
               chaosEnabled && 'animate-pulse'
@@ -303,7 +330,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
             }}
             label="Dens"
             size="sm"
-            variant={muted ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
           />
           <Knob
             value={chaosParams.intensity}
@@ -315,7 +342,7 @@ export const GlitchModuleCompact = ({ className }: GlitchModuleCompactProps) => 
             }}
             label="Int"
             size="sm"
-            variant={muted ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
           />
         </div>
       </div>
