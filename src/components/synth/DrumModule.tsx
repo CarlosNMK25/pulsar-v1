@@ -35,6 +35,8 @@ interface DrumModuleProps {
   onParamsChange: (params: DrumParams) => void;
   muted: boolean;
   onMuteToggle: () => void;
+  swing?: number;
+  humanize?: number;
 }
 
 export const DrumModule = ({ 
@@ -55,6 +57,8 @@ export const DrumModule = ({
   onParamsChange,
   muted,
   onMuteToggle,
+  swing = 0,
+  humanize = 0,
 }: DrumModuleProps) => {
   const toggleStep = useCallback((track: 'kick' | 'snare' | 'hat', index: number) => {
     const steps = { kick: kickSteps, snare: snareSteps, hat: hatSteps };
@@ -86,6 +90,8 @@ export const DrumModule = ({
             onLengthChange={onKickLengthChange}
             label="KICK"
             variant="primary"
+            swing={swing}
+            humanize={humanize}
           />
           <StepSequencer
             steps={snareSteps}
@@ -98,6 +104,8 @@ export const DrumModule = ({
             onLengthChange={onSnareLengthChange}
             label="SNARE"
             variant="secondary"
+            swing={swing}
+            humanize={humanize}
           />
           <StepSequencer
             steps={hatSteps}
@@ -110,6 +118,8 @@ export const DrumModule = ({
             onLengthChange={onHatLengthChange}
             label="HI-HAT"
             variant="muted"
+            swing={swing}
+            humanize={humanize}
           />
         </div>
 

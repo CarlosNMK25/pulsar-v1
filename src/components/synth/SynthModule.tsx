@@ -33,6 +33,8 @@ interface SynthModuleProps {
   onParamsChange: (params: SynthModuleProps['params']) => void;
   muted: boolean;
   onMuteToggle: () => void;
+  swing?: number;
+  humanize?: number;
 }
 
 const waveforms: WaveformType[] = ['sine', 'saw', 'square', 'tri'];
@@ -47,6 +49,8 @@ export const SynthModule = ({
   onParamsChange,
   muted,
   onMuteToggle,
+  swing = 0,
+  humanize = 0,
 }: SynthModuleProps) => {
   const toggleStep = (index: number) => {
     onStepsChange(steps.map((step, i) => 
@@ -112,6 +116,8 @@ export const SynthModule = ({
           showAcid={true}
           label="Sequence"
           variant="primary"
+          swing={swing}
+          humanize={humanize}
         />
 
         {/* Parameters */}

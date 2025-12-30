@@ -557,6 +557,8 @@ const Index = () => {
               onParamsChange={setDrumParams}
               muted={drumMuted}
               onMuteToggle={() => setDrumMuted(!drumMuted)}
+              swing={swing}
+              humanize={humanize}
             />
             <SynthModule 
               currentStep={currentStep}
@@ -568,6 +570,8 @@ const Index = () => {
               onParamsChange={setSynthParams}
               muted={synthMuted}
               onMuteToggle={() => setSynthMuted(!synthMuted)}
+              swing={swing}
+              humanize={humanize}
             />
             <TextureModule 
               isPlaying={isPlaying}

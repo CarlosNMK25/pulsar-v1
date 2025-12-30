@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Play, Pause, Square, SkipBack } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Knob } from './Knob';
@@ -25,6 +26,45 @@ export const TransportControls = ({
   onSwingChange,
   onHumanizeChange,
 }: TransportControlsProps) => {
+  const [tapTimes, setTapTimes] = useState<number[]>([]);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    };
+  }, []);
+
+  const handleTap = useCallback(() => {
+    const now = Date.now();
+    
+    // Clear existing timeout and set new one
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    tapTimeoutRef.current = setTimeout(() => setTapTimes([]), 2000);
+    
+    setTapTimes(prev => {
+      const newTaps = [...prev, now].slice(-8); // Keep last 8 taps
+      
+      if (newTaps.length >= 2) {
+        // Calculate average interval between taps
+        const intervals: number[] = [];
+        for (let i = 1; i < newTaps.length; i++) {
+          intervals.push(newTaps[i] - newTaps[i - 1]);
+        }
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const calculatedBpm = Math.round(60000 / avgInterval);
+        
+        // Clamp to valid BPM range
+        if (calculatedBpm >= 40 && calculatedBpm <= 300) {
+          onBpmChange(calculatedBpm);
+        }
+      }
+      
+      return newTaps;
+    });
+  }, [onBpmChange]);
+
   return (
     <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-border bg-card">
       {/* Transport buttons */}
@@ -88,6 +128,20 @@ export const TransportControls = ({
             +
           </button>
         </div>
+        
+        {/* Tap Tempo */}
+        <button
+          onClick={handleTap}
+          className={cn(
+            "px-3 h-8 rounded text-xs font-medium uppercase tracking-wider transition-colors",
+            tapTimes.length > 1 
+              ? "bg-primary/20 text-primary border border-primary/50" 
+              : "bg-muted hover:bg-accent"
+          )}
+          title="Tap repeatedly to set tempo"
+        >
+          TAP
+        </button>
       </div>
 
       {/* Divider */}
