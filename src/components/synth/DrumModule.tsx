@@ -1,8 +1,11 @@
-import { useCallback } from 'react';
-import { Disc3 } from 'lucide-react';
+import { useCallback, useRef } from 'react';
+import { Disc3, Upload, X } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { StepSequencer } from './StepSequencer';
 import { Knob } from './Knob';
+import { Button } from '@/components/ui/button';
+import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
+import { toast } from 'sonner';
 
 interface Step {
   active: boolean;
@@ -37,6 +40,9 @@ interface DrumModuleProps {
   onMuteToggle: () => void;
   swing?: number;
   humanize?: number;
+  loadedSamples?: { kick: boolean; snare: boolean; hat: boolean };
+  onLoadSample?: (drumType: 'kick' | 'snare' | 'hat', buffer: AudioBuffer) => void;
+  onClearSample?: (drumType: 'kick' | 'snare' | 'hat') => void;
 }
 
 export const DrumModule = ({ 
@@ -59,7 +65,13 @@ export const DrumModule = ({
   onMuteToggle,
   swing = 0,
   humanize = 0,
+  loadedSamples = { kick: false, snare: false, hat: false },
+  onLoadSample,
+  onClearSample,
 }: DrumModuleProps) => {
+  const kickInputRef = useRef<HTMLInputElement>(null);
+  const snareInputRef = useRef<HTMLInputElement>(null);
+  const hatInputRef = useRef<HTMLInputElement>(null);
   const toggleStep = useCallback((track: 'kick' | 'snare' | 'hat', index: number) => {
     const steps = { kick: kickSteps, snare: snareSteps, hat: hatSteps };
     const setters = { kick: onKickChange, snare: onSnareChange, hat: onHatChange };
@@ -68,6 +80,58 @@ export const DrumModule = ({
       i === index ? { ...step, active: !step.active } : step
     ));
   }, [kickSteps, snareSteps, hatSteps, onKickChange, onSnareChange, onHatChange]);
+
+  const handleFileSelect = useCallback(async (drumType: 'kick' | 'snare' | 'hat', file: File) => {
+    const validation = validateAudioFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    try {
+      const audioBuffer = await decodeAudioFile(file);
+      onLoadSample?.(drumType, audioBuffer);
+      toast.success(`${drumType.toUpperCase()} sample loaded`);
+    } catch (error) {
+      toast.error('Failed to decode audio file');
+      console.error(error);
+    }
+  }, [onLoadSample]);
+
+  const handleInputChange = useCallback((drumType: 'kick' | 'snare' | 'hat') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(drumType, file);
+    }
+    e.target.value = '';
+  }, [handleFileSelect]);
+
+  const inputRefs = { kick: kickInputRef, snare: snareInputRef, hat: hatInputRef };
+
+  const renderSampleButton = (drumType: 'kick' | 'snare' | 'hat') => (
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-5 w-5 p-0"
+        onClick={() => inputRefs[drumType].current?.click()}
+        title={`Load ${drumType} sample`}
+      >
+        <Upload className="w-2.5 h-2.5" />
+      </Button>
+      {loadedSamples[drumType] && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 w-5 p-0 text-destructive"
+          onClick={() => onClearSample?.(drumType)}
+          title={`Clear ${drumType} sample`}
+        >
+          <X className="w-2.5 h-2.5" />
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <ModuleCard
@@ -122,6 +186,11 @@ export const DrumModule = ({
             humanize={humanize}
           />
         </div>
+
+        {/* Hidden file inputs */}
+        <input ref={kickInputRef} type="file" accept=".wav,.mp3,.ogg" className="hidden" onChange={handleInputChange('kick')} />
+        <input ref={snareInputRef} type="file" accept=".wav,.mp3,.ogg" className="hidden" onChange={handleInputChange('snare')} />
+        <input ref={hatInputRef} type="file" accept=".wav,.mp3,.ogg" className="hidden" onChange={handleInputChange('hat')} />
 
         {/* Parameters */}
         <div className="flex justify-between pt-3 border-t border-border">

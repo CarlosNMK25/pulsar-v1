@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { GlitchTarget } from '@/audio/AudioEngine';
 import { Header } from '@/components/synth/Header';
 import { TransportControls } from '@/components/synth/TransportControls';
 import { GlitchWaveformDisplay } from '@/components/synth/GlitchWaveformDisplay';
@@ -15,8 +16,10 @@ import { useDrumState } from '@/hooks/useDrumState';
 import { useSynthState } from '@/hooks/useSynthState';
 import { useTextureState } from '@/hooks/useTextureState';
 import { useFXState } from '@/hooks/useFXState';
+import { useSampleState } from '@/hooks/useSampleState';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { SampleModule } from '@/components/synth/SampleModule';
 
 const Index = () => {
   // Transport state
@@ -26,13 +29,15 @@ const Index = () => {
   const [humanize, setHumanize] = useState(0);
   
   // Glitch targets state
-  const [glitchTargets, setGlitchTargets] = useState<Array<'master' | 'drums' | 'synth' | 'texture'>>(['master']);
+  const [glitchTargets, setGlitchTargets] = useState<GlitchTarget[]>(['master']);
 
   // Instrument state hooks
   const drumState = useDrumState();
   const synthState = useSynthState();
   const textureState = useTextureState();
   const fxState = useFXState();
+  const sampleState = useSampleState();
+  const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
 
   // Scene manager
   const sceneManager = useSceneManager({
@@ -147,7 +152,7 @@ const Index = () => {
           </div>
 
           {/* Instruments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <DrumModule 
               currentStep={currentStep}
               kickSteps={drumState.kickSteps}
@@ -196,6 +201,21 @@ const Index = () => {
               delayParams={fxState.delayParams}
               onReverbChange={fxState.updateReverbParams}
               onDelayChange={fxState.updateDelayParams}
+            />
+            <SampleModule
+              buffer={sampleState.sampleBuffer}
+              sampleName={sampleState.sampleName}
+              muted={sampleState.sampleMuted}
+              params={sampleState.sampleParams}
+              isPlaying={sampleIsPlaying}
+              onLoadSample={(buffer, name) => {
+                sampleState.setSampleBuffer(buffer);
+                sampleState.setSampleName(name);
+              }}
+              onClearSample={sampleState.clearSample}
+              onParamsChange={sampleState.setSampleParams}
+              onMuteToggle={sampleState.toggleSampleMute}
+              onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
             />
           </div>
 

@@ -22,6 +22,7 @@ export class TextureEngine {
   private mode: TextureMode = 'noise';
   private noiseSource: AudioBufferSourceNode | null = null;
   private grainBuffer: AudioBuffer | null = null;
+  private customGrainBuffer: AudioBuffer | null = null;
   private grainScheduler: number | null = null;
   private droneOscillators: OscillatorNode[] = [];
   private droneLFOs: OscillatorNode[] = [];
@@ -381,7 +382,8 @@ export class TextureEngine {
 
   // ========== GRANULAR MODE ==========
   private startGranular(): void {
-    if (!this.grainBuffer) return;
+    const buffer = this.customGrainBuffer || this.grainBuffer;
+    if (!buffer) return;
 
     // Schedule grains based on density
     const scheduleGrain = () => {
@@ -398,19 +400,20 @@ export class TextureEngine {
   }
 
   private createGrain(): void {
-    if (!this.grainBuffer) return;
+    const buffer = this.customGrainBuffer || this.grainBuffer;
+    if (!buffer) return;
 
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
 
     const grain = ctx.createBufferSource();
-    grain.buffer = this.grainBuffer;
+    grain.buffer = buffer;
 
     // Playback rate based on pitch (0.25x - 3x for more dramatic effect)
     grain.playbackRate.value = 0.25 + this.params.pitch * 2.75;
 
     // Start position based on spread
-    const bufferDuration = this.grainBuffer.duration;
+    const bufferDuration = buffer.duration;
     const randomOffset = Math.random() * this.params.spread;
     const startOffset = randomOffset * (bufferDuration - 0.5);
 
@@ -440,6 +443,19 @@ export class TextureEngine {
       envelope.disconnect();
       panner.disconnect();
     };
+  }
+
+  // Custom grain source methods
+  loadGrainSource(buffer: AudioBuffer): void {
+    this.customGrainBuffer = buffer;
+  }
+
+  clearGrainSource(): void {
+    this.customGrainBuffer = null;
+  }
+
+  hasCustomSource(): boolean {
+    return this.customGrainBuffer !== null;
   }
 
   // ========== DRONE MODE ==========
