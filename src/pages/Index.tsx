@@ -15,6 +15,7 @@ import { TextureMode } from '@/audio/TextureEngine';
 import { sceneEngine, SceneData, InterpolatedParams } from '@/audio/SceneEngine';
 import { macroEngine } from '@/audio/MacroEngine';
 import { FactoryPresetName } from '@/audio/factoryPresets';
+import { scheduler } from '@/audio/Scheduler';
 import { toast } from 'sonner';
 
 const initialScenes = [
@@ -451,6 +452,11 @@ const Index = () => {
     });
     macroEngine.setMorphMacroCallback(handleMorphChange);
   }, [handleMorphChange]);
+
+  // Sync humanize to scheduler
+  useEffect(() => {
+    scheduler.setHumanize(humanize / 100);
+  }, [humanize]);
 
   const handlePlayPause = useCallback(async () => {
     if (!isInitialized) {
