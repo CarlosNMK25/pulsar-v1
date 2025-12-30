@@ -14,6 +14,13 @@ interface VoiceParams {
   resonance: number;
 }
 
+// Acid 303 options for noteOn
+export interface AcidNoteOptions {
+  slide?: boolean;
+  accent?: boolean;
+  tie?: boolean;
+}
+
 interface Voice {
   oscillator1: OscillatorNode;
   oscillator2: OscillatorNode;
@@ -21,6 +28,7 @@ interface Voice {
   filter: BiquadFilterNode;
   startTime: number;
   note: number;
+  isSliding?: boolean;
 }
 
 const waveformMap: Record<WaveformType, OscillatorType> = {
@@ -40,6 +48,8 @@ export class SynthVoice {
   private muted = false;
   private lfo: OscillatorNode | null = null;
   private lfoGain: GainNode | null = null;
+  private lastNote: number | null = null;
+  private slideVoice: Voice | null = null;
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -91,6 +101,10 @@ export class SynthVoice {
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
+  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number } {
+    return { ...this.params };
+  }
+
   setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number }>): void {
     this.params = { ...this.params, ...params };
     
@@ -117,12 +131,34 @@ export class SynthVoice {
     });
   }
 
-  noteOn(note: number, velocity: number = 100): void {
+  noteOn(note: number, velocity: number = 100, options?: AcidNoteOptions): void {
     if (this.muted) return;
     
     const ctx = audioEngine.getContext();
     const frequency = this.midiToFrequency(note);
     const now = ctx.currentTime;
+    
+    const slide = options?.slide ?? false;
+    const accent = options?.accent ?? false;
+    const tie = options?.tie ?? false;
+
+    // Acid 303: Slide - glide from previous note instead of retriggering
+    if (slide && this.slideVoice && this.lastNote !== null) {
+      const slideTime = 0.06; // 60ms glide time (classic 303)
+      this.slideVoice.oscillator1.frequency.linearRampToValueAtTime(frequency, now + slideTime);
+      this.slideVoice.oscillator2.frequency.linearRampToValueAtTime(frequency, now + slideTime);
+      this.slideVoice.isSliding = true;
+      this.lastNote = note;
+      return;
+    }
+
+    // Acid 303: Tie - don't retrigger envelope, just change pitch
+    if (tie && this.slideVoice && this.lastNote !== null) {
+      this.slideVoice.oscillator1.frequency.setValueAtTime(frequency, now);
+      this.slideVoice.oscillator2.frequency.setValueAtTime(frequency, now);
+      this.lastNote = note;
+      return;
+    }
 
     // Stop existing voice on same note
     if (this.voices.has(note)) {
@@ -141,12 +177,16 @@ export class SynthVoice {
     // Create filter
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = this.params.cutoff;
-    filter.Q.value = this.params.resonance;
+    // Acid 303: Accent - boost filter cutoff and resonance
+    const accentBoost = accent ? 1.5 : 1.0;
+    filter.frequency.value = this.params.cutoff * accentBoost;
+    filter.Q.value = this.params.resonance * (accent ? 1.3 : 1.0);
 
     // Create voice gain envelope
     const voiceGain = ctx.createGain();
-    const normalizedVelocity = (velocity / 127) * 0.5;
+    // Acid 303: Accent - boost velocity
+    const accentVelocity = accent ? Math.min(velocity * 1.4, 127) : velocity;
+    const normalizedVelocity = (accentVelocity / 127) * 0.5;
     voiceGain.gain.setValueAtTime(0, now);
     voiceGain.gain.linearRampToValueAtTime(normalizedVelocity, now + this.params.attack);
 
@@ -167,14 +207,19 @@ export class SynthVoice {
     osc1.start(now);
     osc2.start(now);
 
-    this.voices.set(note, {
+    const voice: Voice = {
       oscillator1: osc1,
       oscillator2: osc2,
       gainNode: voiceGain,
       filter,
       startTime: now,
       note,
-    });
+      isSliding: false,
+    };
+
+    this.voices.set(note, voice);
+    this.slideVoice = voice;
+    this.lastNote = note;
   }
 
   noteOff(note: number): void {
