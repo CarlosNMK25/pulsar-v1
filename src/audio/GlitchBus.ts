@@ -6,7 +6,7 @@ import { scheduler } from './Scheduler';
 import { StutterParams, BitcrushParams } from './GlitchEngine';
 
 export class GlitchBus {
-  private track: 'drums' | 'synth' | 'texture';
+  private track: 'drums' | 'synth' | 'texture' | 'sample';
   private inputNode: GainNode | null = null;
   private outputNode: GainNode | null = null;
   private dryNode: GainNode | null = null;
@@ -42,7 +42,7 @@ export class GlitchBus {
     reverse: { duration: 0.5, mix: 0.7 },
   };
 
-  constructor(track: 'drums' | 'synth' | 'texture') {
+  constructor(track: 'drums' | 'synth' | 'texture' | 'sample') {
     this.track = track;
   }
 

@@ -7,7 +7,7 @@ import { StutterParams, BitcrushParams } from '@/audio/GlitchEngine';
 import { GlitchTarget } from '@/audio/AudioEngine';
 
 type RoutingMode = 'master' | 'individual';
-type IndividualTarget = 'drums' | 'synth' | 'texture';
+type IndividualTarget = 'drums' | 'synth' | 'texture' | 'sample';
 
 interface GlitchModuleCompactProps {
   className?: string;
@@ -45,6 +45,7 @@ export const GlitchModuleCompact = ({
     if (glitchTargets.includes('drums')) targets.add('drums');
     if (glitchTargets.includes('synth')) targets.add('synth');
     if (glitchTargets.includes('texture')) targets.add('texture');
+    if (glitchTargets.includes('sample')) targets.add('sample');
     return targets;
   });
   
@@ -183,6 +184,7 @@ export const GlitchModuleCompact = ({
     { id: 'drums', label: 'D', color: 'hsl(var(--primary))' },
     { id: 'synth', label: 'S', color: 'hsl(var(--accent))' },
     { id: 'texture', label: 'T', color: 'hsl(var(--secondary))' },
+    { id: 'sample', label: 'Smp', color: 'hsl(var(--muted))' },
   ];
 
   return (
