@@ -29,6 +29,8 @@ interface StepSequencerProps {
   showAcid?: boolean;
   label?: string;
   variant?: 'primary' | 'secondary' | 'muted';
+  swing?: number;
+  humanize?: number;
 }
 
 export const StepSequencer = ({
@@ -46,6 +48,8 @@ export const StepSequencer = ({
   showAcid = false,
   label,
   variant = 'primary',
+  swing = 0,
+  humanize = 0,
 }: StepSequencerProps) => {
   const [editingStep, setEditingStep] = useState<number | null>(null);
   
@@ -170,6 +174,24 @@ export const StepSequencer = ({
                 <div 
                   className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-secondary"
                   title={`${step.probability}% probability`}
+                />
+              )}
+              
+              {/* Swing indicator - odd steps only */}
+              {swing > 0 && index % 2 === 1 && (
+                <div 
+                  className="absolute top-0 right-0 w-0 h-0 border-t-[6px] border-r-[6px] border-t-cyan-400 border-r-transparent rounded-tr"
+                  style={{ opacity: 0.3 + (swing / 100) * 0.7 }}
+                  title={`Swing: ${swing}%`}
+                />
+              )}
+              
+              {/* Humanize indicator */}
+              {humanize > 0 && step.active && (
+                <div 
+                  className="absolute inset-0 rounded border border-dashed border-orange-400"
+                  style={{ opacity: 0.2 + (humanize / 100) * 0.4 }}
+                  title={`Humanize: ${humanize}%`}
                 />
               )}
               
