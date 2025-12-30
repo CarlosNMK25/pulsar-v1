@@ -134,7 +134,7 @@ const Index = () => {
 
       {/* Main content */}
       <main className="flex-1 p-6 overflow-auto scrollbar-thin">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-8">
           {/* Transport & Waveform */}
           <div className="space-y-4">
             <TransportControls
@@ -155,112 +155,139 @@ const Index = () => {
             <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
           </div>
 
-          {/* Instruments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            <DrumModule 
-              currentStep={currentStep}
-              kickSteps={drumState.kickSteps}
-              snareSteps={drumState.snareSteps}
-              hatSteps={drumState.hatSteps}
-              onKickChange={drumState.setKickSteps}
-              onSnareChange={drumState.setSnareSteps}
-              onHatChange={drumState.setHatSteps}
-              kickLength={drumState.kickLength}
-              snareLength={drumState.snareLength}
-              hatLength={drumState.hatLength}
-              onKickLengthChange={drumState.setKickLength}
-              onSnareLengthChange={drumState.setSnareLength}
-              onHatLengthChange={drumState.setHatLength}
-              params={drumState.drumParams}
-              onParamsChange={drumState.setDrumParams}
-              muted={drumState.drumMuted}
-              onMuteToggle={drumState.toggleDrumMute}
-              swing={swing}
-              humanize={humanize}
-            />
-            <SynthModule 
-              currentStep={currentStep}
-              steps={synthState.synthSteps}
-              onStepsChange={synthState.setSynthSteps}
-              patternLength={synthState.synthLength}
-              onLengthChange={synthState.setSynthLength}
-              params={synthState.synthParams}
-              onParamsChange={synthState.setSynthParams}
-              muted={synthState.synthMuted}
-              onMuteToggle={synthState.toggleSynthMute}
-              swing={swing}
-              humanize={humanize}
-            />
-            <TextureModule 
-              isPlaying={isPlaying}
-              muted={textureState.textureMuted}
-              onMuteToggle={textureState.toggleTextureMute}
-              mode={textureState.textureMode}
-              onModeChange={textureState.setTextureMode}
-              params={textureState.textureParams}
-              onParamsChange={textureState.setTextureParams}
-            />
-            <FXModule
-              reverbParams={fxState.reverbParams}
-              delayParams={fxState.delayParams}
-              onReverbChange={fxState.updateReverbParams}
-              onDelayChange={fxState.updateDelayParams}
-            />
-            <SampleModule
-              buffer={sampleState.sampleBuffer}
-              sampleName={sampleState.sampleName}
-              muted={sampleState.sampleMuted}
-              params={sampleState.sampleParams}
-              isPlaying={sampleIsPlaying}
-              onLoadSample={(buffer, name) => {
-                sampleState.setSampleBuffer(buffer);
-                sampleState.setSampleName(name);
-              }}
-              onClearSample={sampleState.clearSample}
-              onParamsChange={sampleState.setSampleParams}
-              onMuteToggle={sampleState.toggleSampleMute}
-              onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
-            />
-          </div>
+          {/* GENERADORES - Sound Sources */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="h-px flex-1 bg-border/50" />
+              <span>Generadores</span>
+              <div className="h-px flex-1 bg-border/50" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <DrumModule 
+                currentStep={currentStep}
+                kickSteps={drumState.kickSteps}
+                snareSteps={drumState.snareSteps}
+                hatSteps={drumState.hatSteps}
+                onKickChange={drumState.setKickSteps}
+                onSnareChange={drumState.setSnareSteps}
+                onHatChange={drumState.setHatSteps}
+                kickLength={drumState.kickLength}
+                snareLength={drumState.snareLength}
+                hatLength={drumState.hatLength}
+                onKickLengthChange={drumState.setKickLength}
+                onSnareLengthChange={drumState.setSnareLength}
+                onHatLengthChange={drumState.setHatLength}
+                params={drumState.drumParams}
+                onParamsChange={drumState.setDrumParams}
+                muted={drumState.drumMuted}
+                onMuteToggle={drumState.toggleDrumMute}
+                swing={swing}
+                humanize={humanize}
+              />
+              <SynthModule 
+                currentStep={currentStep}
+                steps={synthState.synthSteps}
+                onStepsChange={synthState.setSynthSteps}
+                patternLength={synthState.synthLength}
+                onLengthChange={synthState.setSynthLength}
+                params={synthState.synthParams}
+                onParamsChange={synthState.setSynthParams}
+                muted={synthState.synthMuted}
+                onMuteToggle={synthState.toggleSynthMute}
+                swing={swing}
+                humanize={humanize}
+              />
+              <TextureModule 
+                isPlaying={isPlaying}
+                muted={textureState.textureMuted}
+                onMuteToggle={textureState.toggleTextureMute}
+                mode={textureState.textureMode}
+                onModeChange={textureState.setTextureMode}
+                params={textureState.textureParams}
+                onParamsChange={textureState.setTextureParams}
+              />
+              <SampleModule
+                buffer={sampleState.sampleBuffer}
+                sampleName={sampleState.sampleName}
+                muted={sampleState.sampleMuted}
+                params={sampleState.sampleParams}
+                isPlaying={sampleIsPlaying}
+                onLoadSample={(buffer, name) => {
+                  sampleState.setSampleBuffer(buffer);
+                  sampleState.setSampleName(name);
+                }}
+                onClearSample={sampleState.clearSample}
+                onParamsChange={sampleState.setSampleParams}
+                onMuteToggle={sampleState.toggleSampleMute}
+                onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
+              />
+            </div>
+          </section>
 
-          {/* Performance layer - 3 columns */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-            <div className="module">
-              <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
+          {/* PROCESAMIENTO - Effects */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="h-px flex-1 bg-border/50" />
+              <span>Procesamiento</span>
+              <div className="h-px flex-1 bg-border/50" />
             </div>
-            <div className="module p-4">
-              <GlitchModuleCompact 
-                glitchTargets={glitchTargets}
-                onGlitchTargetsChange={setGlitchTargets}
-                onTriggerGlitch={triggerGlitch}
-                onStutterParamsChange={setGlitchStutterParams}
-                onBitcrushParamsChange={setGlitchBitcrushParams}
-                onChaosToggle={setChaosEnabled}
-                onChaosParamsChange={setGlitchChaosParams}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="min-h-[200px]">
+                <FXModule
+                  reverbParams={fxState.reverbParams}
+                  delayParams={fxState.delayParams}
+                  onReverbChange={fxState.updateReverbParams}
+                  onDelayChange={fxState.updateDelayParams}
+                />
+              </div>
+              <div className="module p-4 min-h-[200px]">
+                <GlitchModuleCompact 
+                  glitchTargets={glitchTargets}
+                  onGlitchTargetsChange={setGlitchTargets}
+                  onTriggerGlitch={triggerGlitch}
+                  onStutterParamsChange={setGlitchStutterParams}
+                  onBitcrushParamsChange={setGlitchBitcrushParams}
+                  onChaosToggle={setChaosEnabled}
+                  onChaosParamsChange={setGlitchChaosParams}
+                />
+              </div>
             </div>
-            <div className="module">
-              <SceneSlots
-                scenes={sceneManager.scenes}
-                activeScene={sceneManager.activeScene}
-                morphTargetScene={sceneManager.morphTargetScene}
-                savedSceneIds={sceneManager.savedSceneIds}
-                hasClipboard={sceneManager.hasClipboard}
-                clipboardName={sceneManager.clipboardName}
-                onSceneSelect={sceneManager.handleSceneSelect}
-                onSceneSave={sceneManager.handleSceneSave}
-                onMorphTargetSet={sceneManager.handleMorphTargetSet}
-                onSceneCopy={sceneManager.handleSceneCopy}
-                onScenePaste={sceneManager.handleScenePaste}
-                onSceneRename={sceneManager.handleSceneRename}
-                onLoadPreset={sceneManager.handleLoadPreset}
-                onExportScene={sceneManager.handleExportScene}
-                onExportAll={sceneManager.handleExportAll}
-                onImportScene={sceneManager.handleImportScene}
-                onImportAll={sceneManager.handleImportAll}
-              />
+          </section>
+
+          {/* CONTROL - Performance */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="h-px flex-1 bg-border/50" />
+              <span>Control</span>
+              <div className="h-px flex-1 bg-border/50" />
             </div>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="module">
+                <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
+              </div>
+              <div className="module">
+                <SceneSlots
+                  scenes={sceneManager.scenes}
+                  activeScene={sceneManager.activeScene}
+                  morphTargetScene={sceneManager.morphTargetScene}
+                  savedSceneIds={sceneManager.savedSceneIds}
+                  hasClipboard={sceneManager.hasClipboard}
+                  clipboardName={sceneManager.clipboardName}
+                  onSceneSelect={sceneManager.handleSceneSelect}
+                  onSceneSave={sceneManager.handleSceneSave}
+                  onMorphTargetSet={sceneManager.handleMorphTargetSet}
+                  onSceneCopy={sceneManager.handleSceneCopy}
+                  onScenePaste={sceneManager.handleScenePaste}
+                  onSceneRename={sceneManager.handleSceneRename}
+                  onLoadPreset={sceneManager.handleLoadPreset}
+                  onExportScene={sceneManager.handleExportScene}
+                  onExportAll={sceneManager.handleExportAll}
+                  onImportScene={sceneManager.handleImportScene}
+                  onImportAll={sceneManager.handleImportAll}
+                />
+              </div>
+            </div>
+          </section>
 
           {/* Status bar */}
           <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-card/50 border border-border text-xs text-muted-foreground">
