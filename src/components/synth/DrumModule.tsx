@@ -1,36 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Disc3 } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { StepSequencer } from './StepSequencer';
 import { Knob } from './Knob';
 
-interface DrumModuleProps {
-  currentStep: number;
+interface Step {
+  active: boolean;
+  velocity: number;
+  probability: number;
 }
 
-const initialKickSteps = Array(16).fill(null).map((_, i) => ({
-  active: i % 4 === 0,
-  velocity: 100,
-  probability: 100,
-}));
+interface DrumModuleProps {
+  currentStep: number;
+  kickSteps: Step[];
+  snareSteps: Step[];
+  hatSteps: Step[];
+  onKickChange: (steps: Step[]) => void;
+  onSnareChange: (steps: Step[]) => void;
+  onHatChange: (steps: Step[]) => void;
+}
 
-const initialSnareSteps = Array(16).fill(null).map((_, i) => ({
-  active: i % 8 === 4,
-  velocity: 90,
-  probability: 100,
-}));
-
-const initialHatSteps = Array(16).fill(null).map((_, i) => ({
-  active: i % 2 === 0,
-  velocity: 70 + Math.random() * 30,
-  probability: i % 4 === 2 ? 70 : 100,
-}));
-
-export const DrumModule = ({ currentStep }: DrumModuleProps) => {
+export const DrumModule = ({ 
+  currentStep, 
+  kickSteps, 
+  snareSteps, 
+  hatSteps,
+  onKickChange,
+  onSnareChange,
+  onHatChange,
+}: DrumModuleProps) => {
   const [muted, setMuted] = useState(false);
-  const [kickSteps, setKickSteps] = useState(initialKickSteps);
-  const [snareSteps, setSnareSteps] = useState(initialSnareSteps);
-  const [hatSteps, setHatSteps] = useState(initialHatSteps);
   const [params, setParams] = useState({
     pitch: 50,
     decay: 60,
@@ -38,14 +37,14 @@ export const DrumModule = ({ currentStep }: DrumModuleProps) => {
     mix: 75,
   });
 
-  const toggleStep = (track: 'kick' | 'snare' | 'hat', index: number) => {
-    const setters = { kick: setKickSteps, snare: setSnareSteps, hat: setHatSteps };
+  const toggleStep = useCallback((track: 'kick' | 'snare' | 'hat', index: number) => {
     const steps = { kick: kickSteps, snare: snareSteps, hat: hatSteps };
+    const setters = { kick: onKickChange, snare: onSnareChange, hat: onHatChange };
     
     setters[track](steps[track].map((step, i) => 
       i === index ? { ...step, active: !step.active } : step
     ));
-  };
+  }, [kickSteps, snareSteps, hatSteps, onKickChange, onSnareChange, onHatChange]);
 
   return (
     <ModuleCard

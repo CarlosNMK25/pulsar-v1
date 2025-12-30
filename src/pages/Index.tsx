@@ -7,6 +7,8 @@ import { SynthModule } from '@/components/synth/SynthModule';
 import { TextureModule } from '@/components/synth/TextureModule';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { WaveformType } from '@/audio/SynthVoice';
 
 const initialScenes = [
   { id: 'a', name: 'Init' },
@@ -30,12 +32,61 @@ const initialMacros = [
   { id: 'm8', name: 'Master', value: 75, targets: ['master.gain'] },
 ];
 
+const createInitialSteps = (pattern: number[]) => 
+  Array(16).fill(null).map((_, i) => ({
+    active: pattern.includes(i),
+    velocity: 80 + Math.random() * 40,
+    probability: 100,
+  }));
+
 const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [currentStep, setCurrentStep] = useState(0);
   const [activeScene, setActiveScene] = useState('a');
   const [macros, setMacros] = useState(initialMacros);
+
+  // Drum steps
+  const [kickSteps, setKickSteps] = useState(() => createInitialSteps([0, 4, 8, 12]));
+  const [snareSteps, setSnareSteps] = useState(() => createInitialSteps([4, 12]));
+  const [hatSteps, setHatSteps] = useState(() => createInitialSteps([0, 2, 4, 6, 8, 10, 12, 14]));
+
+  // Synth steps and params
+  const [synthSteps, setSynthSteps] = useState(() => createInitialSteps([0, 3, 6, 8, 10, 12, 14]));
+  const [synthParams, setSynthParams] = useState({
+    waveform: 'saw' as WaveformType,
+    cutoff: 65,
+    resonance: 40,
+    attack: 10,
+    release: 45,
+    detune: 25,
+    lfoRate: 30,
+  });
+
+  // Texture params
+  const [textureMuted, setTextureMuted] = useState(false);
+  const [textureParams, setTextureParams] = useState({
+    density: 45,
+    spread: 60,
+    pitch: 50,
+    size: 35,
+    feedback: 20,
+    mix: 50,
+  });
+
+  // Audio engine hook
+  const { initAudio, isInitialized, analyserData, audioState } = useAudioEngine({
+    isPlaying,
+    bpm,
+    currentStep,
+    kickSteps,
+    snareSteps,
+    hatSteps,
+    synthSteps,
+    synthParams,
+    textureParams,
+    textureMuted,
+  });
 
   // Sequencer clock
   useEffect(() => {
@@ -50,9 +101,12 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [isPlaying, bpm]);
 
-  const handlePlayPause = useCallback(() => {
+  const handlePlayPause = useCallback(async () => {
+    if (!isInitialized) {
+      await initAudio();
+    }
     setIsPlaying((prev) => !prev);
-  }, []);
+  }, [isInitialized, initAudio]);
 
   const handleStop = useCallback(() => {
     setIsPlaying(false);
@@ -67,15 +121,14 @@ const Index = () => {
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
-        handlePlayPause();
+        await handlePlayPause();
       }
       if (e.code === 'Escape') {
         handleStop();
       }
-      // Scene shortcuts (Shift + 1-8)
       if (e.shiftKey && e.code.startsWith('Digit')) {
         const num = parseInt(e.code.replace('Digit', ''));
         if (num >= 1 && num <= 8) {
@@ -106,15 +159,35 @@ const Index = () => {
               onBpmChange={setBpm}
             />
             <div className="lg:col-span-2">
-              <WaveformDisplay isPlaying={isPlaying} />
+              <WaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
             </div>
           </div>
 
           {/* Instruments */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <DrumModule currentStep={currentStep} />
-            <SynthModule currentStep={currentStep} />
-            <TextureModule isPlaying={isPlaying} />
+            <DrumModule 
+              currentStep={currentStep}
+              kickSteps={kickSteps}
+              snareSteps={snareSteps}
+              hatSteps={hatSteps}
+              onKickChange={setKickSteps}
+              onSnareChange={setSnareSteps}
+              onHatChange={setHatSteps}
+            />
+            <SynthModule 
+              currentStep={currentStep}
+              steps={synthSteps}
+              onStepsChange={setSynthSteps}
+              params={synthParams}
+              onParamsChange={setSynthParams}
+            />
+            <TextureModule 
+              isPlaying={isPlaying}
+              muted={textureMuted}
+              onMuteToggle={() => setTextureMuted(!textureMuted)}
+              params={textureParams}
+              onParamsChange={setTextureParams}
+            />
           </div>
 
           {/* Performance layer */}
@@ -138,11 +211,10 @@ const Index = () => {
               <span>Scene: {initialScenes.find(s => s.id === activeScene)?.name}</span>
             </div>
             <div className="flex items-center gap-4">
-              <span>CPU: 12%</span>
-              <span>Latency: 128 samples</span>
+              <span>Audio: {audioState}</span>
               <span className="flex items-center gap-1">
-                <span className="led on" />
-                Audio Ready
+                <span className={`led ${isInitialized ? 'on' : ''}`} />
+                {isInitialized ? 'Engine Ready' : 'Click Play to Init'}
               </span>
             </div>
           </div>

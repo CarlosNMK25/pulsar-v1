@@ -3,13 +3,13 @@ import { cn } from '@/lib/utils';
 
 interface WaveformDisplayProps {
   isPlaying: boolean;
+  analyserData: Uint8Array;
   className?: string;
 }
 
-export const WaveformDisplay = ({ isPlaying, className }: WaveformDisplayProps) => {
+export const WaveformDisplay = ({ isPlaying, analyserData, className }: WaveformDisplayProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
-  const phaseRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24,10 +24,6 @@ export const WaveformDisplay = ({ isPlaying, className }: WaveformDisplayProps) 
       // Clear with fade effect
       ctx.fillStyle = 'rgba(12, 14, 18, 0.15)';
       ctx.fillRect(0, 0, width, height);
-
-      if (isPlaying) {
-        phaseRef.current += 0.05;
-      }
 
       // Draw grid
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
@@ -54,22 +50,22 @@ export const WaveformDisplay = ({ isPlaying, className }: WaveformDisplayProps) 
       ctx.lineTo(width, height / 2);
       ctx.stroke();
 
-      if (isPlaying) {
-        // Draw waveform
+      if (isPlaying && analyserData.length > 0) {
+        // Draw frequency bars
+        const barWidth = width / analyserData.length;
+        
         ctx.beginPath();
         ctx.strokeStyle = 'hsl(180, 100%, 50%)';
         ctx.lineWidth = 2;
         ctx.shadowColor = 'hsl(180, 100%, 50%)';
         ctx.shadowBlur = 10;
 
-        for (let x = 0; x < width; x++) {
-          const y = height / 2 + 
-            Math.sin((x * 0.02) + phaseRef.current) * 30 +
-            Math.sin((x * 0.05) + phaseRef.current * 1.5) * 15 +
-            Math.sin((x * 0.01) + phaseRef.current * 0.5) * 20 +
-            (Math.random() - 0.5) * 5;
-          
-          if (x === 0) {
+        for (let i = 0; i < analyserData.length; i++) {
+          const x = i * barWidth;
+          const barHeight = (analyserData[i] / 255) * height * 0.8;
+          const y = height - barHeight;
+
+          if (i === 0) {
             ctx.moveTo(x, y);
           } else {
             ctx.lineTo(x, y);
@@ -77,19 +73,19 @@ export const WaveformDisplay = ({ isPlaying, className }: WaveformDisplayProps) 
         }
         ctx.stroke();
 
-        // Secondary wave
+        // Mirror effect
         ctx.beginPath();
         ctx.strokeStyle = 'hsl(35, 100%, 55%)';
         ctx.lineWidth = 1;
         ctx.shadowColor = 'hsl(35, 100%, 55%)';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 5;
 
-        for (let x = 0; x < width; x++) {
-          const y = height / 2 + 
-            Math.sin((x * 0.03) + phaseRef.current * 0.7) * 20 +
-            Math.cos((x * 0.02) + phaseRef.current) * 10;
-          
-          if (x === 0) {
+        for (let i = 0; i < analyserData.length; i++) {
+          const x = i * barWidth;
+          const barHeight = (analyserData[i] / 255) * height * 0.4;
+          const y = barHeight;
+
+          if (i === 0) {
             ctx.moveTo(x, y);
           } else {
             ctx.lineTo(x, y);
@@ -110,7 +106,7 @@ export const WaveformDisplay = ({ isPlaying, className }: WaveformDisplayProps) 
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, analyserData]);
 
   // Handle resize
   useEffect(() => {
