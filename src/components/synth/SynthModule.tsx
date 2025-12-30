@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react';
 import { Waves } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { StepSequencer } from './StepSequencer';
@@ -26,6 +26,8 @@ interface SynthModuleProps {
     lfoRate: number;
   };
   onParamsChange: (params: SynthModuleProps['params']) => void;
+  muted: boolean;
+  onMuteToggle: () => void;
 }
 
 const waveforms: WaveformType[] = ['sine', 'saw', 'square', 'tri'];
@@ -36,9 +38,9 @@ export const SynthModule = ({
   onStepsChange,
   params,
   onParamsChange,
+  muted,
+  onMuteToggle,
 }: SynthModuleProps) => {
-  const [muted, setMuted] = useState(false);
-
   const toggleStep = (index: number) => {
     onStepsChange(steps.map((step, i) => 
       i === index ? { ...step, active: !step.active } : step
@@ -54,7 +56,7 @@ export const SynthModule = ({
       title="Synth"
       icon={<Waves className="w-4 h-4" />}
       muted={muted}
-      onMuteToggle={() => setMuted(!muted)}
+      onMuteToggle={onMuteToggle}
     >
       <div className="space-y-4">
         {/* Waveform selector */}
