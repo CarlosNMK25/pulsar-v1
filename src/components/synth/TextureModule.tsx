@@ -6,22 +6,33 @@ import { cn } from '@/lib/utils';
 
 interface TextureModuleProps {
   isPlaying: boolean;
+  muted: boolean;
+  onMuteToggle: () => void;
+  params: {
+    density: number;
+    spread: number;
+    pitch: number;
+    size: number;
+    feedback: number;
+    mix: number;
+  };
+  onParamsChange: (params: TextureModuleProps['params']) => void;
 }
 
-export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
-  const [muted, setMuted] = useState(false);
+export const TextureModule = ({ 
+  isPlaying, 
+  muted, 
+  onMuteToggle,
+  params,
+  onParamsChange,
+}: TextureModuleProps) => {
   const [mode, setMode] = useState<'noise' | 'granular' | 'drone'>('granular');
-  const [params, setParams] = useState({
-    density: 45,
-    spread: 60,
-    pitch: 50,
-    size: 35,
-    feedback: 20,
-    mix: 50,
-  });
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+
+  const updateParam = (key: keyof typeof params, value: number) => {
+    onParamsChange({ ...params, [key]: value });
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,7 +50,6 @@ export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
       ctx.fillRect(0, 0, width, height);
 
       if (isPlaying && !muted) {
-        // Add new particles based on density
         if (Math.random() < params.density / 100) {
           particles.push({
             x: Math.random() * width,
@@ -51,7 +61,6 @@ export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
           });
         }
 
-        // Update and draw particles
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.x += p.vx;
@@ -89,7 +98,7 @@ export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
       title="Texture"
       icon={<CloudFog className="w-4 h-4" />}
       muted={muted}
-      onMuteToggle={() => setMuted(!muted)}
+      onMuteToggle={onMuteToggle}
     >
       <div className="space-y-4">
         {/* Mode selector */}
@@ -119,19 +128,19 @@ export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
         <div className="grid grid-cols-3 gap-4 pt-2">
           <Knob
             value={params.density}
-            onChange={(v) => setParams({ ...params, density: v })}
+            onChange={(v) => updateParam('density', v)}
             label="Density"
             size="sm"
           />
           <Knob
             value={params.spread}
-            onChange={(v) => setParams({ ...params, spread: v })}
+            onChange={(v) => updateParam('spread', v)}
             label="Spread"
             size="sm"
           />
           <Knob
             value={params.pitch}
-            onChange={(v) => setParams({ ...params, pitch: v })}
+            onChange={(v) => updateParam('pitch', v)}
             label="Pitch"
             size="sm"
           />
@@ -140,21 +149,21 @@ export const TextureModule = ({ isPlaying }: TextureModuleProps) => {
         <div className="grid grid-cols-3 gap-4">
           <Knob
             value={params.size}
-            onChange={(v) => setParams({ ...params, size: v })}
+            onChange={(v) => updateParam('size', v)}
             label="Size"
             size="sm"
             variant="secondary"
           />
           <Knob
             value={params.feedback}
-            onChange={(v) => setParams({ ...params, feedback: v })}
+            onChange={(v) => updateParam('feedback', v)}
             label="Feedback"
             size="sm"
             variant="secondary"
           />
           <Knob
             value={params.mix}
-            onChange={(v) => setParams({ ...params, mix: v })}
+            onChange={(v) => updateParam('mix', v)}
             label="Mix"
             size="sm"
           />
