@@ -71,10 +71,16 @@ const Index = () => {
   const [hatSteps, setHatSteps] = useState(() => createInitialSteps([0, 2, 4, 6, 8, 10, 12, 14]));
   const [drumParams, setDrumParams] = useState({ pitch: 50, decay: 60, drive: 30, mix: 75 });
   const [drumMuted, setDrumMuted] = useState(false);
+  
+  // Track lengths for variable pattern length
+  const [kickLength, setKickLength] = useState(16);
+  const [snareLength, setSnareLength] = useState(16);
+  const [hatLength, setHatLength] = useState(16);
 
   // Synth steps and params
   const [synthSteps, setSynthSteps] = useState(() => createInitialSteps([0, 3, 6, 8, 10, 12, 14]));
   const [synthMuted, setSynthMuted] = useState(false);
+  const [synthLength, setSynthLength] = useState(16);
   const [synthParams, setSynthParams] = useState({
     waveform: 'saw' as WaveformType,
     cutoff: 65,
@@ -538,6 +544,12 @@ const Index = () => {
               onKickChange={setKickSteps}
               onSnareChange={setSnareSteps}
               onHatChange={setHatSteps}
+              kickLength={kickLength}
+              snareLength={snareLength}
+              hatLength={hatLength}
+              onKickLengthChange={setKickLength}
+              onSnareLengthChange={setSnareLength}
+              onHatLengthChange={setHatLength}
               params={drumParams}
               onParamsChange={setDrumParams}
               muted={drumMuted}
@@ -547,6 +559,8 @@ const Index = () => {
               currentStep={currentStep}
               steps={synthSteps}
               onStepsChange={setSynthSteps}
+              patternLength={synthLength}
+              onLengthChange={setSynthLength}
               params={synthParams}
               onParamsChange={setSynthParams}
               muted={synthMuted}

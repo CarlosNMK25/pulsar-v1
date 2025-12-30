@@ -25,6 +25,12 @@ interface DrumModuleProps {
   onKickChange: (steps: Step[]) => void;
   onSnareChange: (steps: Step[]) => void;
   onHatChange: (steps: Step[]) => void;
+  kickLength: number;
+  snareLength: number;
+  hatLength: number;
+  onKickLengthChange: (length: number) => void;
+  onSnareLengthChange: (length: number) => void;
+  onHatLengthChange: (length: number) => void;
   params: DrumParams;
   onParamsChange: (params: DrumParams) => void;
   muted: boolean;
@@ -39,6 +45,12 @@ export const DrumModule = ({
   onKickChange,
   onSnareChange,
   onHatChange,
+  kickLength,
+  snareLength,
+  hatLength,
+  onKickLengthChange,
+  onSnareLengthChange,
+  onHatLengthChange,
   params,
   onParamsChange,
   muted,
@@ -69,6 +81,9 @@ export const DrumModule = ({
             onStepToggle={(i) => toggleStep('kick', i)}
             onPatternGenerate={onKickChange}
             showControls={true}
+            showLengthSelector={true}
+            patternLength={kickLength}
+            onLengthChange={onKickLengthChange}
             label="KICK"
             variant="primary"
           />
@@ -78,6 +93,9 @@ export const DrumModule = ({
             onStepToggle={(i) => toggleStep('snare', i)}
             onPatternGenerate={onSnareChange}
             showControls={true}
+            showLengthSelector={true}
+            patternLength={snareLength}
+            onLengthChange={onSnareLengthChange}
             label="SNARE"
             variant="secondary"
           />
@@ -87,6 +105,9 @@ export const DrumModule = ({
             onStepToggle={(i) => toggleStep('hat', i)}
             onPatternGenerate={onHatChange}
             showControls={true}
+            showLengthSelector={true}
+            patternLength={hatLength}
+            onLengthChange={onHatLengthChange}
             label="HI-HAT"
             variant="muted"
           />
