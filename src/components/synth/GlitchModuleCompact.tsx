@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,9 @@ export const GlitchModuleCompact = ({
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   
+  // Flag to prevent notifying parent of changes that came from props
+  const isExternalUpdateRef = useRef(false);
+  
   // Routing mode: master vs individual tracks
   const [routingMode, setRoutingMode] = useState<RoutingMode>(() => 
     glitchTargets.includes('master') ? 'master' : 'individual'
@@ -64,8 +67,14 @@ export const GlitchModuleCompact = ({
     intensity: 50,
   });
 
-  // Sync routing mode changes to parent
+  // Sync routing mode changes to parent (only for local user interactions)
   useEffect(() => {
+    // Skip if this change came from external props
+    if (isExternalUpdateRef.current) {
+      isExternalUpdateRef.current = false;
+      return;
+    }
+    
     if (routingMode === 'master') {
       onGlitchTargetsChange(['master']);
     } else {
@@ -76,24 +85,28 @@ export const GlitchModuleCompact = ({
   // Sync local state with props when glitchTargets changes externally (e.g. preset load)
   useEffect(() => {
     const isMasterMode = glitchTargets.includes('master');
-    const currentMode = routingMode;
     
-    if (isMasterMode && currentMode !== 'master') {
-      setRoutingMode('master');
-    } else if (!isMasterMode && currentMode !== 'individual') {
-      setRoutingMode('individual');
-      const newIndividual = new Set<IndividualTarget>();
-      if (glitchTargets.includes('drums')) newIndividual.add('drums');
-      if (glitchTargets.includes('synth')) newIndividual.add('synth');
-      if (glitchTargets.includes('texture')) newIndividual.add('texture');
-      setIndividualTargets(newIndividual);
-    } else if (!isMasterMode) {
-      // Update individual targets even if already in individual mode
-      const newIndividual = new Set<IndividualTarget>();
-      if (glitchTargets.includes('drums')) newIndividual.add('drums');
-      if (glitchTargets.includes('synth')) newIndividual.add('synth');
-      if (glitchTargets.includes('texture')) newIndividual.add('texture');
-      setIndividualTargets(newIndividual);
+    // Compare current state with incoming props
+    const currentIsMaster = routingMode === 'master';
+    const currentTargetsArray = Array.from(individualTargets).sort();
+    const incomingTargetsArray = glitchTargets.filter(t => t !== 'master').sort() as IndividualTarget[];
+    
+    const modeChanged = isMasterMode !== currentIsMaster;
+    const targetsChanged = !isMasterMode && (
+      currentTargetsArray.length !== incomingTargetsArray.length ||
+      currentTargetsArray.some((t, i) => t !== incomingTargetsArray[i])
+    );
+    
+    // Only update if there's an actual difference
+    if (modeChanged || targetsChanged) {
+      isExternalUpdateRef.current = true;
+      
+      if (isMasterMode) {
+        setRoutingMode('master');
+      } else {
+        setRoutingMode('individual');
+        setIndividualTargets(new Set(incomingTargetsArray));
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [glitchTargets]);
