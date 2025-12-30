@@ -6,6 +6,7 @@ import { DrumModule } from '@/components/synth/DrumModule';
 import { SynthModule } from '@/components/synth/SynthModule';
 import { TextureModule } from '@/components/synth/TextureModule';
 import { FXModule } from '@/components/synth/FXModule';
+import { GlitchModule } from '@/components/synth/GlitchModule';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
@@ -567,6 +568,9 @@ const Index = () => {
               onDelayChange={(params) => setDelayParams(prev => ({ ...prev, ...params }))}
             />
           </div>
+
+          {/* Glitch Effects */}
+          <GlitchModule />
 
           {/* Performance layer */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
