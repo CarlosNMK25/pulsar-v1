@@ -35,6 +35,7 @@ interface UseAudioEngineProps {
   isPlaying: boolean;
   bpm: number;
   swing: number;
+  humanize: number;
   kickSteps: Step[];
   snareSteps: Step[];
   hatSteps: Step[];
@@ -87,6 +88,7 @@ export const useAudioEngine = ({
   isPlaying,
   bpm,
   swing,
+  humanize,
   kickSteps,
   snareSteps,
   hatSteps,
@@ -197,6 +199,11 @@ export const useAudioEngine = ({
   useEffect(() => {
     scheduler.setSwing(swing / 100);
   }, [swing]);
+
+  // Update Humanize
+  useEffect(() => {
+    scheduler.setHumanize(humanize / 100);
+  }, [humanize]);
 
   // Update synth parameters
   useEffect(() => {

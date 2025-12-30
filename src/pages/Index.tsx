@@ -136,6 +136,7 @@ const Index = () => {
     isPlaying,
     bpm,
     swing,
+    humanize,
     kickSteps,
     snareSteps,
     hatSteps,
@@ -452,11 +453,6 @@ const Index = () => {
     });
     macroEngine.setMorphMacroCallback(handleMorphChange);
   }, [handleMorphChange]);
-
-  // Sync humanize to scheduler
-  useEffect(() => {
-    scheduler.setHumanize(humanize / 100);
-  }, [humanize]);
 
   const handlePlayPause = useCallback(async () => {
     if (!isInitialized) {
