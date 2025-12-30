@@ -1,6 +1,7 @@
 // Scene System Engine - Manages save/load/morph between scenes
 import { WaveformType } from './SynthVoice';
 import { TextureMode } from './TextureEngine';
+import { factoryPresets, FactoryPresetName } from './factoryPresets';
 
 export interface Step {
   active: boolean;
@@ -99,6 +100,7 @@ class SceneEngine {
   private scenes: Map<string, SceneData> = new Map();
   private morphCallback: MorphCallback | null = null;
   private morphTargetScene: string | null = null;
+  private clipboard: SceneData | null = null;
   
   private constructor() {}
   
@@ -147,6 +149,21 @@ class SceneEngine {
     return Array.from(this.scenes.entries())
       .filter(([_, data]) => data.saved)
       .map(([id]) => id);
+  }
+  
+  // Get scene name
+  getSceneName(sceneId: string): string | undefined {
+    return this.scenes.get(sceneId)?.name;
+  }
+  
+  // Rename scene
+  renameScene(sceneId: string, newName: string): void {
+    const scene = this.scenes.get(sceneId);
+    if (scene) {
+      scene.name = newName;
+      this.scenes.set(sceneId, scene);
+      this.saveToLocalStorage();
+    }
   }
   
   // Linear interpolation helper
@@ -212,7 +229,108 @@ class SceneEngine {
       : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
   
-  // LocalStorage persistence
+  // ========== CLIPBOARD (Copy/Paste) ==========
+  
+  copyScene(sceneId: string): boolean {
+    const scene = this.scenes.get(sceneId);
+    if (scene) {
+      this.clipboard = { ...scene };
+      return true;
+    }
+    return false;
+  }
+  
+  pasteScene(targetId: string): SceneData | null {
+    if (!this.clipboard) return null;
+    
+    const pastedScene: SceneData = {
+      ...this.clipboard,
+      id: targetId,
+      saved: true,
+    };
+    this.scenes.set(targetId, pastedScene);
+    this.saveToLocalStorage();
+    return pastedScene;
+  }
+  
+  hasClipboard(): boolean {
+    return this.clipboard !== null;
+  }
+  
+  getClipboardName(): string | undefined {
+    return this.clipboard?.name;
+  }
+  
+  // ========== FACTORY PRESETS ==========
+  
+  getFactoryPresetNames(): FactoryPresetName[] {
+    return Object.keys(factoryPresets) as FactoryPresetName[];
+  }
+  
+  loadFactoryPreset(presetName: FactoryPresetName, targetId: string): SceneData {
+    const preset = factoryPresets[presetName];
+    const sceneData: SceneData = {
+      ...preset,
+      id: targetId,
+      saved: true,
+    };
+    this.scenes.set(targetId, sceneData);
+    this.saveToLocalStorage();
+    return sceneData;
+  }
+  
+  // ========== EXPORT/IMPORT ==========
+  
+  exportSceneToJSON(sceneId: string): string | null {
+    const scene = this.scenes.get(sceneId);
+    if (!scene) return null;
+    return JSON.stringify(scene, null, 2);
+  }
+  
+  exportAllScenesToJSON(): string {
+    const allScenes = Array.from(this.scenes.entries());
+    return JSON.stringify(allScenes, null, 2);
+  }
+  
+  importSceneFromJSON(json: string, targetId: string): SceneData | null {
+    try {
+      const parsed = JSON.parse(json) as SceneData;
+      // Validate basic structure
+      if (!parsed.drumSteps || !parsed.synthSteps || !parsed.synthParams) {
+        throw new Error('Invalid scene structure');
+      }
+      const sceneData: SceneData = {
+        ...parsed,
+        id: targetId,
+        saved: true,
+      };
+      this.scenes.set(targetId, sceneData);
+      this.saveToLocalStorage();
+      return sceneData;
+    } catch (e) {
+      console.error('Failed to import scene:', e);
+      return null;
+    }
+  }
+  
+  importAllScenesFromJSON(json: string): boolean {
+    try {
+      const parsed = JSON.parse(json) as [string, SceneData][];
+      // Validate array structure
+      if (!Array.isArray(parsed)) {
+        throw new Error('Invalid scenes array');
+      }
+      this.scenes = new Map(parsed);
+      this.saveToLocalStorage();
+      return true;
+    } catch (e) {
+      console.error('Failed to import scenes:', e);
+      return false;
+    }
+  }
+  
+  // ========== LOCALSTORAGE ==========
+  
   saveToLocalStorage(): void {
     try {
       const data = Array.from(this.scenes.entries());
