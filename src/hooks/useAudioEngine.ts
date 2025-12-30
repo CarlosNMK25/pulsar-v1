@@ -3,6 +3,9 @@ import { audioEngine } from '@/audio/AudioEngine';
 import { SynthVoice, WaveformType } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine } from '@/audio/TextureEngine';
+import { scheduler, StepCallback } from '@/audio/Scheduler';
+import { fxEngine } from '@/audio/FXEngine';
+import { macroEngine } from '@/audio/MacroEngine';
 
 interface Step {
   active: boolean;
@@ -13,7 +16,6 @@ interface Step {
 interface UseAudioEngineProps {
   isPlaying: boolean;
   bpm: number;
-  currentStep: number;
   kickSteps: Step[];
   snareSteps: Step[];
   hatSteps: Step[];
@@ -35,6 +37,18 @@ interface UseAudioEngineProps {
     mix: number;
   };
   textureMuted: boolean;
+  reverbParams: {
+    size: number;
+    decay: number;
+    damping: number;
+    mix: number;
+  };
+  delayParams: {
+    time: number;
+    feedback: number;
+    filter: number;
+    mix: number;
+  };
 }
 
 // Note sequence for synth (C minor pentatonic)
@@ -43,7 +57,6 @@ const synthNotes = [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 75, 77, 79, 82, 
 export const useAudioEngine = ({
   isPlaying,
   bpm,
-  currentStep,
   kickSteps,
   snareSteps,
   hatSteps,
@@ -51,15 +64,23 @@ export const useAudioEngine = ({
   synthParams,
   textureParams,
   textureMuted,
+  reverbParams,
+  delayParams,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
+  const [currentStep, setCurrentStep] = useState(0);
   
   const synthRef = useRef<SynthVoice | null>(null);
   const drumRef = useRef<DrumEngine | null>(null);
   const textureRef = useRef<TextureEngine | null>(null);
-  const prevStepRef = useRef(-1);
   const animationFrameRef = useRef<number>();
+  
+  // Store step data in refs for scheduler callback access
+  const stepsRef = useRef({ kickSteps, snareSteps, hatSteps, synthSteps });
+  useEffect(() => {
+    stepsRef.current = { kickSteps, snareSteps, hatSteps, synthSteps };
+  }, [kickSteps, snareSteps, hatSteps, synthSteps]);
 
   // Initialize audio engine
   const initAudio = useCallback(async () => {
@@ -72,13 +93,33 @@ export const useAudioEngine = ({
       synthRef.current = new SynthVoice();
       drumRef.current = new DrumEngine();
       textureRef.current = new TextureEngine();
+      
+      // Initialize FX engine (singleton, auto-init on first access)
+      fxEngine.getReverbSend();
+      fxEngine.getDelaySend();
+      
+      // Setup macro engine callback
+      macroEngine.setParamUpdateCallback((engineId, paramId, value) => {
+        // This callback is used for synth/drums/texture parameter updates from macros
+        // For now, we just log - full integration would update state
+        console.log(`[MacroEngine] ${engineId}.${paramId} = ${value}`);
+      });
 
       setIsInitialized(true);
-      console.log('[useAudioEngine] Audio initialized');
+      console.log('[useAudioEngine] Audio initialized with Scheduler, FX, and Macros');
     } catch (error) {
       console.error('[useAudioEngine] Init failed:', error);
     }
   }, [isInitialized]);
+
+  // Update BPM
+  useEffect(() => {
+    scheduler.setBpm(bpm);
+    // Optionally sync delay to BPM
+    if (isInitialized) {
+      fxEngine.syncDelayToBpm(bpm);
+    }
+  }, [bpm, isInitialized]);
 
   // Update synth parameters
   useEffect(() => {
@@ -108,6 +149,17 @@ export const useAudioEngine = ({
     });
   }, [textureParams]);
 
+  // Update FX parameters
+  useEffect(() => {
+    if (!isInitialized) return;
+    fxEngine.setReverbParams(reverbParams);
+  }, [reverbParams, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    fxEngine.setDelayParams(delayParams);
+  }, [delayParams, isInitialized]);
+
   // Handle texture mute and playback
   useEffect(() => {
     if (!textureRef.current) return;
@@ -119,50 +171,62 @@ export const useAudioEngine = ({
     }
   }, [isPlaying, textureMuted]);
 
-  // Trigger sounds on step change
+  // Scheduler step callback - triggers sounds with precise timing
   useEffect(() => {
-    if (!isPlaying || currentStep === prevStepRef.current) return;
-    if (!drumRef.current || !synthRef.current) return;
+    if (!isInitialized) return;
 
-    prevStepRef.current = currentStep;
-
-    // Drums
-    const kick = kickSteps[currentStep];
-    if (kick.active && Math.random() * 100 < kick.probability) {
-      drumRef.current.trigger('kick', kick.velocity);
-    }
-
-    const snare = snareSteps[currentStep];
-    if (snare.active && Math.random() * 100 < snare.probability) {
-      drumRef.current.trigger('snare', snare.velocity);
-    }
-
-    const hat = hatSteps[currentStep];
-    if (hat.active && Math.random() * 100 < hat.probability) {
-      drumRef.current.trigger('hat', hat.velocity);
-    }
-
-    // Synth - trigger note on step, release on next
-    const synth = synthSteps[currentStep];
-    if (synth.active && Math.random() * 100 < synth.probability) {
-      const note = synthNotes[currentStep % synthNotes.length];
-      synthRef.current.noteOn(note, synth.velocity);
+    const stepCallback: StepCallback = (step, time) => {
+      const { kickSteps, snareSteps, hatSteps, synthSteps } = stepsRef.current;
       
-      // Auto note-off after half step duration
-      const stepDuration = (60 / bpm / 4) * 1000;
-      setTimeout(() => {
-        synthRef.current?.noteOff(note);
-      }, stepDuration * 0.8);
-    }
-  }, [currentStep, isPlaying, kickSteps, snareSteps, hatSteps, synthSteps, bpm]);
+      // Update UI step indicator
+      setCurrentStep(step);
 
-  // Stop all on playback stop
+      // Drums - use Web Audio time for precise scheduling
+      const kick = kickSteps[step];
+      if (kick.active && Math.random() * 100 < kick.probability) {
+        drumRef.current?.trigger('kick', kick.velocity);
+      }
+
+      const snare = snareSteps[step];
+      if (snare.active && Math.random() * 100 < snare.probability) {
+        drumRef.current?.trigger('snare', snare.velocity);
+      }
+
+      const hat = hatSteps[step];
+      if (hat.active && Math.random() * 100 < hat.probability) {
+        drumRef.current?.trigger('hat', hat.velocity);
+      }
+
+      // Synth
+      const synth = synthSteps[step];
+      if (synth.active && Math.random() * 100 < synth.probability) {
+        const note = synthNotes[step % synthNotes.length];
+        synthRef.current?.noteOn(note, synth.velocity);
+        
+        // Schedule note-off using precise timing
+        const stepDuration = 60 / scheduler.getBpm() / 4;
+        setTimeout(() => {
+          synthRef.current?.noteOff(note);
+        }, stepDuration * 0.8 * 1000);
+      }
+    };
+
+    const unsubscribe = scheduler.onStep(stepCallback);
+    return unsubscribe;
+  }, [isInitialized]);
+
+  // Start/stop scheduler based on isPlaying
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isInitialized) return;
+
+    if (isPlaying) {
+      scheduler.start();
+    } else {
+      scheduler.stop();
       synthRef.current?.allNotesOff();
-      prevStepRef.current = -1;
+      setCurrentStep(0);
     }
-  }, [isPlaying]);
+  }, [isPlaying, isInitialized]);
 
   // Analyser animation loop
   useEffect(() => {
@@ -192,16 +256,24 @@ export const useAudioEngine = ({
   // Cleanup
   useEffect(() => {
     return () => {
+      scheduler.stop();
       synthRef.current?.disconnect();
       drumRef.current?.disconnect();
       textureRef.current?.disconnect();
     };
   }, []);
 
+  // Macro change handler
+  const handleMacroChange = useCallback((macroId: string, value: number) => {
+    macroEngine.setMacroValue(macroId, value);
+  }, []);
+
   return {
     initAudio,
     isInitialized,
     analyserData,
+    currentStep,
     audioState: audioEngine.state,
+    handleMacroChange,
   };
 };

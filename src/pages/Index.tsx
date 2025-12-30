@@ -5,6 +5,7 @@ import { WaveformDisplay } from '@/components/synth/WaveformDisplay';
 import { DrumModule } from '@/components/synth/DrumModule';
 import { SynthModule } from '@/components/synth/SynthModule';
 import { TextureModule } from '@/components/synth/TextureModule';
+import { FXModule } from '@/components/synth/FXModule';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
@@ -42,7 +43,6 @@ const createInitialSteps = (pattern: number[]) =>
 const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
-  const [currentStep, setCurrentStep] = useState(0);
   const [activeScene, setActiveScene] = useState('a');
   const [macros, setMacros] = useState(initialMacros);
 
@@ -74,11 +74,32 @@ const Index = () => {
     mix: 50,
   });
 
-  // Audio engine hook
-  const { initAudio, isInitialized, analyserData, audioState } = useAudioEngine({
+  // FX params
+  const [reverbParams, setReverbParams] = useState({
+    size: 0.5,
+    decay: 0.5,
+    damping: 0.5,
+    mix: 0.3,
+  });
+
+  const [delayParams, setDelayParams] = useState({
+    time: 0.375,
+    feedback: 0.4,
+    filter: 0.7,
+    mix: 0.25,
+  });
+
+  // Audio engine hook - now with scheduler-based timing
+  const { 
+    initAudio, 
+    isInitialized, 
+    analyserData, 
+    currentStep,
+    audioState,
+    handleMacroChange: audioMacroChange,
+  } = useAudioEngine({
     isPlaying,
     bpm,
-    currentStep,
     kickSteps,
     snareSteps,
     hatSteps,
@@ -86,20 +107,9 @@ const Index = () => {
     synthParams,
     textureParams,
     textureMuted,
+    reverbParams,
+    delayParams,
   });
-
-  // Sequencer clock
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const stepDuration = (60 / bpm / 4) * 1000; // 16th notes
-    
-    const interval = setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % 16);
-    }, stepDuration);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, bpm]);
 
   const handlePlayPause = useCallback(async () => {
     if (!isInitialized) {
@@ -110,14 +120,15 @@ const Index = () => {
 
   const handleStop = useCallback(() => {
     setIsPlaying(false);
-    setCurrentStep(0);
   }, []);
 
   const handleMacroChange = useCallback((id: string, value: number) => {
     setMacros((prev) => 
       prev.map((m) => m.id === id ? { ...m, value } : m)
     );
-  }, []);
+    // Also update the audio engine's macro system
+    audioMacroChange(id, value);
+  }, [audioMacroChange]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -164,7 +175,7 @@ const Index = () => {
           </div>
 
           {/* Instruments */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <DrumModule 
               currentStep={currentStep}
               kickSteps={kickSteps}
@@ -187,6 +198,12 @@ const Index = () => {
               onMuteToggle={() => setTextureMuted(!textureMuted)}
               params={textureParams}
               onParamsChange={setTextureParams}
+            />
+            <FXModule
+              reverbParams={reverbParams}
+              delayParams={delayParams}
+              onReverbChange={(params) => setReverbParams(prev => ({ ...prev, ...params }))}
+              onDelayChange={(params) => setDelayParams(prev => ({ ...prev, ...params }))}
             />
           </div>
 
