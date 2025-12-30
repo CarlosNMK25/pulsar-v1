@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Zap, Radio, Square, Disc, Sparkles } from 'lucide-react';
+import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
@@ -103,20 +103,20 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
       className={className}
     >
       <div className="space-y-4">
-        {/* Trigger Buttons */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Trigger Buttons - 5 buttons now */}
+        <div className="grid grid-cols-5 gap-1.5">
           <Button
             variant="outline"
             size="sm"
             onClick={handleStutterTrigger}
             disabled={muted}
             className={cn(
-              'h-10 flex flex-col items-center justify-center gap-1',
+              'h-10 flex flex-col items-center justify-center gap-0.5 px-1',
               activeEffect === 'stutter' && 'bg-primary/20 border-primary'
             )}
           >
-            <Radio className="w-4 h-4" />
-            <span className="text-[10px]">Stutter</span>
+            <Radio className="w-3.5 h-3.5" />
+            <span className="text-[9px]">Stutter</span>
           </Button>
           
           <Button
@@ -125,12 +125,12 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
             onClick={handleTapeStopTrigger}
             disabled={muted}
             className={cn(
-              'h-10 flex flex-col items-center justify-center gap-1',
+              'h-10 flex flex-col items-center justify-center gap-0.5 px-1',
               activeEffect === 'tapestop' && 'bg-primary/20 border-primary'
             )}
           >
-            <Square className="w-4 h-4" />
-            <span className="text-[10px]">Tape</span>
+            <Square className="w-3.5 h-3.5" />
+            <span className="text-[9px]">Tape</span>
           </Button>
           
           <Button
@@ -139,12 +139,12 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
             onClick={handleFreezeTrigger}
             disabled={muted}
             className={cn(
-              'h-10 flex flex-col items-center justify-center gap-1',
+              'h-10 flex flex-col items-center justify-center gap-0.5 px-1',
               activeEffect === 'freeze' && 'bg-primary/20 border-primary'
             )}
           >
-            <Disc className="w-4 h-4" />
-            <span className="text-[10px]">Freeze</span>
+            <Disc className="w-3.5 h-3.5" />
+            <span className="text-[9px]">Freeze</span>
           </Button>
           
           <Button
@@ -153,12 +153,31 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
             onClick={handleBitcrushTrigger}
             disabled={muted}
             className={cn(
-              'h-10 flex flex-col items-center justify-center gap-1',
+              'h-10 flex flex-col items-center justify-center gap-0.5 px-1',
               activeEffect === 'crush' && 'bg-primary/20 border-primary'
             )}
           >
-            <Zap className="w-4 h-4" />
-            <span className="text-[10px]">Crush</span>
+            <Zap className="w-3.5 h-3.5" />
+            <span className="text-[9px]">Crush</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (muted) return;
+              setActiveEffect('reverse');
+              glitchEngine.triggerReverse();
+              setTimeout(() => setActiveEffect(null), 400);
+            }}
+            disabled={muted}
+            className={cn(
+              'h-10 flex flex-col items-center justify-center gap-0.5 px-1',
+              activeEffect === 'reverse' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Rewind className="w-3.5 h-3.5" />
+            <span className="text-[9px]">Reverse</span>
           </Button>
         </div>
 

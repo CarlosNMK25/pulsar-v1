@@ -283,59 +283,83 @@ export const useAudioEngine = ({
       // Update UI step indicator
       setCurrentStep(step);
 
-      // Drums - use Web Audio time for precise scheduling
+      // Helper to trigger with micro-timing offset
+      const triggerWithMicroTiming = (callback: () => void, microTimingMs?: number) => {
+        if (microTimingMs && microTimingMs > 0) {
+          // Positive offset: delay the trigger
+          setTimeout(callback, microTimingMs);
+        } else {
+          // No offset or negative (negative would need pre-scheduling, so we just trigger immediately)
+          callback();
+        }
+      };
+
+      // Drums - use Web Audio time for precise scheduling with micro-timing
       const kick = kickSteps[step];
       if (kick.active && Math.random() * 100 < kick.probability) {
-        drumRef.current?.trigger('kick', kick.velocity);
+        triggerWithMicroTiming(
+          () => drumRef.current?.trigger('kick', kick.velocity),
+          kick.pLocks?.microTiming
+        );
       }
 
       const snare = snareSteps[step];
       if (snare.active && Math.random() * 100 < snare.probability) {
-        drumRef.current?.trigger('snare', snare.velocity);
+        triggerWithMicroTiming(
+          () => drumRef.current?.trigger('snare', snare.velocity),
+          snare.pLocks?.microTiming
+        );
       }
 
       const hat = hatSteps[step];
       if (hat.active && Math.random() * 100 < hat.probability) {
-        drumRef.current?.trigger('hat', hat.velocity);
+        triggerWithMicroTiming(
+          () => drumRef.current?.trigger('hat', hat.velocity),
+          hat.pLocks?.microTiming
+        );
       }
 
-      // Synth with P-Locks and Acid 303 support
+      // Synth with P-Locks, Acid 303 support, and micro-timing
       const synth = synthSteps[step];
       if (synth.active && Math.random() * 100 < synth.probability) {
-        const note = synthNotes[step % synthNotes.length];
-        
-        // Apply P-Locks temporarily if present
-        let originalParams: { cutoff?: number; resonance?: number } | null = null;
-        if (synth.pLocks) {
-          originalParams = {};
-          if (synth.pLocks.cutoff !== undefined) {
-            originalParams.cutoff = synthRef.current?.getParams?.().cutoff;
-            synthRef.current?.setParams({ cutoff: 200 + (synth.pLocks.cutoff / 100) * 4000 });
-          }
-          if (synth.pLocks.resonance !== undefined) {
-            originalParams.resonance = synthRef.current?.getParams?.().resonance;
-            synthRef.current?.setParams({ resonance: (synth.pLocks.resonance / 100) * 20 });
-          }
-        }
-        
-        // Trigger note with Acid 303 options
-        synthRef.current?.noteOn(note, synth.velocity, synth.acid);
-        
-        // Schedule note-off using precise timing
-        const stepDuration = 60 / scheduler.getBpm() / 4;
-        setTimeout(() => {
-          synthRef.current?.noteOff(note);
+        const synthTrigger = () => {
+          const note = synthNotes[step % synthNotes.length];
           
-          // Restore original params after P-Lock
-          if (originalParams) {
-            if (originalParams.cutoff !== undefined) {
-              synthRef.current?.setParams({ cutoff: originalParams.cutoff });
+          // Apply P-Locks temporarily if present
+          let originalParams: { cutoff?: number; resonance?: number } | null = null;
+          if (synth.pLocks) {
+            originalParams = {};
+            if (synth.pLocks.cutoff !== undefined) {
+              originalParams.cutoff = synthRef.current?.getParams?.().cutoff;
+              synthRef.current?.setParams({ cutoff: 200 + (synth.pLocks.cutoff / 100) * 4000 });
             }
-            if (originalParams.resonance !== undefined) {
-              synthRef.current?.setParams({ resonance: originalParams.resonance });
+            if (synth.pLocks.resonance !== undefined) {
+              originalParams.resonance = synthRef.current?.getParams?.().resonance;
+              synthRef.current?.setParams({ resonance: (synth.pLocks.resonance / 100) * 20 });
             }
           }
-        }, stepDuration * 0.8 * 1000);
+          
+          // Trigger note with Acid 303 options
+          synthRef.current?.noteOn(note, synth.velocity, synth.acid);
+          
+          // Schedule note-off using precise timing
+          const stepDuration = 60 / scheduler.getBpm() / 4;
+          setTimeout(() => {
+            synthRef.current?.noteOff(note);
+            
+            // Restore original params after P-Lock
+            if (originalParams) {
+              if (originalParams.cutoff !== undefined) {
+                synthRef.current?.setParams({ cutoff: originalParams.cutoff });
+              }
+              if (originalParams.resonance !== undefined) {
+                synthRef.current?.setParams({ resonance: originalParams.resonance });
+              }
+            }
+          }, stepDuration * 0.8 * 1000);
+        };
+        
+        triggerWithMicroTiming(synthTrigger, synth.pLocks?.microTiming);
       }
     };
 

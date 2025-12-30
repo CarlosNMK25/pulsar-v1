@@ -177,15 +177,29 @@ export class SynthVoice {
     // Create filter
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    // Acid 303: Accent - boost filter cutoff and resonance
-    const accentBoost = accent ? 1.5 : 1.0;
-    filter.frequency.value = this.params.cutoff * accentBoost;
-    filter.Q.value = this.params.resonance * (accent ? 1.3 : 1.0);
+    
+    // TB-303 Style Filter: Aggressive resonance and envelope for accented notes
+    if (accent) {
+      // Much higher resonance for accent - creates the classic "squelch"
+      const accentResonance = Math.min(this.params.resonance * 2.5, 25);
+      filter.Q.value = accentResonance;
+      
+      // Start with boosted cutoff, then sweep down for "squelch" effect
+      const peakCutoff = Math.min(this.params.cutoff * 3, 8000);
+      filter.frequency.setValueAtTime(peakCutoff, now);
+      filter.frequency.exponentialRampToValueAtTime(
+        this.params.cutoff * 0.5,
+        now + 0.12 // Fast decay for punchy 303 sound
+      );
+    } else {
+      filter.frequency.value = this.params.cutoff;
+      filter.Q.value = this.params.resonance;
+    }
 
     // Create voice gain envelope
     const voiceGain = ctx.createGain();
-    // Acid 303: Accent - boost velocity
-    const accentVelocity = accent ? Math.min(velocity * 1.4, 127) : velocity;
+    // Acid 303: Accent - boost velocity significantly
+    const accentVelocity = accent ? Math.min(velocity * 1.5, 127) : velocity;
     const normalizedVelocity = (accentVelocity / 127) * 0.5;
     voiceGain.gain.setValueAtTime(0, now);
     voiceGain.gain.linearRampToValueAtTime(normalizedVelocity, now + this.params.attack);
