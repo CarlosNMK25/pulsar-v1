@@ -42,7 +42,8 @@ export class TextureEngine {
 
     this.outputGain = ctx.createGain();
     this.outputGain.gain.value = 0;
-    this.outputGain.connect(audioEngine.getMasterGain());
+    // Connect to track bus instead of master gain for per-track glitch routing
+    this.outputGain.connect(audioEngine.getTrackBus('texture'));
 
     // FX send nodes
     this.reverbSend = ctx.createGain();

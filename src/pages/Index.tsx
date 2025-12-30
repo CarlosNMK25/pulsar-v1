@@ -120,6 +120,9 @@ const Index = () => {
     mix: 0.25,
   });
 
+  // Glitch targets state
+  const [glitchTargets, setGlitchTargets] = useState<Array<'master' | 'drums' | 'synth' | 'texture'>>(['master']);
+
   // Refs for transition animation
   const transitionRef = useRef<number | null>(null);
   const morphBaseRef = useRef<SceneData | null>(null);
@@ -132,6 +135,9 @@ const Index = () => {
     currentStep,
     audioState,
     handleMacroChange: audioMacroChange,
+    triggerGlitch,
+    setGlitchStutterParams,
+    setGlitchBitcrushParams,
   } = useAudioEngine({
     isPlaying,
     bpm,
@@ -150,6 +156,7 @@ const Index = () => {
     textureMode,
     reverbParams,
     delayParams,
+    glitchTargets,
   });
 
   // Load saved scenes on mount
@@ -596,7 +603,13 @@ const Index = () => {
               <MacroKnobs macros={macros} onMacroChange={handleMacroChange} />
             </div>
             <div className="module p-4">
-              <GlitchModuleCompact />
+              <GlitchModuleCompact 
+                glitchTargets={glitchTargets}
+                onGlitchTargetsChange={setGlitchTargets}
+                onTriggerGlitch={triggerGlitch}
+                onStutterParamsChange={setGlitchStutterParams}
+                onBitcrushParamsChange={setGlitchBitcrushParams}
+              />
             </div>
             <div className="module">
               <SceneSlots
