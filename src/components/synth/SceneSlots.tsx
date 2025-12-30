@@ -121,7 +121,7 @@ export function SceneSlots({
     }
   };
   
-  const presets: FactoryPresetName[] = ['techno', 'ambient', 'breaks', 'experimental'];
+  const presets: FactoryPresetName[] = ['techno', 'ambient', 'breaks', 'experimental', 'glitchDemo'];
   
   return (
     <div className="space-y-2">
