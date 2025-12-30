@@ -1,0 +1,216 @@
+import { useState } from 'react';
+import { Zap, Radio, Square, Disc } from 'lucide-react';
+import { ModuleCard } from './ModuleCard';
+import { Knob } from './Knob';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { 
+  glitchEngine, 
+  GlitchParams, 
+  StutterParams, 
+  BitcrushParams 
+} from '@/audio/GlitchEngine';
+
+interface GlitchModuleProps {
+  className?: string;
+}
+
+export const GlitchModule = ({ className }: GlitchModuleProps) => {
+  const [muted, setMuted] = useState(true);
+  const [activeEffect, setActiveEffect] = useState<string | null>(null);
+  
+  const [stutterParams, setStutterParams] = useState<StutterParams>({
+    active: false,
+    mix: 50,
+    division: '1/16',
+    decay: 50,
+  });
+  
+  const [bitcrushParams, setBitcrushParams] = useState<BitcrushParams>({
+    active: false,
+    mix: 50,
+    bits: 8,
+    sampleRate: 50,
+  });
+
+  const handleMuteToggle = () => {
+    const newMuted = !muted;
+    setMuted(newMuted);
+    glitchEngine.setBypass(newMuted);
+  };
+
+  const handleStutterTrigger = () => {
+    if (muted) return;
+    setActiveEffect('stutter');
+    glitchEngine.triggerStutter();
+    setTimeout(() => setActiveEffect(null), 200);
+  };
+
+  const handleTapeStopTrigger = () => {
+    if (muted) return;
+    setActiveEffect('tapestop');
+    glitchEngine.triggerTapeStop();
+    setTimeout(() => setActiveEffect(null), 500);
+  };
+
+  const handleFreezeTrigger = () => {
+    if (muted) return;
+    setActiveEffect('freeze');
+    glitchEngine.triggerGranularFreeze();
+    setTimeout(() => setActiveEffect(null), 300);
+  };
+
+  const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
+
+  return (
+    <ModuleCard
+      title="Glitch"
+      icon={<Zap className="w-4 h-4" />}
+      muted={muted}
+      onMuteToggle={handleMuteToggle}
+      className={className}
+    >
+      <div className="space-y-4">
+        {/* Trigger Buttons */}
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStutterTrigger}
+            disabled={muted}
+            className={cn(
+              'h-10 flex flex-col items-center justify-center gap-1',
+              activeEffect === 'stutter' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Radio className="w-4 h-4" />
+            <span className="text-[10px]">Stutter</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTapeStopTrigger}
+            disabled={muted}
+            className={cn(
+              'h-10 flex flex-col items-center justify-center gap-1',
+              activeEffect === 'tapestop' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Square className="w-4 h-4" />
+            <span className="text-[10px]">Tape</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFreezeTrigger}
+            disabled={muted}
+            className={cn(
+              'h-10 flex flex-col items-center justify-center gap-1',
+              activeEffect === 'freeze' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Disc className="w-4 h-4" />
+            <span className="text-[10px]">Freeze</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={muted}
+            className="h-10 flex flex-col items-center justify-center gap-1"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="text-[10px]">Crush</span>
+          </Button>
+        </div>
+
+        {/* Stutter Section */}
+        <div className="space-y-2">
+          <div className="text-label text-muted-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+            Stutter
+          </div>
+          
+          {/* Division selector */}
+          <div className="flex gap-1">
+            {divisions.map((div) => (
+              <button
+                key={div}
+                onClick={() => {
+                  setStutterParams(prev => ({ ...prev, division: div }));
+                  glitchEngine.setStutterParams({ division: div });
+                }}
+                disabled={muted}
+                className={cn(
+                  'flex-1 py-1 text-[10px] font-mono rounded border transition-colors',
+                  stutterParams.division === div
+                    ? 'border-primary bg-primary/20 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground',
+                  muted && 'opacity-50'
+                )}
+              >
+                {div}
+              </button>
+            ))}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Knob
+              value={stutterParams.decay}
+              onChange={(v) => {
+                setStutterParams(prev => ({ ...prev, decay: v }));
+                glitchEngine.setStutterParams({ decay: v / 100 });
+              }}
+              label="Decay"
+              size="sm"
+              variant={muted ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={stutterParams.mix}
+              onChange={(v) => {
+                setStutterParams(prev => ({ ...prev, mix: v }));
+                glitchEngine.setStutterParams({ mix: v / 100 });
+              }}
+              label="Mix"
+              size="sm"
+              variant={muted ? 'secondary' : 'accent'}
+            />
+          </div>
+        </div>
+
+        {/* Bitcrush Section */}
+        <div className="space-y-2">
+          <div className="text-label text-muted-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
+            Bitcrush
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Knob
+              value={bitcrushParams.bits * 6.25}
+              onChange={(v) => {
+                const bits = Math.round(v / 6.25);
+                setBitcrushParams(prev => ({ ...prev, bits: Math.max(1, Math.min(16, bits)) }));
+                glitchEngine.setBitcrushParams({ bits });
+              }}
+              label={`Bits: ${bitcrushParams.bits}`}
+              size="sm"
+              variant={muted ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={bitcrushParams.sampleRate}
+              onChange={(v) => {
+                setBitcrushParams(prev => ({ ...prev, sampleRate: v }));
+                glitchEngine.setBitcrushParams({ sampleRate: v / 100 });
+              }}
+              label="Crush"
+              size="sm"
+              variant={muted ? 'secondary' : 'accent'}
+            />
+          </div>
+        </div>
+      </div>
+    </ModuleCard>
+  );
+};

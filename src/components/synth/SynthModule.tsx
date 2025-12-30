@@ -82,6 +82,8 @@ export const SynthModule = ({
           steps={steps}
           currentStep={currentStep}
           onStepToggle={toggleStep}
+          onPatternGenerate={onStepsChange}
+          showControls={true}
           label="Sequence"
           variant="primary"
         />

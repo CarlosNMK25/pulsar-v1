@@ -1,7 +1,8 @@
 // Precise lookahead scheduler using AudioContext timing
 import { audioEngine } from './AudioEngine';
+import { DEFAULT_TRACK_LENGTH } from './TrackConfig';
 
-export type StepCallback = (step: number, time: number) => void;
+export type StepCallback = (step: number, time: number, trackSteps?: Map<string, number>) => void;
 
 export class Scheduler {
   private static instance: Scheduler;
@@ -11,6 +12,10 @@ export class Scheduler {
   private isRunning = false;
   private currentStep = 0;
   private nextStepTime = 0;
+  
+  // Per-track step counters and lengths
+  private trackLengths: Map<string, number> = new Map();
+  private trackSteps: Map<string, number> = new Map();
   
   // Timing constants
   private readonly lookahead = 0.025; // 25ms lookahead
@@ -48,6 +53,34 @@ export class Scheduler {
     return this.currentStep;
   }
 
+  // Per-track length management
+  setTrackLength(trackId: string, length: number): void {
+    const clampedLength = Math.max(1, Math.min(32, length));
+    this.trackLengths.set(trackId, clampedLength);
+    // Initialize track step if not exists
+    if (!this.trackSteps.has(trackId)) {
+      this.trackSteps.set(trackId, 0);
+    }
+  }
+
+  getTrackLength(trackId: string): number {
+    return this.trackLengths.get(trackId) || DEFAULT_TRACK_LENGTH;
+  }
+
+  getTrackStep(trackId: string): number {
+    const trackStep = this.trackSteps.get(trackId);
+    if (trackStep !== undefined) {
+      return trackStep;
+    }
+    // Fallback to global step modulo track length
+    const length = this.getTrackLength(trackId);
+    return this.currentStep % length;
+  }
+
+  getAllTrackSteps(): Map<string, number> {
+    return new Map(this.trackSteps);
+  }
+
   onStep(callback: StepCallback): () => void {
     this.stepCallbacks.add(callback);
     return () => this.stepCallbacks.delete(callback);
@@ -67,13 +100,24 @@ export class Scheduler {
   }
 
   private scheduleStep(step: number, time: number): void {
-    // Notify all callbacks with precise timing
+    // Update per-track steps before notifying callbacks
+    const trackSteps = new Map(this.trackSteps);
+    
+    // Notify all callbacks with precise timing and track steps
     this.stepCallbacks.forEach(callback => {
       try {
-        callback(step, time);
+        callback(step, time, trackSteps);
       } catch (e) {
         console.error('[Scheduler] Callback error:', e);
       }
+    });
+  }
+
+  private advanceTrackSteps(): void {
+    // Advance each track's step counter according to its length
+    this.trackLengths.forEach((length, trackId) => {
+      const currentTrackStep = this.trackSteps.get(trackId) || 0;
+      this.trackSteps.set(trackId, (currentTrackStep + 1) % length);
     });
   }
 
@@ -87,9 +131,10 @@ export class Scheduler {
       
       this.scheduleStep(this.currentStep, scheduledTime);
       
-      // Advance to next step
+      // Advance global and per-track steps
       this.nextStepTime += this.stepDuration;
       this.currentStep = (this.currentStep + 1) % 16;
+      this.advanceTrackSteps();
     }
   }
 
@@ -100,6 +145,11 @@ export class Scheduler {
     this.currentStep = 0;
     this.nextStepTime = ctx.currentTime + 0.05; // Small delay for smooth start
     this.isRunning = true;
+    
+    // Reset all track steps to 0
+    this.trackSteps.forEach((_, trackId) => {
+      this.trackSteps.set(trackId, 0);
+    });
     
     // Use setInterval as fallback (Web Workers would be better for production)
     // The key is that we're using AudioContext.currentTime for precise scheduling
@@ -120,6 +170,12 @@ export class Scheduler {
     
     this.isRunning = false;
     this.currentStep = 0;
+    
+    // Reset all track steps
+    this.trackSteps.forEach((_, trackId) => {
+      this.trackSteps.set(trackId, 0);
+    });
+    
     console.log('[Scheduler] Stopped');
   }
 

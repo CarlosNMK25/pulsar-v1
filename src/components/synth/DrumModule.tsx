@@ -67,6 +67,8 @@ export const DrumModule = ({
             steps={kickSteps}
             currentStep={currentStep}
             onStepToggle={(i) => toggleStep('kick', i)}
+            onPatternGenerate={onKickChange}
+            showControls={true}
             label="KICK"
             variant="primary"
           />
@@ -74,6 +76,8 @@ export const DrumModule = ({
             steps={snareSteps}
             currentStep={currentStep}
             onStepToggle={(i) => toggleStep('snare', i)}
+            onPatternGenerate={onSnareChange}
+            showControls={true}
             label="SNARE"
             variant="secondary"
           />
@@ -81,6 +85,8 @@ export const DrumModule = ({
             steps={hatSteps}
             currentStep={currentStep}
             onStepToggle={(i) => toggleStep('hat', i)}
+            onPatternGenerate={onHatChange}
+            showControls={true}
             label="HI-HAT"
             variant="muted"
           />
