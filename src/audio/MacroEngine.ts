@@ -1,6 +1,7 @@
 // Macro parameter mapping engine
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { sceneEngine } from './SceneEngine';
 
 type CurveType = 'linear' | 'exponential' | 'logarithmic';
 
@@ -19,12 +20,15 @@ interface MacroDefinition {
 }
 
 type ParamUpdateCallback = (engineId: string, paramId: string, value: number) => void;
+type MorphMacroCallback = (amount: number) => void;
 
 export class MacroEngine {
   private static instance: MacroEngine;
   
   private macroValues: Map<string, number> = new Map();
   private paramUpdateCallback: ParamUpdateCallback | null = null;
+  private morphMacroCallback: MorphMacroCallback | null = null;
+  private activeScene: string = 'a';
   
   // Predefined macro mappings
   private macroDefinitions: Map<string, MacroDefinition> = new Map([
@@ -111,6 +115,20 @@ export class MacroEngine {
     this.paramUpdateCallback = callback;
   }
 
+  // Set callback for morph macro (called by Index.tsx)
+  setMorphMacroCallback(callback: MorphMacroCallback): void {
+    this.morphMacroCallback = callback;
+  }
+
+  // Set active scene (called when scene changes)
+  setActiveScene(sceneId: string): void {
+    this.activeScene = sceneId;
+  }
+
+  getActiveScene(): string {
+    return this.activeScene;
+  }
+
   // Apply curve transformation
   private applyCurve(value: number, curve: CurveType): number {
     const normalized = value / 100;
@@ -137,6 +155,12 @@ export class MacroEngine {
     const clampedValue = Math.max(0, Math.min(100, value));
     this.macroValues.set(macroId, clampedValue);
     
+    // Special handling for M7 Morph
+    if (macroId === 'm7') {
+      this.handleMorphMacro(clampedValue);
+      return;
+    }
+    
     const definition = this.macroDefinitions.get(macroId);
     if (!definition) return;
     
@@ -154,6 +178,19 @@ export class MacroEngine {
         this.paramUpdateCallback(target.engineId, target.paramId, mappedValue);
       }
     });
+  }
+
+  // Handle M7 Morph macro - interpolates between active scene and target scene
+  private handleMorphMacro(value: number): void {
+    const amount = value / 100; // 0-1 range
+    
+    // Trigger morph through SceneEngine
+    sceneEngine.triggerMorph(amount, this.activeScene);
+    
+    // Also call the morph callback if set
+    if (this.morphMacroCallback) {
+      this.morphMacroCallback(amount);
+    }
   }
 
   private applyFXParam(paramId: string, value: number): void {
