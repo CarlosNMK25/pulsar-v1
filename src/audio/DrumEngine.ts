@@ -1,12 +1,21 @@
 import { audioEngine } from './AudioEngine';
+import { fxEngine } from './FXEngine';
 
 interface DrumSound {
-  play: (velocity: number) => void;
+  play: (velocity: number, decay: number) => void;
+}
+
+interface DrumParams {
+  decay: number;  // 0-1, multiplies envelope duration
 }
 
 export class DrumEngine {
   private outputGain: GainNode;
+  private reverbSend: GainNode;
+  private delaySend: GainNode;
   private sounds: Map<string, DrumSound> = new Map();
+  private params: DrumParams = { decay: 0.5 };
+  private fxConnected = false;
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -14,29 +23,54 @@ export class DrumEngine {
     this.outputGain.gain.value = 0.6;
     this.outputGain.connect(audioEngine.getMasterGain());
 
+    // FX send nodes
+    this.reverbSend = ctx.createGain();
+    this.reverbSend.gain.value = 0.2;
+    
+    this.delaySend = ctx.createGain();
+    this.delaySend.gain.value = 0.15;
+
     // Initialize drum sounds
     this.sounds.set('kick', this.createKick());
     this.sounds.set('snare', this.createSnare());
     this.sounds.set('hat', this.createHiHat());
   }
 
+  connectFX(): void {
+    if (this.fxConnected) return;
+    this.reverbSend.connect(fxEngine.getReverbSend());
+    this.delaySend.connect(fxEngine.getDelaySend());
+    this.fxConnected = true;
+  }
+
+  setParams(params: Partial<DrumParams>): void {
+    this.params = { ...this.params, ...params };
+  }
+
+  setFXSend(reverb: number, delay: number): void {
+    const ctx = audioEngine.getContext();
+    this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.05);
+    this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
+  }
+
   private createKick(): DrumSound {
     return {
-      play: (velocity: number) => {
+      play: (velocity: number, decay: number) => {
         const ctx = audioEngine.getContext();
         const now = ctx.currentTime;
         const vel = velocity / 127;
+        const decayMult = 0.3 + decay * 0.7; // Range 0.3-1.0
 
         // Oscillator for body
         const osc = ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(150 * vel + 50, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1 * decayMult);
 
         // Gain envelope
         const gain = ctx.createGain();
         gain.gain.setValueAtTime(vel * 0.8, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4 * decayMult);
 
         // Click transient
         const click = ctx.createOscillator();
@@ -47,15 +81,19 @@ export class DrumEngine {
         clickGain.gain.setValueAtTime(vel * 0.3, now);
         clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
 
-        // Connect
+        // Connect to dry output
         osc.connect(gain);
         click.connect(clickGain);
         gain.connect(this.outputGain);
         clickGain.connect(this.outputGain);
+        
+        // Connect to FX sends (kick gets less reverb/delay)
+        gain.connect(this.reverbSend);
+        gain.connect(this.delaySend);
 
         // Play
         osc.start(now);
-        osc.stop(now + 0.5);
+        osc.stop(now + 0.5 * decayMult);
         click.start(now);
         click.stop(now + 0.03);
       },
@@ -64,13 +102,14 @@ export class DrumEngine {
 
   private createSnare(): DrumSound {
     return {
-      play: (velocity: number) => {
+      play: (velocity: number, decay: number) => {
         const ctx = audioEngine.getContext();
         const now = ctx.currentTime;
         const vel = velocity / 127;
+        const decayMult = 0.4 + decay * 0.6; // Range 0.4-1.0
 
         // Noise for snare body
-        const bufferSize = ctx.sampleRate * 0.2;
+        const bufferSize = ctx.sampleRate * 0.3;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -88,7 +127,7 @@ export class DrumEngine {
         // Noise envelope
         const noiseGain = ctx.createGain();
         noiseGain.gain.setValueAtTime(vel * 0.5, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15 * decayMult);
 
         // Tone oscillator
         const osc = ctx.createOscillator();
@@ -98,32 +137,37 @@ export class DrumEngine {
 
         const oscGain = ctx.createGain();
         oscGain.gain.setValueAtTime(vel * 0.4, now);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 * decayMult);
 
-        // Connect
+        // Connect to dry output
         noise.connect(filter);
         filter.connect(noiseGain);
         noiseGain.connect(this.outputGain);
         osc.connect(oscGain);
         oscGain.connect(this.outputGain);
+        
+        // Connect to FX sends (snare gets more reverb)
+        noiseGain.connect(this.reverbSend);
+        noiseGain.connect(this.delaySend);
 
         // Play
         noise.start(now);
         osc.start(now);
-        osc.stop(now + 0.2);
+        osc.stop(now + 0.3 * decayMult);
       },
     };
   }
 
   private createHiHat(): DrumSound {
     return {
-      play: (velocity: number) => {
+      play: (velocity: number, decay: number) => {
         const ctx = audioEngine.getContext();
         const now = ctx.currentTime;
         const vel = velocity / 127;
+        const decayMult = 0.3 + decay * 0.7; // Range 0.3-1.0
 
         // Noise
-        const bufferSize = ctx.sampleRate * 0.1;
+        const bufferSize = ctx.sampleRate * 0.15;
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -147,13 +191,16 @@ export class DrumEngine {
         // Envelope
         const gain = ctx.createGain();
         gain.gain.setValueAtTime(vel * 0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 * decayMult);
 
-        // Connect
+        // Connect to dry output
         noise.connect(bandpass);
         bandpass.connect(highpass);
         highpass.connect(gain);
         gain.connect(this.outputGain);
+        
+        // Connect to FX sends (hat gets subtle delay)
+        gain.connect(this.delaySend);
 
         // Play
         noise.start(now);
@@ -164,11 +211,13 @@ export class DrumEngine {
   trigger(sound: 'kick' | 'snare' | 'hat', velocity: number = 100): void {
     const drum = this.sounds.get(sound);
     if (drum) {
-      drum.play(velocity);
+      drum.play(velocity, this.params.decay);
     }
   }
 
   disconnect(): void {
     this.outputGain.disconnect();
+    this.reverbSend.disconnect();
+    this.delaySend.disconnect();
   }
 }

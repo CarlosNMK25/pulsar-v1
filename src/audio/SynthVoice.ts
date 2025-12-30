@@ -1,4 +1,5 @@
 import { audioEngine } from './AudioEngine';
+import { fxEngine } from './FXEngine';
 
 export type WaveformType = 'sine' | 'saw' | 'square' | 'tri';
 
@@ -32,13 +33,23 @@ const waveformMap: Record<WaveformType, OscillatorType> = {
 export class SynthVoice {
   private voices: Map<number, Voice> = new Map();
   private outputGain: GainNode;
+  private reverbSend: GainNode;
+  private delaySend: GainNode;
   private params: Omit<VoiceParams, 'frequency' | 'velocity'>;
+  private fxConnected = false;
 
   constructor() {
     const ctx = audioEngine.getContext();
     this.outputGain = ctx.createGain();
     this.outputGain.gain.value = 0.3;
     this.outputGain.connect(audioEngine.getMasterGain());
+
+    // FX send nodes
+    this.reverbSend = ctx.createGain();
+    this.reverbSend.gain.value = 0.25;
+    
+    this.delaySend = ctx.createGain();
+    this.delaySend.gain.value = 0.2;
 
     this.params = {
       waveform: 'saw',
@@ -48,6 +59,19 @@ export class SynthVoice {
       cutoff: 2000,
       resonance: 5,
     };
+  }
+
+  connectFX(): void {
+    if (this.fxConnected) return;
+    this.reverbSend.connect(fxEngine.getReverbSend());
+    this.delaySend.connect(fxEngine.getDelaySend());
+    this.fxConnected = true;
+  }
+
+  setFXSend(reverb: number, delay: number): void {
+    const ctx = audioEngine.getContext();
+    this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.05);
+    this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
   setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'>>): void {
@@ -95,11 +119,13 @@ export class SynthVoice {
     voiceGain.gain.setValueAtTime(0, now);
     voiceGain.gain.linearRampToValueAtTime(normalizedVelocity, now + this.params.attack);
 
-    // Connect: oscs -> filter -> voiceGain -> output
+    // Connect: oscs -> filter -> voiceGain -> output + FX sends
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(voiceGain);
     voiceGain.connect(this.outputGain);
+    voiceGain.connect(this.reverbSend);
+    voiceGain.connect(this.delaySend);
 
     // Start oscillators
     osc1.start(now);
@@ -152,5 +178,7 @@ export class SynthVoice {
   disconnect(): void {
     this.allNotesOff();
     this.outputGain.disconnect();
+    this.reverbSend.disconnect();
+    this.delaySend.disconnect();
   }
 }

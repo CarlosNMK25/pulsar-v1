@@ -222,6 +222,19 @@ export class FXEngine {
     this.delayParams.time = (delayTime - 0.05) / 0.95;
   }
 
+  setBypass(effect: 'reverb' | 'delay' | 'all', bypass: boolean): void {
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const value = bypass ? 0 : (effect === 'reverb' ? this.reverbParams.mix * 0.5 : this.delayParams.mix * 0.5);
+    
+    if (effect === 'reverb' || effect === 'all') {
+      this.reverbGain.gain.setTargetAtTime(bypass ? 0 : this.reverbParams.mix * 0.5, now, 0.05);
+    }
+    if (effect === 'delay' || effect === 'all') {
+      this.delayGain.gain.setTargetAtTime(bypass ? 0 : this.delayParams.mix * 0.5, now, 0.05);
+    }
+  }
+
   disconnect(): void {
     this.reverbInput.disconnect();
     this.reverbGain.disconnect();

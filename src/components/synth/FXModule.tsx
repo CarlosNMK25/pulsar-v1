@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
+import { fxEngine } from '@/audio/FXEngine';
 
 interface FXModuleProps {
   reverbParams: {
@@ -26,6 +27,11 @@ export function FXModule({
   onDelayChange 
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
+
+  // Apply bypass to FX engine when mute changes
+  useEffect(() => {
+    fxEngine.setBypass('all', muted);
+  }, [muted]);
   
   return (
     <ModuleCard 

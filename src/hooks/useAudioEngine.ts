@@ -98,11 +98,42 @@ export const useAudioEngine = ({
       fxEngine.getReverbSend();
       fxEngine.getDelaySend();
       
-      // Setup macro engine callback
+      // Connect instruments to FX sends
+      synthRef.current.connectFX();
+      drumRef.current.connectFX();
+      textureRef.current.connectFX();
+      
+      // Setup macro engine callback - actually update parameters
       macroEngine.setParamUpdateCallback((engineId, paramId, value) => {
-        // This callback is used for synth/drums/texture parameter updates from macros
-        // For now, we just log - full integration would update state
-        console.log(`[MacroEngine] ${engineId}.${paramId} = ${value}`);
+        switch (engineId) {
+          case 'synth':
+            if (synthRef.current) {
+              synthRef.current.setParams({ [paramId]: value });
+            }
+            break;
+          case 'texture':
+            if (textureRef.current) {
+              textureRef.current.setParams({ [paramId]: value });
+            }
+            break;
+          case 'drums':
+            if (drumRef.current) {
+              drumRef.current.setParams({ [paramId]: value });
+            }
+            break;
+          case 'fx':
+            if (paramId.startsWith('reverb.')) {
+              fxEngine.setReverbParams({ [paramId.replace('reverb.', '')]: value });
+            } else if (paramId.startsWith('delay.')) {
+              fxEngine.setDelayParams({ [paramId.replace('delay.', '')]: value });
+            }
+            break;
+          case 'master':
+            if (paramId === 'gain') {
+              audioEngine.setMasterVolume(value);
+            }
+            break;
+        }
       });
 
       setIsInitialized(true);
