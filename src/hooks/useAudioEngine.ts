@@ -3,6 +3,7 @@ import { audioEngine, GlitchTarget } from '@/audio/AudioEngine';
 import { SynthVoice, WaveformType } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
+import { SampleEngine, SampleParams } from '@/audio/SampleEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
 import { fxEngine } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
@@ -81,6 +82,10 @@ interface UseAudioEngineProps {
     mix: number;
   };
   glitchTargets: GlitchTarget[];
+  sampleBuffer: AudioBuffer | null;
+  sampleParams: SampleParams;
+  sampleMuted: boolean;
+  sampleIsPlaying: boolean;
 }
 
 // Note sequence for synth (C minor pentatonic)
@@ -105,6 +110,10 @@ export const useAudioEngine = ({
   reverbParams,
   delayParams,
   glitchTargets,
+  sampleBuffer,
+  sampleParams,
+  sampleMuted,
+  sampleIsPlaying,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -113,6 +122,7 @@ export const useAudioEngine = ({
   const synthRef = useRef<SynthVoice | null>(null);
   const drumRef = useRef<DrumEngine | null>(null);
   const textureRef = useRef<TextureEngine | null>(null);
+  const sampleRef = useRef<SampleEngine | null>(null);
   const animationFrameRef = useRef<number>();
   
   // Track-specific glitch buses
@@ -137,6 +147,7 @@ export const useAudioEngine = ({
       synthRef.current = new SynthVoice();
       drumRef.current = new DrumEngine();
       textureRef.current = new TextureEngine();
+      sampleRef.current = new SampleEngine();
       
       // Initialize FX engine (singleton, auto-init on first access)
       fxEngine.getReverbSend();
@@ -163,6 +174,7 @@ export const useAudioEngine = ({
       synthRef.current.connectFX();
       drumRef.current.connectFX();
       textureRef.current.connectFX();
+      sampleRef.current.connectFX();
       
       // Setup macro engine callback - actually update parameters
       macroEngine.setParamUpdateCallback((engineId, paramId, value) => {
@@ -297,6 +309,39 @@ export const useAudioEngine = ({
       textureRef.current.stop();
     }
   }, [isPlaying, textureMuted]);
+
+  // Sample engine: load buffer
+  useEffect(() => {
+    if (!sampleRef.current) return;
+    if (sampleBuffer) {
+      sampleRef.current.loadSample(sampleBuffer);
+    } else {
+      sampleRef.current.clearSample();
+    }
+  }, [sampleBuffer]);
+
+  // Sample engine: sync params
+  useEffect(() => {
+    if (!sampleRef.current) return;
+    sampleRef.current.setParams(sampleParams);
+  }, [sampleParams]);
+
+  // Sample engine: mute
+  useEffect(() => {
+    if (!sampleRef.current) return;
+    sampleRef.current.setMuted(sampleMuted);
+  }, [sampleMuted]);
+
+  // Sample engine: play/stop
+  useEffect(() => {
+    if (!sampleRef.current || !isInitialized) return;
+    
+    if (sampleIsPlaying) {
+      sampleRef.current.start();
+    } else {
+      sampleRef.current.stop();
+    }
+  }, [sampleIsPlaying, isInitialized]);
 
   // Scheduler step callback - triggers sounds with precise timing
   useEffect(() => {
@@ -437,6 +482,7 @@ export const useAudioEngine = ({
       synthRef.current?.disconnect();
       drumRef.current?.disconnect();
       textureRef.current?.disconnect();
+      sampleRef.current?.disconnect();
       drumsGlitchRef.current?.disconnect();
       synthGlitchRef.current?.disconnect();
       textureGlitchRef.current?.disconnect();

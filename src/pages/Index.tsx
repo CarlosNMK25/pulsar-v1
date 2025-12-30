@@ -91,6 +91,10 @@ const Index = () => {
     reverbParams: fxState.reverbParams,
     delayParams: fxState.delayParams,
     glitchTargets,
+    sampleBuffer: sampleState.sampleBuffer,
+    sampleParams: sampleState.sampleParams,
+    sampleMuted: sampleState.sampleMuted,
+    sampleIsPlaying,
   });
 
   const handlePlayPause = useCallback(async () => {
