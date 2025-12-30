@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from '@/components/synth/Header';
 import { TransportControls } from '@/components/synth/TransportControls';
 import { WaveformDisplay } from '@/components/synth/WaveformDisplay';
@@ -11,6 +11,9 @@ import { SceneSlots } from '@/components/synth/SceneSlots';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { WaveformType } from '@/audio/SynthVoice';
 import { TextureMode } from '@/audio/TextureEngine';
+import { sceneEngine, SceneData, InterpolatedParams } from '@/audio/SceneEngine';
+import { macroEngine } from '@/audio/MacroEngine';
+import { toast } from 'sonner';
 
 const initialScenes = [
   { id: 'a', name: 'Init' },
@@ -30,7 +33,7 @@ const initialMacros = [
   { id: 'm4', name: 'Chaos', value: 0, targets: [] },
   { id: 'm5', name: 'Drive', value: 25, targets: ['master.drive'] },
   { id: 'm6', name: 'LFO', value: 50, targets: ['synth.lfo'] },
-  { id: 'm7', name: 'Morph', value: 50, targets: [] },
+  { id: 'm7', name: 'Morph', value: 0, targets: [] },
   { id: 'm8', name: 'Master', value: 75, targets: ['master.gain'] },
 ];
 
@@ -41,11 +44,15 @@ const createInitialSteps = (pattern: number[]) =>
     probability: 100,
   }));
 
+const TRANSITION_DURATION = 500; // ms
+
 const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [swing, setSwing] = useState(0);
   const [activeScene, setActiveScene] = useState('a');
+  const [morphTargetScene, setMorphTargetScene] = useState<string | null>(null);
+  const [savedSceneIds, setSavedSceneIds] = useState<string[]>([]);
   const [macros, setMacros] = useState(initialMacros);
 
   // Drum steps and params
@@ -95,7 +102,11 @@ const Index = () => {
     mix: 0.25,
   });
 
-  // Audio engine hook - now with scheduler-based timing
+  // Refs for transition animation
+  const transitionRef = useRef<number | null>(null);
+  const morphBaseRef = useRef<SceneData | null>(null);
+
+  // Audio engine hook
   const { 
     initAudio, 
     isInitialized, 
@@ -122,6 +133,155 @@ const Index = () => {
     delayParams,
   });
 
+  // Load saved scenes on mount
+  useEffect(() => {
+    sceneEngine.loadFromLocalStorage();
+    setSavedSceneIds(sceneEngine.getSavedSceneIds());
+  }, []);
+
+  // Get current state as SceneData
+  const getCurrentSceneSnapshot = useCallback((): Omit<SceneData, 'id' | 'saved'> => {
+    return {
+      name: initialScenes.find(s => s.id === activeScene)?.name || 'Scene',
+      drumSteps: { kick: kickSteps, snare: snareSteps, hat: hatSteps },
+      drumParams,
+      drumMuted,
+      synthSteps,
+      synthParams,
+      synthMuted,
+      textureMode,
+      textureParams,
+      textureMuted,
+      reverbParams,
+      delayParams,
+      bpm,
+      swing,
+    };
+  }, [
+    activeScene, kickSteps, snareSteps, hatSteps, drumParams, drumMuted,
+    synthSteps, synthParams, synthMuted, textureMode, textureParams, 
+    textureMuted, reverbParams, delayParams, bpm, swing
+  ]);
+
+  // Apply interpolated params to state
+  const applyInterpolatedParams = useCallback((params: InterpolatedParams) => {
+    setDrumParams(params.drumParams);
+    setSynthParams(prev => ({ ...prev, ...params.synthParams }));
+    setTextureParams(params.textureParams);
+    setReverbParams(params.reverbParams);
+    setDelayParams(params.delayParams);
+    setBpm(params.bpm);
+    setSwing(params.swing);
+  }, []);
+
+  // Apply discrete params (steps, mutes, waveform, mode)
+  const applyDiscreteParams = useCallback((scene: SceneData) => {
+    setKickSteps(scene.drumSteps.kick);
+    setSnareSteps(scene.drumSteps.snare);
+    setHatSteps(scene.drumSteps.hat);
+    setDrumMuted(scene.drumMuted);
+    setSynthSteps(scene.synthSteps);
+    setSynthParams(prev => ({ ...prev, waveform: scene.synthParams.waveform }));
+    setSynthMuted(scene.synthMuted);
+    setTextureMode(scene.textureMode);
+    setTextureMuted(scene.textureMuted);
+  }, []);
+
+  // Transition to a scene with smooth animation
+  const transitionToScene = useCallback((targetScene: SceneData, duration: number = TRANSITION_DURATION) => {
+    // Cancel any existing transition
+    if (transitionRef.current) {
+      cancelAnimationFrame(transitionRef.current);
+    }
+
+    const startSnapshot = getCurrentSceneSnapshot();
+    const startScene: SceneData = { ...startSnapshot, id: 'temp', saved: false };
+    const startTime = performance.now();
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const rawProgress = Math.min(elapsed / duration, 1);
+      const progress = sceneEngine.easeInOutCubic(rawProgress);
+
+      const interpolated = sceneEngine.interpolateParams(startScene, targetScene, progress);
+      applyInterpolatedParams(interpolated);
+
+      if (rawProgress < 1) {
+        transitionRef.current = requestAnimationFrame(animate);
+      } else {
+        // Apply discrete params at the end
+        applyDiscreteParams(targetScene);
+        transitionRef.current = null;
+      }
+    };
+
+    transitionRef.current = requestAnimationFrame(animate);
+  }, [getCurrentSceneSnapshot, applyInterpolatedParams, applyDiscreteParams]);
+
+  // Handle scene selection
+  const handleSceneSelect = useCallback((sceneId: string) => {
+    const sceneData = sceneEngine.loadScene(sceneId);
+    
+    if (sceneData) {
+      transitionToScene(sceneData);
+    }
+    
+    setActiveScene(sceneId);
+    macroEngine.setActiveScene(sceneId);
+    
+    // Reset morph to 0 when changing scenes
+    setMacros(prev => prev.map(m => m.id === 'm7' ? { ...m, value: 0 } : m));
+  }, [transitionToScene]);
+
+  // Handle scene save
+  const handleSceneSave = useCallback((sceneId: string) => {
+    const snapshot = getCurrentSceneSnapshot();
+    sceneEngine.saveScene(sceneId, {
+      ...snapshot,
+      name: initialScenes.find(s => s.id === sceneId)?.name || 'Scene',
+    });
+    setSavedSceneIds(sceneEngine.getSavedSceneIds());
+    toast.success(`Scene ${initialScenes.find(s => s.id === sceneId)?.name} saved`);
+  }, [getCurrentSceneSnapshot]);
+
+  // Handle morph target change
+  const handleMorphTargetSet = useCallback((sceneId: string | null) => {
+    setMorphTargetScene(sceneId);
+    sceneEngine.setMorphTarget(sceneId);
+    
+    // Store current state as morph base
+    if (sceneId) {
+      const snapshot = getCurrentSceneSnapshot();
+      morphBaseRef.current = { ...snapshot, id: activeScene, saved: false };
+    } else {
+      morphBaseRef.current = null;
+    }
+  }, [getCurrentSceneSnapshot, activeScene]);
+
+  // Handle morph callback from MacroEngine/SceneEngine
+  const handleMorphChange = useCallback((amount: number) => {
+    if (!morphTargetScene || !morphBaseRef.current) return;
+    
+    const targetScene = sceneEngine.loadScene(morphTargetScene);
+    if (!targetScene) return;
+
+    const interpolated = sceneEngine.interpolateParams(morphBaseRef.current, targetScene, amount);
+    applyInterpolatedParams(interpolated);
+
+    // At 100%, apply discrete params
+    if (amount >= 0.99) {
+      applyDiscreteParams(targetScene);
+    }
+  }, [morphTargetScene, applyInterpolatedParams, applyDiscreteParams]);
+
+  // Set up morph callback
+  useEffect(() => {
+    sceneEngine.setMorphCallback((amount, _fromScene, _toScene) => {
+      handleMorphChange(amount);
+    });
+    macroEngine.setMorphMacroCallback(handleMorphChange);
+  }, [handleMorphChange]);
+
   const handlePlayPause = useCallback(async () => {
     if (!isInitialized) {
       await initAudio();
@@ -137,7 +297,6 @@ const Index = () => {
     setMacros((prev) => 
       prev.map((m) => m.id === id ? { ...m, value } : m)
     );
-    // Also update the audio engine's macro system
     audioMacroChange(id, value);
   }, [audioMacroChange]);
 
@@ -154,14 +313,23 @@ const Index = () => {
       if (e.shiftKey && e.code.startsWith('Digit')) {
         const num = parseInt(e.code.replace('Digit', ''));
         if (num >= 1 && num <= 8) {
-          setActiveScene(initialScenes[num - 1].id);
+          handleSceneSelect(initialScenes[num - 1].id);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePlayPause, handleStop]);
+  }, [handlePlayPause, handleStop, handleSceneSelect]);
+
+  // Cleanup transition on unmount
+  useEffect(() => {
+    return () => {
+      if (transitionRef.current) {
+        cancelAnimationFrame(transitionRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -237,7 +405,11 @@ const Index = () => {
               <SceneSlots
                 scenes={initialScenes}
                 activeScene={activeScene}
-                onSceneSelect={setActiveScene}
+                morphTargetScene={morphTargetScene}
+                savedSceneIds={savedSceneIds}
+                onSceneSelect={handleSceneSelect}
+                onSceneSave={handleSceneSave}
+                onMorphTargetSet={handleMorphTargetSet}
               />
             </div>
           </div>
@@ -247,6 +419,11 @@ const Index = () => {
             <div className="flex items-center gap-4">
               <span>Step: {currentStep + 1}/16</span>
               <span>Scene: {initialScenes.find(s => s.id === activeScene)?.name}</span>
+              {morphTargetScene && (
+                <span className="text-primary">
+                  Morph → {initialScenes.find(s => s.id === morphTargetScene)?.name}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <span>Audio: {audioState}</span>
@@ -262,7 +439,7 @@ const Index = () => {
       {/* Footer hint */}
       <footer className="px-6 py-2 border-t border-border text-xs text-muted-foreground text-center">
         <span className="opacity-50">
-          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Click+Drag: Adjust knobs
+          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Double-Click: Save Scene • Shift+Click: Morph Target
         </span>
       </footer>
     </div>
