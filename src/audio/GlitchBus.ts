@@ -41,7 +41,7 @@ export class GlitchBus {
     bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5, curve: 'exp' as TapeStopCurve, wobble: 0, probability: 1.0 },
     granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.5, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, probability: 1.0 },
-    reverse: { duration: 0.5, mix: 0.7 },
+    reverse: { duration: 0.5, mix: 0.7, position: 0, crossfade: 0.3, speed: 0.5, feedback: 0, loop: 0, probability: 1.0 },
   };
 
   constructor(track: 'drums' | 'synth' | 'texture' | 'sample' | 'fx') {
@@ -156,9 +156,15 @@ export class GlitchBus {
     if (params.probability !== undefined) this.params.granularFreeze.probability = params.probability;
   }
 
-  setReverseParams(params: Partial<{ duration: number; mix: number }>): void {
+  setReverseParams(params: Partial<{ duration: number; mix: number; position: number; crossfade: number; speed: number; feedback: number; loop: number; probability: number }>): void {
     if (params.duration !== undefined) this.params.reverse.duration = params.duration;
     if (params.mix !== undefined) this.params.reverse.mix = params.mix;
+    if (params.position !== undefined) this.params.reverse.position = params.position;
+    if (params.crossfade !== undefined) this.params.reverse.crossfade = params.crossfade;
+    if (params.speed !== undefined) this.params.reverse.speed = params.speed;
+    if (params.feedback !== undefined) this.params.reverse.feedback = params.feedback;
+    if (params.loop !== undefined) this.params.reverse.loop = params.loop;
+    if (params.probability !== undefined) this.params.reverse.probability = params.probability;
   }
 
   triggerStutter(duration?: number): void {
@@ -394,10 +400,18 @@ export class GlitchBus {
   triggerReverse(duration?: number): void {
     if (this.bypass || !this.reverseGain || !this.wetNode || !this.dryNode) return;
     
+    // Probability check
+    if (Math.random() > this.params.reverse.probability) {
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const sampleRate = ctx.sampleRate;
     
     const reverseDuration = duration || (0.1 + this.params.reverse.duration * 0.4);
+    const playbackSpeed = 0.5 + this.params.reverse.speed * 1.5;
+    const loopCount = Math.floor(1 + this.params.reverse.loop * 3);
+    const crossfadeTime = 0.005 + this.params.reverse.crossfade * 0.095;
     const bufferSize = Math.floor(reverseDuration * sampleRate);
     
     this.reverseSamples = [new Float32Array(bufferSize), new Float32Array(bufferSize)];
@@ -408,27 +422,54 @@ export class GlitchBus {
     setTimeout(() => {
       this.reverseRecording = false;
       
+      const positionOffset = Math.floor(this.params.reverse.position * bufferSize * 0.5);
+      
       for (let ch = 0; ch < this.reverseSamples.length; ch++) {
-        this.reverseSamples[ch].reverse();
-      }
-      
-      this.reversePlayback = true;
-      this.reversePlaybackIndex = 0;
-      
-      if (this.wetNode && this.dryNode && this.reverseGain) {
-        this.wetNode.gain.setValueAtTime(this.params.reverse.mix, ctx.currentTime);
-        this.dryNode.gain.setValueAtTime(1 - this.params.reverse.mix * 0.7, ctx.currentTime);
-        this.reverseGain.gain.setValueAtTime(1, ctx.currentTime);
-      }
-      
-      setTimeout(() => {
-        this.reversePlayback = false;
-        if (this.wetNode && this.dryNode && this.reverseGain) {
-          this.wetNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
-          this.dryNode.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
-          this.reverseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        if (positionOffset > 0) {
+          const shifted = new Float32Array(bufferSize);
+          for (let i = 0; i < bufferSize; i++) {
+            shifted[i] = this.reverseSamples[ch][(i + positionOffset) % bufferSize];
+          }
+          this.reverseSamples[ch] = shifted;
         }
-      }, reverseDuration * 1000);
+        this.reverseSamples[ch].reverse();
+        
+        const fadeLength = Math.floor(crossfadeTime * sampleRate);
+        for (let i = 0; i < fadeLength && i < bufferSize; i++) {
+          const fade = i / fadeLength;
+          this.reverseSamples[ch][i] *= fade;
+          this.reverseSamples[ch][bufferSize - 1 - i] *= fade;
+        }
+      }
+      
+      let currentLoop = 0;
+      const playLoop = () => {
+        if (currentLoop >= loopCount) {
+          this.reversePlayback = false;
+          if (this.wetNode && this.dryNode && this.reverseGain) {
+            this.wetNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+            this.dryNode.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+            this.reverseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+          }
+          return;
+        }
+        
+        this.reversePlayback = true;
+        this.reversePlaybackIndex = 0;
+        
+        if (this.wetNode && this.dryNode && this.reverseGain) {
+          const feedbackDecay = Math.pow(1 - this.params.reverse.feedback * 0.3, currentLoop);
+          this.wetNode.gain.setValueAtTime(this.params.reverse.mix * feedbackDecay, ctx.currentTime);
+          this.dryNode.gain.setValueAtTime(1 - this.params.reverse.mix * 0.7 * feedbackDecay, ctx.currentTime);
+          this.reverseGain.gain.setValueAtTime(1, ctx.currentTime);
+        }
+        
+        currentLoop++;
+        const loopDurationMs = (reverseDuration / playbackSpeed) * 1000;
+        setTimeout(playLoop, loopDurationMs);
+      };
+      
+      playLoop();
       
     }, reverseDuration * 1000);
   }

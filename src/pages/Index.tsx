@@ -401,10 +401,15 @@ const Index = () => {
                   }}
                   onReverseParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateReverseParams(track, params);
-                    // FIX: Ahora aplicamos los params al engine en tiempo real
                     setGlitchReverseParams(track, {
                       duration: params.duration !== undefined ? params.duration / 100 : undefined,
                       mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                      position: params.position !== undefined ? params.position / 100 : undefined,
+                      crossfade: params.crossfade !== undefined ? params.crossfade / 100 : undefined,
+                      speed: params.speed !== undefined ? params.speed / 100 : undefined,
+                      feedback: params.feedback !== undefined ? params.feedback / 100 : undefined,
+                      loop: params.loop !== undefined ? params.loop / 100 : undefined,
+                      probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
                   onChaosToggle={(enabled, params) => !glitchMuted && setChaosEnabled(enabled, params)}

@@ -1004,8 +1004,8 @@ export const useAudioEngine = ({
     }
   }, []);
 
-  // Reverse params
-  const setGlitchReverseParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { duration?: number; mix?: number }) => {
+  // Reverse params with 6 new advanced parameters
+  const setGlitchReverseParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { duration?: number; mix?: number; position?: number; crossfade?: number; speed?: number; feedback?: number; loop?: number; probability?: number }) => {
     switch (track) {
       case 'master':
         glitchEngine.setReverseParams(params);
