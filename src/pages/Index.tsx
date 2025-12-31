@@ -345,23 +345,38 @@ const Index = () => {
                   glitchTargets={glitchTargets}
                   muted={glitchMuted}
                   paramsPerTrack={glitchState.paramsPerTrack}
+                  masterMix={glitchState.masterMix}
+                  isPlaying={isPlaying}
+                  analyserData={analyserData}
                   onMuteToggle={() => setGlitchMuted(prev => !prev)}
                   onGlitchTargetsChange={setGlitchTargets}
                   onTriggerGlitch={(effect) => !glitchMuted && triggerGlitch(effect)}
                   onStutterParamsChange={(track: GlitchTrackId, params) => {
-                    glitchState.updateStutterParams(track, {
+                    glitchState.updateStutterParams(track, params);
+                    setGlitchStutterParams(track, {
                       division: params.division,
-                      decay: params.decay !== undefined ? params.decay * 100 : undefined,
-                      mix: params.mix !== undefined ? params.mix * 100 : undefined,
+                      decay: params.decay !== undefined ? params.decay / 100 : undefined,
+                      mix: params.mix !== undefined ? params.mix / 100 : undefined,
                     });
-                    setGlitchStutterParams(track, params);
                   }}
                   onBitcrushParamsChange={(track: GlitchTrackId, params) => {
-                    glitchState.updateBitcrushParams(track, {
+                    glitchState.updateBitcrushParams(track, params);
+                    setGlitchBitcrushParams(track, {
                       bits: params.bits,
-                      sampleRate: params.sampleRate !== undefined ? params.sampleRate * 100 : undefined,
+                      sampleRate: params.sampleRate !== undefined ? params.sampleRate / 100 : undefined,
                     });
-                    setGlitchBitcrushParams(track, params);
+                  }}
+                  onTapeStopParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateTapeStopParams(track, params);
+                    // TapeStop params applied to engine when triggered
+                  }}
+                  onFreezeParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateFreezeParams(track, params);
+                    // Freeze params applied to engine when triggered
+                  }}
+                  onReverseParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateReverseParams(track, params);
+                    // Reverse params applied to engine when triggered
                   }}
                   onChaosToggle={(enabled, params) => !glitchMuted && setChaosEnabled(enabled, params)}
                   onChaosParamsChange={(track: GlitchTrackId, params) => {
@@ -370,6 +385,14 @@ const Index = () => {
                       density: params.density !== undefined ? params.density / 100 : undefined,
                       intensity: params.intensity !== undefined ? params.intensity / 100 : undefined,
                     });
+                  }}
+                  onFXSendsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateFXSendsParams(track, params);
+                    // FX sends applied through glitch engine when triggered
+                  }}
+                  onMasterMixChange={(value) => {
+                    glitchState.setMasterMix(value);
+                    // Apply to audio engine
                   }}
                 />
               </div>

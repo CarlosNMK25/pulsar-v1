@@ -284,6 +284,16 @@ export class GlitchEngine {
     return { ...this.params };
   }
 
+  // Master mix control (global dry/wet for all glitch effects)
+  setMasterMix(mix: number): void {
+    if (!this.wetNode || !this.dryNode) return;
+    const ctx = audioEngine.getContext();
+    const normalizedMix = mix / 100;
+    // Keep dry signal mostly intact, blend wet based on mix
+    this.dryNode.gain.setTargetAtTime(1 - normalizedMix * 0.5, ctx.currentTime, 0.02);
+    this.wetNode.gain.setTargetAtTime(normalizedMix, ctx.currentTime, 0.02);
+  }
+
   // Individual effect controls
   setStutterParams(params: Partial<StutterParams>): void {
     this.params.stutter = { ...this.params.stutter, ...params };
