@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
-import { FXMeter } from './FXMeter';
+import { FXVisualizer } from './FXVisualizer';
 import { SendMatrix } from './SendMatrix';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { useFXAnalyser } from '@/hooks/useFXAnalyser';
@@ -53,7 +53,8 @@ export function FXModule({
   onSendChange,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
-  const { reverb: reverbLevel, delay: delayLevel, master: masterLevel } = useFXAnalyser(isPlaying && !muted);
+  const levels = useFXAnalyser(isPlaying && !muted);
+  const { reverb: reverbLevel, delay: delayLevel } = levels;
 
   // Apply bypass to FX engine when mute changes
   useEffect(() => {
@@ -206,9 +207,16 @@ export function FXModule({
           </div>
         </div>
 
-        {/* VU Meter - Wet Signal */}
-        <div className="py-1.5">
-          <FXMeter level={masterLevel} className="mx-0.5" />
+        {/* Wet Signal Visualizer */}
+        <div className="py-2">
+          <FXVisualizer 
+            leftLevel={levels.masterLeft}
+            rightLevel={levels.masterRight}
+            peakLeft={levels.peakLeft}
+            peakRight={levels.peakRight}
+            spectrum={levels.spectrum}
+            isPlaying={isPlaying && !muted}
+          />
         </div>
 
         {/* Send Matrix */}
