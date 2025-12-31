@@ -460,6 +460,8 @@ const Index = () => {
         onVolumeChange={setChannelVolume}
         trackRouting={fxState.trackRouting}
         onRoutingChange={fxState.updateTrackRouting}
+        sendLevels={fxState.sendLevels}
+        onSendChange={fxState.updateSendLevel}
       />
 
       {/* Performance Panel (Left) */}

@@ -5,7 +5,7 @@ import { KeyboardTab, KeyboardTarget } from './dock/KeyboardTab';
 import { MixerTab } from './dock/MixerTab';
 import { ScopeTab } from './dock/ScopeTab';
 import { ParamsTab } from './dock/ParamsTab';
-import { TrackName, TrackRoutingState } from '@/hooks/useFXState';
+import { TrackName, TrackRoutingState, TrackSendLevels } from '@/hooks/useFXState';
 
 interface BottomDockProps {
   state: DockState;
@@ -42,6 +42,9 @@ interface BottomDockProps {
   // Track routing
   trackRouting?: TrackRoutingState;
   onRoutingChange?: (track: TrackName, routing: { fxBypass?: boolean; glitchBypass?: boolean }) => void;
+  // Send levels
+  sendLevels?: TrackSendLevels;
+  onSendChange?: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
 }
 
 const tabs = [
@@ -87,6 +90,8 @@ export const BottomDock = ({
   onVolumeChange,
   trackRouting,
   onRoutingChange,
+  sendLevels,
+  onSendChange,
 }: BottomDockProps) => {
   const height = DOCK_HEIGHTS[state];
   const isVisible = state !== 'hidden';
@@ -189,6 +194,8 @@ export const BottomDock = ({
               onVolumeChange={onVolumeChange}
               trackRouting={trackRouting}
               onRoutingChange={onRoutingChange}
+              sendLevels={sendLevels}
+              onSendChange={onSendChange}
             />
           )}
           {activeTab === 'scope' && <ScopeTab analyserData={analyserData} />}

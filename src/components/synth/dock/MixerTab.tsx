@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
 import { Volume2, VolumeX, Sparkles, Waves } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import { TrackName, TrackRoutingState } from '@/hooks/useFXState';
+import { TrackName, TrackRoutingState, TrackSendLevels } from '@/hooks/useFXState';
+import { SendMatrix } from '../SendMatrix';
 
 interface MixerTabProps {
   drumMuted?: boolean;
@@ -16,6 +17,9 @@ interface MixerTabProps {
   onVolumeChange?: (channel: string, value: number) => void;
   trackRouting?: TrackRoutingState;
   onRoutingChange?: (track: TrackName, routing: { fxBypass?: boolean; glitchBypass?: boolean }) => void;
+  // Send levels
+  sendLevels?: TrackSendLevels;
+  onSendChange?: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
 }
 
 interface ChannelProps {
@@ -146,78 +150,96 @@ export const MixerTab = ({
   onVolumeChange,
   trackRouting,
   onRoutingChange,
+  sendLevels,
+  onSendChange,
 }: MixerTabProps) => {
   return (
-    <div className="flex items-center justify-center h-full gap-0.5 px-4">
-      <Channel 
-        name="Drum" 
-        channelId="drum"
-        muted={drumMuted} 
-        volume={volumes.drum ?? 0.8}
-        onMuteToggle={onDrumMuteToggle} 
-        onVolumeChange={(v) => onVolumeChange?.('drum', v)}
-        color="bg-secondary"
-        fxBypass={trackRouting?.drums.fxBypass}
-        glitchBypass={trackRouting?.drums.glitchBypass}
-        onFxBypassToggle={() => onRoutingChange?.('drums', { fxBypass: !trackRouting?.drums.fxBypass })}
-        onGlitchBypassToggle={() => onRoutingChange?.('drums', { glitchBypass: !trackRouting?.drums.glitchBypass })}
-        showRouting={!!trackRouting}
-      />
-      <div className="w-px h-44 bg-border/30" />
-      <Channel 
-        name="Synth" 
-        channelId="synth"
-        muted={synthMuted} 
-        volume={volumes.synth ?? 0.8}
-        onMuteToggle={onSynthMuteToggle} 
-        onVolumeChange={(v) => onVolumeChange?.('synth', v)}
-        color="bg-primary"
-        fxBypass={trackRouting?.synth.fxBypass}
-        glitchBypass={trackRouting?.synth.glitchBypass}
-        onFxBypassToggle={() => onRoutingChange?.('synth', { fxBypass: !trackRouting?.synth.fxBypass })}
-        onGlitchBypassToggle={() => onRoutingChange?.('synth', { glitchBypass: !trackRouting?.synth.glitchBypass })}
-        showRouting={!!trackRouting}
-      />
-      <div className="w-px h-44 bg-border/30" />
-      <Channel 
-        name="Texture" 
-        channelId="texture"
-        muted={textureMuted} 
-        volume={volumes.texture ?? 0.8}
-        onMuteToggle={onTextureMuteToggle} 
-        onVolumeChange={(v) => onVolumeChange?.('texture', v)}
-        color="bg-accent-foreground"
-        fxBypass={trackRouting?.texture.fxBypass}
-        glitchBypass={trackRouting?.texture.glitchBypass}
-        onFxBypassToggle={() => onRoutingChange?.('texture', { fxBypass: !trackRouting?.texture.fxBypass })}
-        onGlitchBypassToggle={() => onRoutingChange?.('texture', { glitchBypass: !trackRouting?.texture.glitchBypass })}
-        showRouting={!!trackRouting}
-      />
-      <div className="w-px h-44 bg-border/30" />
-      <Channel 
-        name="Sample" 
-        channelId="sample"
-        muted={sampleMuted} 
-        volume={volumes.sample ?? 0.8}
-        onMuteToggle={onSampleMuteToggle} 
-        onVolumeChange={(v) => onVolumeChange?.('sample', v)}
-        color="bg-primary/70"
-        fxBypass={trackRouting?.sample.fxBypass}
-        glitchBypass={trackRouting?.sample.glitchBypass}
-        onFxBypassToggle={() => onRoutingChange?.('sample', { fxBypass: !trackRouting?.sample.fxBypass })}
-        onGlitchBypassToggle={() => onRoutingChange?.('sample', { glitchBypass: !trackRouting?.sample.glitchBypass })}
-        showRouting={!!trackRouting}
-      />
-      <div className="w-px h-44 bg-border/50 mx-2" />
-      <Channel 
-        name="Master" 
-        channelId="master"
-        muted={false} 
-        volume={volumes.master ?? 0.8}
-        onVolumeChange={(v) => onVolumeChange?.('master', v)}
-        color="bg-foreground/70"
-        showRouting={false}
-      />
+    <div className="flex items-center justify-center h-full gap-2 px-4">
+      {/* Channel strips */}
+      <div className="flex items-center gap-0.5">
+        <Channel 
+          name="Drum" 
+          channelId="drum"
+          muted={drumMuted} 
+          volume={volumes.drum ?? 0.8}
+          onMuteToggle={onDrumMuteToggle} 
+          onVolumeChange={(v) => onVolumeChange?.('drum', v)}
+          color="bg-secondary"
+          fxBypass={trackRouting?.drums.fxBypass}
+          glitchBypass={trackRouting?.drums.glitchBypass}
+          onFxBypassToggle={() => onRoutingChange?.('drums', { fxBypass: !trackRouting?.drums.fxBypass })}
+          onGlitchBypassToggle={() => onRoutingChange?.('drums', { glitchBypass: !trackRouting?.drums.glitchBypass })}
+          showRouting={!!trackRouting}
+        />
+        <div className="w-px h-44 bg-border/30" />
+        <Channel 
+          name="Synth" 
+          channelId="synth"
+          muted={synthMuted} 
+          volume={volumes.synth ?? 0.8}
+          onMuteToggle={onSynthMuteToggle} 
+          onVolumeChange={(v) => onVolumeChange?.('synth', v)}
+          color="bg-primary"
+          fxBypass={trackRouting?.synth.fxBypass}
+          glitchBypass={trackRouting?.synth.glitchBypass}
+          onFxBypassToggle={() => onRoutingChange?.('synth', { fxBypass: !trackRouting?.synth.fxBypass })}
+          onGlitchBypassToggle={() => onRoutingChange?.('synth', { glitchBypass: !trackRouting?.synth.glitchBypass })}
+          showRouting={!!trackRouting}
+        />
+        <div className="w-px h-44 bg-border/30" />
+        <Channel 
+          name="Texture" 
+          channelId="texture"
+          muted={textureMuted} 
+          volume={volumes.texture ?? 0.8}
+          onMuteToggle={onTextureMuteToggle} 
+          onVolumeChange={(v) => onVolumeChange?.('texture', v)}
+          color="bg-accent-foreground"
+          fxBypass={trackRouting?.texture.fxBypass}
+          glitchBypass={trackRouting?.texture.glitchBypass}
+          onFxBypassToggle={() => onRoutingChange?.('texture', { fxBypass: !trackRouting?.texture.fxBypass })}
+          onGlitchBypassToggle={() => onRoutingChange?.('texture', { glitchBypass: !trackRouting?.texture.glitchBypass })}
+          showRouting={!!trackRouting}
+        />
+        <div className="w-px h-44 bg-border/30" />
+        <Channel 
+          name="Sample" 
+          channelId="sample"
+          muted={sampleMuted} 
+          volume={volumes.sample ?? 0.8}
+          onMuteToggle={onSampleMuteToggle} 
+          onVolumeChange={(v) => onVolumeChange?.('sample', v)}
+          color="bg-primary/70"
+          fxBypass={trackRouting?.sample.fxBypass}
+          glitchBypass={trackRouting?.sample.glitchBypass}
+          onFxBypassToggle={() => onRoutingChange?.('sample', { fxBypass: !trackRouting?.sample.fxBypass })}
+          onGlitchBypassToggle={() => onRoutingChange?.('sample', { glitchBypass: !trackRouting?.sample.glitchBypass })}
+          showRouting={!!trackRouting}
+        />
+        <div className="w-px h-44 bg-border/50 mx-2" />
+        <Channel 
+          name="Master" 
+          channelId="master"
+          muted={false} 
+          volume={volumes.master ?? 0.8}
+          onVolumeChange={(v) => onVolumeChange?.('master', v)}
+          color="bg-foreground/70"
+          showRouting={false}
+        />
+      </div>
+
+      {/* Send Matrix */}
+      {sendLevels && onSendChange && (
+        <>
+          <div className="w-px h-32 bg-border/50" />
+          <div className="flex flex-col justify-center h-full py-4">
+            <SendMatrix 
+              sendLevels={sendLevels} 
+              onSendChange={onSendChange} 
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
