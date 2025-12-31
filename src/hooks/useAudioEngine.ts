@@ -1004,6 +1004,38 @@ export const useAudioEngine = ({
     }
   }, []);
 
+  // Start sustained freeze on targets
+  const startGlitchFreezeSustain = useCallback(() => {
+    if (glitchTargets.includes('master')) {
+      glitchEngine.startSustainedFreeze();
+    }
+    if (glitchTargets.includes('drums')) {
+      drumsGlitchRef.current?.startSustainedFreeze();
+    }
+    if (glitchTargets.includes('synth')) {
+      synthGlitchRef.current?.startSustainedFreeze();
+    }
+    if (glitchTargets.includes('texture')) {
+      textureGlitchRef.current?.startSustainedFreeze();
+    }
+    if (glitchTargets.includes('sample')) {
+      sampleGlitchRef.current?.startSustainedFreeze();
+    }
+    if (glitchTargets.includes('fx')) {
+      fxGlitchRef.current?.startSustainedFreeze();
+    }
+  }, [glitchTargets]);
+
+  // Stop sustained freeze on all targets
+  const stopGlitchFreezeSustain = useCallback(() => {
+    glitchEngine.stopSustainedFreeze();
+    drumsGlitchRef.current?.stopSustainedFreeze();
+    synthGlitchRef.current?.stopSustainedFreeze();
+    textureGlitchRef.current?.stopSustainedFreeze();
+    sampleGlitchRef.current?.stopSustainedFreeze();
+    fxGlitchRef.current?.stopSustainedFreeze();
+  }, []);
+
   // Reverse params with 6 new advanced parameters
   const setGlitchReverseParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { duration?: number; mix?: number; position?: number; crossfade?: number; speed?: number; feedback?: number; loop?: number; probability?: number }) => {
     switch (track) {
@@ -1104,6 +1136,8 @@ export const useAudioEngine = ({
     setGlitchFXSends,
     setChaosEnabled,
     setGlitchChaosParams,
+    startGlitchFreezeSustain,
+    stopGlitchFreezeSustain,
     playNote,
     stopNote,
     triggerDrum,
