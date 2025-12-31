@@ -57,12 +57,20 @@ export const GlitchModuleCompact = ({
     return targets;
   });
 
+  // Explicit track being edited (user-selectable when multiple tracks active)
+  const [selectedEditTrack, setSelectedEditTrack] = useState<IndividualTarget | null>(null);
+
   // Determine which track's params to display
   const editingTrack: GlitchTrackId = useMemo(() => {
     if (routingMode === 'master') return 'master';
+    // If user explicitly selected an edit track and it's still active, use it
+    if (selectedEditTrack && individualTargets.has(selectedEditTrack)) {
+      return selectedEditTrack;
+    }
+    // Otherwise use first active track
     const targetsArray = Array.from(individualTargets);
     return targetsArray.length > 0 ? targetsArray[0] : 'drums';
-  }, [routingMode, individualTargets]);
+  }, [routingMode, individualTargets, selectedEditTrack]);
 
   // Get current params for the editing track
   const currentParams = paramsPerTrack[editingTrack];
@@ -124,11 +132,37 @@ export const GlitchModuleCompact = ({
       const next = new Set(prev);
       if (next.has(target)) {
         next.delete(target);
+        // If we're removing the currently edited track, clear selection
+        if (selectedEditTrack === target) {
+          setSelectedEditTrack(null);
+        }
       } else {
         next.add(target);
       }
       return next;
     });
+  };
+
+  // Handle clicking on track button - either toggle or switch editing
+  const handleTrackClick = (target: IndividualTarget) => {
+    if (individualTargets.has(target)) {
+      // Already active - if multiple tracks, switch to editing this one
+      if (individualTargets.size > 1) {
+        setSelectedEditTrack(target);
+      } else {
+        // Only one track active, toggle it off
+        toggleIndividualTarget(target);
+      }
+    } else {
+      // Not active - activate and set as editing
+      toggleIndividualTarget(target);
+      setSelectedEditTrack(target);
+    }
+  };
+
+  // Double-click always toggles active state
+  const handleTrackDoubleClick = (target: IndividualTarget) => {
+    toggleIndividualTarget(target);
   };
 
   const handleStutterTrigger = () => {
@@ -244,26 +278,40 @@ export const GlitchModuleCompact = ({
         
         {/* Individual track selectors - only visible in individual mode */}
         {routingMode === 'individual' && (
-          <div className="flex gap-1">
-            {individualButtons.map(({ id, label }) => (
-              <Button
-                key={id}
-                variant={individualTargets.has(id) ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => toggleIndividualTarget(id)}
-                className={cn(
-                  'flex-1 h-6 text-[10px] font-mono transition-all',
-                  individualTargets.has(id) 
-                    ? 'bg-primary/80 text-primary-foreground border-primary' 
-                    : 'opacity-60 hover:opacity-100',
-                  // Highlight the editing track when multiple selected
-                  multipleTracksSelected && id === editingTrack && 'ring-1 ring-accent'
-                )}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
+          <>
+            <div className="flex gap-1">
+              {individualButtons.map(({ id, label }) => {
+                const isActive = individualTargets.has(id);
+                const isEditing = id === editingTrack;
+                return (
+                  <Button
+                    key={id}
+                    variant={isActive ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTrackClick(id)}
+                    onDoubleClick={() => handleTrackDoubleClick(id)}
+                    className={cn(
+                      'flex-1 h-6 text-[10px] font-mono transition-all relative',
+                      isActive 
+                        ? isEditing
+                          ? 'bg-primary text-primary-foreground ring-2 ring-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.5)]'
+                          : 'bg-primary/60 text-primary-foreground'
+                        : 'opacity-50 hover:opacity-80'
+                    )}
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            {/* Editing indicator when multiple tracks selected */}
+            {multipleTracksSelected && (
+              <div className="text-[9px] text-yellow-400/80 font-mono text-center">
+                ✏️ Editing: {individualButtons.find(b => b.id === editingTrack)?.label || editingTrack}
+              </div>
+            )}
+          </>
         )}
         
         {/* Warning when no target selected in individual mode */}
