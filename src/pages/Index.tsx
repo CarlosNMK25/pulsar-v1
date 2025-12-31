@@ -7,6 +7,7 @@ import { DrumModule } from '@/components/synth/DrumModule';
 import { SynthModule } from '@/components/synth/SynthModule';
 import { TextureModule } from '@/components/synth/TextureModule';
 import { FXModule } from '@/components/synth/FXModule';
+import { ModulationModule } from '@/components/synth/ModulationModule';
 import { GlitchModuleCompact } from '@/components/synth/GlitchModuleCompact';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
@@ -21,6 +22,7 @@ import { useDrumState } from '@/hooks/useDrumState';
 import { useSynthState } from '@/hooks/useSynthState';
 import { useTextureState } from '@/hooks/useTextureState';
 import { useFXState } from '@/hooks/useFXState';
+import { useModulationState } from '@/hooks/useModulationState';
 import { useSampleState } from '@/hooks/useSampleState';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { usePatternChain } from '@/hooks/usePatternChain';
@@ -62,6 +64,7 @@ const Index = () => {
   const synthState = useSynthState();
   const textureState = useTextureState();
   const fxState = useFXState();
+  const modulationState = useModulationState();
   const sampleState = useSampleState();
   const glitchState = useGlitchState();
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
@@ -323,9 +326,9 @@ const Index = () => {
             title="Procesamiento"
             isOpen={uiLayout.processingOpen}
             onToggle={uiLayout.toggleProcessing}
-            moduleCount={2}
+            moduleCount={3}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="min-h-[200px]">
                 <FXModule
                   reverbParams={fxState.reverbParams}
@@ -345,6 +348,28 @@ const Index = () => {
                   onTargetToggle={fxState.toggleFxTarget}
                   onFXOffsetChange={fxState.updateFXOffset}
                   onResetTrackOffsets={fxState.resetTrackOffsets}
+                />
+              </div>
+              <div className="min-h-[200px]">
+                <ModulationModule
+                  chorus={modulationState.chorus}
+                  flanger={modulationState.flanger}
+                  phaser={modulationState.phaser}
+                  tremolo={modulationState.tremolo}
+                  ringMod={modulationState.ringMod}
+                  autoPan={modulationState.autoPan}
+                  bypassed={modulationState.bypassed}
+                  routingMode={modulationState.routingMode}
+                  targets={modulationState.targets}
+                  onChorusChange={modulationState.updateChorusParams}
+                  onFlangerChange={modulationState.updateFlangerParams}
+                  onPhaserChange={modulationState.updatePhaserParams}
+                  onTremoloChange={modulationState.updateTremoloParams}
+                  onRingModChange={modulationState.updateRingModParams}
+                  onAutoPanChange={modulationState.updateAutoPanParams}
+                  onBypassToggle={modulationState.toggleBypass}
+                  onRoutingModeChange={modulationState.setRoutingMode}
+                  onTargetToggle={modulationState.toggleTarget}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">
