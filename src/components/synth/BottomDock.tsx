@@ -21,9 +21,13 @@ interface BottomDockProps {
   onSampleTrigger?: (velocity?: number) => void;
   isAudioReady?: boolean;
   onInitAudio?: () => Promise<void>;
-  // Keyboard target
+  // Keyboard target and state
   keyboardTarget?: KeyboardTarget;
   onKeyboardTargetChange?: (target: KeyboardTarget) => void;
+  keyboardOctave?: number;
+  onKeyboardOctaveChange?: (octave: number) => void;
+  pressedMidi?: Set<number>;
+  pressedDrums?: Set<string>;
   // Mixer data
   drumMuted?: boolean;
   synthMuted?: boolean;
@@ -67,6 +71,10 @@ export const BottomDock = ({
   onInitAudio,
   keyboardTarget = 'synth',
   onKeyboardTargetChange,
+  keyboardOctave = 3,
+  onKeyboardOctaveChange,
+  pressedMidi,
+  pressedDrums,
   drumMuted = false,
   synthMuted = false,
   textureMuted = false,
@@ -161,6 +169,10 @@ export const BottomDock = ({
               onInitAudio={onInitAudio}
               target={keyboardTarget}
               onTargetChange={onKeyboardTargetChange}
+              octave={keyboardOctave}
+              onOctaveChange={onKeyboardOctaveChange}
+              pressedMidi={pressedMidi}
+              pressedDrums={pressedDrums}
             />
           )}
           {activeTab === 'mixer' && (
