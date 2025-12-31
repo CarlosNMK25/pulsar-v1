@@ -54,6 +54,11 @@ export class FXEngine {
   private masterLowpass: BiquadFilterNode | null = null;
   private masterHighpass: BiquadFilterNode | null = null;
   
+  // Analysers for visual feedback
+  private reverbAnalyser: AnalyserNode | null = null;
+  private delayAnalyser: AnalyserNode | null = null;
+  private masterWetAnalyser: AnalyserNode | null = null;
+  
   // Parameters
   private reverbParams: ReverbParams = {
     size: 0.5,
@@ -186,8 +191,24 @@ export class FXEngine {
     this.delayMerger.connect(this.delayGain);
     this.delayGain.connect(this.masterFilterInput); // Route to master filter
     
+    // === ANALYSERS FOR VISUAL FEEDBACK ===
+    this.reverbAnalyser = ctx.createAnalyser();
+    this.reverbAnalyser.fftSize = 256;
+    this.reverbAnalyser.smoothingTimeConstant = 0.8;
+    this.reverbGain.connect(this.reverbAnalyser);
+    
+    this.delayAnalyser = ctx.createAnalyser();
+    this.delayAnalyser.fftSize = 256;
+    this.delayAnalyser.smoothingTimeConstant = 0.8;
+    this.delayGain.connect(this.delayAnalyser);
+    
+    this.masterWetAnalyser = ctx.createAnalyser();
+    this.masterWetAnalyser.fftSize = 64;
+    this.masterWetAnalyser.smoothingTimeConstant = 0.7;
+    this.masterHighpass.connect(this.masterWetAnalyser);
+    
     this.initialized = true;
-    console.log('[FXEngine] Initialized with PreDelay, LoFi, Spread, and Master Filter');
+    console.log('[FXEngine] Initialized with PreDelay, LoFi, Spread, Master Filter, and Analysers');
   }
 
   private createReverbImpulse(): void {
@@ -393,6 +414,19 @@ export class FXEngine {
     }
   }
 
+  // Analyser getters for visual feedback
+  getReverbAnalyser(): AnalyserNode | null {
+    return this.reverbAnalyser;
+  }
+
+  getDelayAnalyser(): AnalyserNode | null {
+    return this.delayAnalyser;
+  }
+
+  getMasterWetAnalyser(): AnalyserNode | null {
+    return this.masterWetAnalyser;
+  }
+
   disconnect(): void {
     if (!this.initialized) return;
     this.reverbInput?.disconnect();
@@ -413,6 +447,9 @@ export class FXEngine {
     this.masterFilterInput?.disconnect();
     this.masterLowpass?.disconnect();
     this.masterHighpass?.disconnect();
+    this.reverbAnalyser?.disconnect();
+    this.delayAnalyser?.disconnect();
+    this.masterWetAnalyser?.disconnect();
   }
 }
 

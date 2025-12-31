@@ -240,6 +240,7 @@ const Index = () => {
                   delayParams={fxState.delayParams}
                   masterFilterParams={fxState.masterFilterParams}
                   bpm={bpm}
+                  isPlaying={isPlaying}
                   onReverbChange={fxState.updateReverbParams}
                   onDelayChange={fxState.updateDelayParams}
                   onMasterFilterChange={fxState.updateMasterFilterParams}
