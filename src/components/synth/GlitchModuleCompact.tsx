@@ -12,6 +12,8 @@ type IndividualTarget = 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
 interface GlitchModuleCompactProps {
   className?: string;
   glitchTargets: GlitchTarget[];
+  muted: boolean;
+  onMuteToggle: () => void;
   onGlitchTargetsChange: (targets: GlitchTarget[]) => void;
   onTriggerGlitch: (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse') => void;
   onStutterParamsChange: (params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
@@ -22,7 +24,9 @@ interface GlitchModuleCompactProps {
 
 export const GlitchModuleCompact = ({ 
   className, 
-  glitchTargets, 
+  glitchTargets,
+  muted,
+  onMuteToggle,
   onGlitchTargetsChange,
   onTriggerGlitch,
   onStutterParamsChange,
@@ -190,11 +194,25 @@ export const GlitchModuleCompact = ({
   ];
 
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Zap className="w-3 h-3 text-muted-foreground" />
-        <span className="text-label text-muted-foreground">Glitch</span>
+    <div className={cn('space-y-3', className, muted && 'opacity-50')}>
+      {/* Header with Mute */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={cn('led', !muted && isActive && 'on')} />
+          <Zap className="w-3 h-3 text-muted-foreground" />
+          <span className="text-label text-muted-foreground">Glitch</span>
+        </div>
+        <button
+          onClick={onMuteToggle}
+          className={cn(
+            'px-2 py-0.5 text-[10px] uppercase tracking-wider rounded border transition-colors',
+            muted 
+              ? 'border-destructive/50 text-destructive bg-destructive/10' 
+              : 'border-border text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {muted ? 'Muted' : 'Mute'}
+        </button>
       </div>
 
       {/* Routing Mode Selector */}

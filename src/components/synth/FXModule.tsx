@@ -63,143 +63,150 @@ export function FXModule({
       onMuteToggle={() => setMuted(!muted)}
     >
       <div className="space-y-3">
-        {/* Reverb Section - 6 knobs */}
-        <div className="space-y-2">
-          <div className="text-label text-muted-foreground flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-            Reverb
+        {/* Reverb + Delay in 2 columns */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Reverb Column */}
+          <div className="space-y-2">
+            <div className="text-label text-muted-foreground flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+              Reverb
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <Knob
+                value={reverbParams.size * 100}
+                onChange={(v) => onReverbChange({ size: v / 100 })}
+                label="Size"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={reverbParams.decay * 100}
+                onChange={(v) => onReverbChange({ decay: v / 100 })}
+                label="Decay"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={reverbParams.damping * 100}
+                onChange={(v) => onReverbChange({ damping: v / 100 })}
+                label="Damp"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={reverbParams.preDelay * 100}
+                onChange={(v) => onReverbChange({ preDelay: v / 100 })}
+                label="PreDly"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={reverbParams.lofi * 100}
+                onChange={(v) => onReverbChange({ lofi: v / 100 })}
+                label="LoFi"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={reverbParams.mix * 100}
+                onChange={(v) => onReverbChange({ mix: v / 100 })}
+                label="Mix"
+                size="sm"
+                variant={muted ? 'secondary' : 'accent'}
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-6 gap-2">
-            <Knob
-              value={reverbParams.size * 100}
-              onChange={(v) => onReverbChange({ size: v / 100 })}
-              label="Size"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={reverbParams.decay * 100}
-              onChange={(v) => onReverbChange({ decay: v / 100 })}
-              label="Decay"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={reverbParams.damping * 100}
-              onChange={(v) => onReverbChange({ damping: v / 100 })}
-              label="Damp"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={reverbParams.preDelay * 100}
-              onChange={(v) => onReverbChange({ preDelay: v / 100 })}
-              label="PreDly"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={reverbParams.lofi * 100}
-              onChange={(v) => onReverbChange({ lofi: v / 100 })}
-              label="LoFi"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={reverbParams.mix * 100}
-              onChange={(v) => onReverbChange({ mix: v / 100 })}
-              label="Mix"
-              size="sm"
-              variant={muted ? 'secondary' : 'accent'}
-            />
-          </div>
-        </div>
 
-        {/* Delay Section - 5 knobs + sync buttons */}
-        <div className="space-y-2">
-          <div className="text-label text-muted-foreground flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
-              Delay
+          {/* Delay Column */}
+          <div className="space-y-2">
+            <div className="text-label text-muted-foreground flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
+                Delay
+              </div>
+              <div className="flex gap-0.5">
+                {syncDivisions.map(div => (
+                  <button 
+                    key={div}
+                    onClick={() => handleSyncChange(div)}
+                    className={cn(
+                      "px-1 py-0.5 text-[9px] rounded transition-colors",
+                      delayParams.syncDivision === div 
+                        ? "bg-accent text-accent-foreground" 
+                        : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                    )}
+                  >
+                    {div}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-1">
-              {syncDivisions.map(div => (
-                <button 
-                  key={div}
-                  onClick={() => handleSyncChange(div)}
-                  className={cn(
-                    "px-1.5 py-0.5 text-[10px] rounded transition-colors",
-                    delayParams.syncDivision === div 
-                      ? "bg-accent text-accent-foreground" 
-                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                  )}
-                >
-                  {div}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-1.5">
+              <Knob
+                value={delayParams.time * 100}
+                onChange={(v) => onDelayChange({ time: v / 100 })}
+                label="Time"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={delayParams.feedback * 100}
+                onChange={(v) => onDelayChange({ feedback: v / 100 })}
+                label="Fdbk"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={delayParams.filter * 100}
+                onChange={(v) => onDelayChange({ filter: v / 100 })}
+                label="Filter"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={delayParams.spread * 100}
+                onChange={(v) => onDelayChange({ spread: v / 100 })}
+                label="Spread"
+                size="sm"
+                variant={muted ? 'secondary' : 'primary'}
+              />
+              <Knob
+                value={delayParams.mix * 100}
+                onChange={(v) => onDelayChange({ mix: v / 100 })}
+                label="Mix"
+                size="sm"
+                variant={muted ? 'secondary' : 'accent'}
+              />
             </div>
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            <Knob
-              value={delayParams.time * 100}
-              onChange={(v) => onDelayChange({ time: v / 100 })}
-              label="Time"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={delayParams.feedback * 100}
-              onChange={(v) => onDelayChange({ feedback: v / 100 })}
-              label="Fdbk"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={delayParams.filter * 100}
-              onChange={(v) => onDelayChange({ filter: v / 100 })}
-              label="Filter"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={delayParams.spread * 100}
-              onChange={(v) => onDelayChange({ spread: v / 100 })}
-              label="Spread"
-              size="sm"
-              variant={muted ? 'secondary' : 'primary'}
-            />
-            <Knob
-              value={delayParams.mix * 100}
-              onChange={(v) => onDelayChange({ mix: v / 100 })}
-              label="Mix"
-              size="sm"
-              variant={muted ? 'secondary' : 'accent'}
-            />
           </div>
         </div>
 
         {/* Master Filter Section */}
-        <div className="space-y-2 pt-2 border-t border-border/30">
-          <div className="text-label text-muted-foreground flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-secondary/60" />
-            Master Filter
-          </div>
-          <div className="flex items-center justify-between gap-4 px-2">
-            <Knob 
-              value={masterFilterParams.highpass * 100}
-              onChange={(v) => onMasterFilterChange({ highpass: v / 100 })}
-              label="HiPass" 
-              size="sm" 
-              variant="secondary" 
-            />
-            <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
-            <Knob 
-              value={masterFilterParams.lowpass * 100}
-              onChange={(v) => onMasterFilterChange({ lowpass: v / 100 })}
-              label="LoPass" 
-              size="sm" 
-              variant="secondary" 
-            />
+        <div className="pt-2 border-t border-border/30">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Knob 
+                value={masterFilterParams.highpass * 100}
+                onChange={(v) => onMasterFilterChange({ highpass: v / 100 })}
+                label="HiPass" 
+                size="sm" 
+                variant="secondary" 
+              />
+            </div>
+            <div className="flex-1 flex items-center gap-2">
+              <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
+              <span className="text-[9px] text-muted-foreground/60">Master</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Knob 
+                value={masterFilterParams.lowpass * 100}
+                onChange={(v) => onMasterFilterChange({ lowpass: v / 100 })}
+                label="LoPass" 
+                size="sm" 
+                variant="secondary" 
+              />
+            </div>
           </div>
         </div>
       </div>
