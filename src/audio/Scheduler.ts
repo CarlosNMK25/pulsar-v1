@@ -4,6 +4,8 @@ import { DEFAULT_TRACK_LENGTH } from './TrackConfig';
 
 export type StepCallback = (step: number, time: number, trackSteps?: Map<string, number>) => void;
 
+export type BarCallback = (bar: number) => void;
+
 export class Scheduler {
   private static instance: Scheduler;
   
@@ -17,6 +19,11 @@ export class Scheduler {
   // Per-track step counters and lengths
   private trackLengths: Map<string, number> = new Map();
   private trackSteps: Map<string, number> = new Map();
+  
+  // Bar tracking for pattern chaining
+  private barCount = 0;
+  private stepsPerBar = 16;
+  private barCallbacks: Set<BarCallback> = new Set();
   
   // Timing constants
   private readonly lookahead = 0.025; // 25ms lookahead
@@ -95,6 +102,24 @@ export class Scheduler {
     return () => this.stepCallbacks.delete(callback);
   }
 
+  // Bar callback for pattern chaining
+  onBar(callback: BarCallback): () => void {
+    this.barCallbacks.add(callback);
+    return () => this.barCallbacks.delete(callback);
+  }
+
+  getBarCount(): number {
+    return this.barCount;
+  }
+
+  setStepsPerBar(steps: number): void {
+    this.stepsPerBar = Math.max(4, Math.min(32, steps));
+  }
+
+  getStepsPerBar(): number {
+    return this.stepsPerBar;
+  }
+
   private get stepDuration(): number {
     // 16th note duration in seconds
     return 60 / this.bpm / 4;
@@ -137,6 +162,16 @@ export class Scheduler {
     });
   }
 
+  private notifyBarCallbacks(): void {
+    this.barCallbacks.forEach(callback => {
+      try {
+        callback(this.barCount);
+      } catch (e) {
+        console.error('[Scheduler] Bar callback error:', e);
+      }
+    });
+  }
+
   private scheduler(): void {
     const ctx = audioEngine.getContext();
     
@@ -150,8 +185,15 @@ export class Scheduler {
       
       // Advance global and per-track steps
       this.nextStepTime += this.stepDuration;
+      const prevStep = this.currentStep;
       this.currentStep = (this.currentStep + 1) % 16;
       this.advanceTrackSteps();
+      
+      // Check for bar completion (when step wraps from stepsPerBar-1 to 0)
+      if (prevStep === this.stepsPerBar - 1 && this.currentStep === 0) {
+        this.barCount++;
+        this.notifyBarCallbacks();
+      }
     }
   }
 
@@ -160,6 +202,7 @@ export class Scheduler {
     
     const ctx = audioEngine.getContext();
     this.currentStep = 0;
+    this.barCount = 0;
     this.nextStepTime = ctx.currentTime + 0.05; // Small delay for smooth start
     this.isRunning = true;
     
@@ -187,6 +230,7 @@ export class Scheduler {
     
     this.isRunning = false;
     this.currentStep = 0;
+    this.barCount = 0;
     
     // Reset all track steps
     this.trackSteps.forEach((_, trackId) => {
