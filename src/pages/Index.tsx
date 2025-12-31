@@ -27,6 +27,7 @@ import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMusicalKeyboard } from '@/hooks/useMusicalKeyboard';
 import { useUILayout } from '@/hooks/useUILayout';
+import { useGlitchState, GlitchTrackId } from '@/hooks/useGlitchState';
 import { SampleModule } from '@/components/synth/SampleModule';
 import { KeyboardTarget } from '@/components/synth/dock/KeyboardTab';
 
@@ -62,6 +63,7 @@ const Index = () => {
   const textureState = useTextureState();
   const fxState = useFXState();
   const sampleState = useSampleState();
+  const glitchState = useGlitchState();
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
   const [keyboardTarget, setKeyboardTarget] = useState<KeyboardTarget>('synth');
   const [keyboardOctave, setKeyboardOctave] = useState(3);
@@ -338,13 +340,33 @@ const Index = () => {
                 <GlitchModuleCompact 
                   glitchTargets={glitchTargets}
                   muted={glitchMuted}
+                  paramsPerTrack={glitchState.paramsPerTrack}
                   onMuteToggle={() => setGlitchMuted(prev => !prev)}
                   onGlitchTargetsChange={setGlitchTargets}
                   onTriggerGlitch={(effect) => !glitchMuted && triggerGlitch(effect)}
-                  onStutterParamsChange={setGlitchStutterParams}
-                  onBitcrushParamsChange={setGlitchBitcrushParams}
+                  onStutterParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateStutterParams(track, {
+                      division: params.division,
+                      decay: params.decay !== undefined ? params.decay * 100 : undefined,
+                      mix: params.mix !== undefined ? params.mix * 100 : undefined,
+                    });
+                    setGlitchStutterParams(track, params);
+                  }}
+                  onBitcrushParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateBitcrushParams(track, {
+                      bits: params.bits,
+                      sampleRate: params.sampleRate !== undefined ? params.sampleRate * 100 : undefined,
+                    });
+                    setGlitchBitcrushParams(track, params);
+                  }}
                   onChaosToggle={(enabled, params) => !glitchMuted && setChaosEnabled(enabled, params)}
-                  onChaosParamsChange={setGlitchChaosParams}
+                  onChaosParamsChange={(track: GlitchTrackId, params) => {
+                    glitchState.updateChaosParams(track, params);
+                    setGlitchChaosParams(track, { 
+                      density: params.density !== undefined ? params.density / 100 : undefined,
+                      intensity: params.intensity !== undefined ? params.intensity / 100 : undefined,
+                    });
+                  }}
                 />
               </div>
             </div>
