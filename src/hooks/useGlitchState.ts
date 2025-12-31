@@ -24,11 +24,17 @@ export interface TrackGlitchParams {
     wobble: number;     // 0-100
     probability: number; // 0-100
   };
-  freeze: {             // NEW
+  freeze: {
     grainSize: number;  // 0-100
     pitch: number;      // 0-100
     spread: number;     // 0-100
     mix: number;        // 0-100
+    position: number;   // 0-100: capture point in grain cycle
+    overlap: number;    // 0-100: grain superposition
+    density: number;    // 0-100: grains per second multiplier
+    jitter: number;     // 0-100: temporal variation
+    attack: number;     // 0-100: grain envelope attack
+    probability: number; // 0-100: chance of triggering
   };
   reverse: {            // NEW
     duration: number;   // 0-100
@@ -50,7 +56,7 @@ const createDefaultTrackParams = (): TrackGlitchParams => ({
   stutter: { division: '1/16', decay: 50, mix: 50, repeatCount: 4, probability: 100 },
   bitcrush: { bits: 8, sampleRate: 50, mix: 50 },
   tapeStop: { speed: 50, duration: 50, mix: 70, curve: 'exp', wobble: 0, probability: 100 },
-  freeze: { grainSize: 50, pitch: 50, spread: 50, mix: 50 },
+  freeze: { grainSize: 50, pitch: 50, spread: 50, mix: 50, position: 50, overlap: 50, density: 50, jitter: 20, attack: 10, probability: 100 },
   reverse: { duration: 50, mix: 70 },
   chaos: { density: 30, intensity: 50 },
   fxSends: { reverb: 30, delay: 20 },

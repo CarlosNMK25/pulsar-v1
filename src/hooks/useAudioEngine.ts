@@ -980,8 +980,8 @@ export const useAudioEngine = ({
     }
   }, []);
 
-  // Freeze params - FIX: ahora el knob Pitch tiene efecto
-  const setGlitchFreezeParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { grainSize?: number; pitch?: number; spread?: number; mix?: number }) => {
+  // Freeze params with 6 new advanced parameters
+  const setGlitchFreezeParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { grainSize?: number; pitch?: number; spread?: number; mix?: number; position?: number; overlap?: number; density?: number; jitter?: number; attack?: number; probability?: number }) => {
     switch (track) {
       case 'master':
         glitchEngine.setGranularFreezeParams(params);
