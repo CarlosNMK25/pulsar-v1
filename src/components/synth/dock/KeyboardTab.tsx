@@ -95,6 +95,8 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
         // Store mapping immediately (synchronous, no state batching issues)
         keyMap.set(key, midiNote);
         
+        console.log(`[KeyboardTab] noteOn: key=${key} midi=${midiNote} activeKeys=${Array.from(keyMap.keys()).join(',')}`);
+        
         setPressedKeys(prev => new Set(prev).add(fullNote));
         setPressedMidi(prev => new Set(prev).add(midiNote));
         onNoteOnRef.current?.(midiNote, 100);
@@ -106,10 +108,13 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
       const keyMap = activeKeyMapRef.current;
       const midiNote = keyMap.get(key);
       
+      console.log(`[KeyboardTab] keyUp: key=${key} midi=${midiNote} activeKeys=${Array.from(keyMap.keys()).join(',')}`);
+      
       if (midiNote !== undefined) {
         // Remove mapping immediately
         keyMap.delete(key);
         
+        console.log(`[KeyboardTab] noteOff: midi=${midiNote}`);
         onNoteOffRef.current?.(midiNote);
         
         setPressedMidi(prev => {
@@ -124,6 +129,8 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
           next.delete(fullNote);
           return next;
         });
+      } else {
+        console.log(`[KeyboardTab] keyUp MISSED: key=${key} not in activeKeyMap`);
       }
     };
 
