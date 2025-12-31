@@ -311,11 +311,7 @@ export class FXEngine {
   }
 
   setDelayParams(params: Partial<DelayParams>): void {
-    console.log('[FXEngine] setDelayParams:', params);
-    if (!this.initialized) {
-      console.log('[FXEngine] Not initialized, skipping');
-      return;
-    }
+    if (!this.initialized) return;
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
