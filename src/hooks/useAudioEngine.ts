@@ -869,7 +869,7 @@ export const useAudioEngine = ({
     }
   }, []);
 
-  const setGlitchBitcrushParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { bits?: number; sampleRate?: number }) => {
+  const setGlitchBitcrushParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { bits?: number; sampleRate?: number; drive?: number; curve?: 'soft' | 'hard' | 'fold' | 'tube'; noise?: number; noiseType?: 'white' | 'pink' | 'brown'; filter?: number; jitter?: number; jitterMode?: 'random' | 'sine' | 'tape'; probability?: number }) => {
     switch (track) {
       case 'master':
         glitchEngine.setBitcrushParams(params);

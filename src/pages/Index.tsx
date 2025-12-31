@@ -373,6 +373,14 @@ const Index = () => {
                     setGlitchBitcrushParams(track, {
                       bits: params.bits,
                       sampleRate: params.sampleRate !== undefined ? params.sampleRate / 100 : undefined,
+                      drive: params.drive !== undefined ? params.drive / 100 : undefined,
+                      curve: params.curve,
+                      noise: params.noise !== undefined ? params.noise / 100 : undefined,
+                      noiseType: params.noiseType,
+                      filter: params.filter !== undefined ? params.filter / 100 : undefined,
+                      jitter: params.jitter !== undefined ? params.jitter / 100 : undefined,
+                      jitterMode: params.jitterMode,
+                      probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
                   onTapeStopParamsChange={(track: GlitchTrackId, params) => {

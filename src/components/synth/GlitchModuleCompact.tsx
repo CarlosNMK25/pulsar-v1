@@ -654,22 +654,45 @@ export const GlitchModuleCompact = ({
           </div>
         </TabsContent>
 
-        {/* BITCRUSH Tab */}
+        {/* BITCRUSH Tab - Lo-Fi Degradation Engine */}
         <TabsContent value="crush" className="space-y-2 mt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTrigger('bitcrush', 500)}
-            disabled={!isActive}
-            className={cn(
-              'h-7 w-full text-[10px]',
-              activeEffect === 'crush' && 'bg-primary/20 border-primary'
-            )}
-          >
-            <Zap className="w-3 h-3 mr-1" />
-            TRIGGER
-          </Button>
-          <div className="grid grid-cols-3 gap-2">
+          {/* Row 0: Trigger controls */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleTrigger('bitcrush', 500)}
+              disabled={!isActive}
+              className={cn(
+                'h-7 flex-1 text-[9px] px-2',
+                activeEffect === 'bitcrush' && 'bg-primary/20 border-primary'
+              )}
+            >
+              TRIG
+            </Button>
+            {/* Curve selector */}
+            <div className="flex gap-0.5">
+              {(['soft', 'hard', 'fold', 'tube'] as const).map((curve) => (
+                <button
+                  key={curve}
+                  onClick={() => onBitcrushParamsChange(editingTrack, { curve })}
+                  disabled={!isActive}
+                  className={cn(
+                    'px-1.5 py-0.5 text-[8px] font-mono uppercase rounded border transition-colors',
+                    currentParams.bitcrush.curve === curve
+                      ? 'border-primary bg-primary/20 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground',
+                    !isActive && 'opacity-50'
+                  )}
+                >
+                  {curve.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Row 1: Core degradation */}
+          <div className="grid grid-cols-4 gap-1">
             <Knob
               value={currentParams.bitcrush.bits * 6.25}
               onChange={(v) => {
@@ -683,7 +706,39 @@ export const GlitchModuleCompact = ({
             <Knob
               value={currentParams.bitcrush.sampleRate}
               onChange={(v) => onBitcrushParamsChange(editingTrack, { sampleRate: v })}
-              label="Crush"
+              label="Rate"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.bitcrush.drive}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { drive: v })}
+              label="Drive"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.bitcrush.filter}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { filter: v })}
+              label="Filt"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          
+          {/* Row 2: Lo-Fi texture */}
+          <div className="grid grid-cols-4 gap-1">
+            <Knob
+              value={currentParams.bitcrush.noise}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { noise: v })}
+              label="Noise"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.bitcrush.jitter}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { jitter: v })}
+              label="Jit"
               size="sm"
               variant={!isActive ? 'secondary' : 'primary'}
             />
@@ -694,6 +749,55 @@ export const GlitchModuleCompact = ({
               size="sm"
               variant={!isActive ? 'secondary' : 'accent'}
             />
+            <Knob
+              value={currentParams.bitcrush.probability}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { probability: v })}
+              label="Prob"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          
+          {/* Row 3: Mode selectors */}
+          <div className="flex items-center gap-2 text-[8px]">
+            <span className="text-muted-foreground">NSE:</span>
+            <div className="flex gap-0.5">
+              {(['white', 'pink', 'brown'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => onBitcrushParamsChange(editingTrack, { noiseType: type })}
+                  disabled={!isActive}
+                  className={cn(
+                    'px-1 py-0.5 text-[7px] font-mono uppercase rounded border transition-colors',
+                    currentParams.bitcrush.noiseType === type
+                      ? 'border-primary bg-primary/20 text-primary'
+                      : 'border-border text-muted-foreground',
+                    !isActive && 'opacity-50'
+                  )}
+                >
+                  {type.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+            <span className="text-muted-foreground ml-1">JIT:</span>
+            <div className="flex gap-0.5">
+              {(['random', 'sine', 'tape'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => onBitcrushParamsChange(editingTrack, { jitterMode: mode })}
+                  disabled={!isActive}
+                  className={cn(
+                    'px-1 py-0.5 text-[7px] font-mono uppercase rounded border transition-colors',
+                    currentParams.bitcrush.jitterMode === mode
+                      ? 'border-primary bg-primary/20 text-primary'
+                      : 'border-border text-muted-foreground',
+                    !isActive && 'opacity-50'
+                  )}
+                >
+                  {mode === 'random' ? 'RND' : mode === 'sine' ? 'SIN' : 'TAPE'}
+                </button>
+              ))}
+            </div>
           </div>
         </TabsContent>
 
