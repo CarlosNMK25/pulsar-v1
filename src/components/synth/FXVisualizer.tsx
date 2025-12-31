@@ -12,9 +12,8 @@ interface FXVisualizerProps {
 }
 
 const VU_SEGMENTS = 20;
-const VU_SEGMENTS_COMPACT = 12;
+const VU_SEGMENTS_COMPACT = 20;
 const SPECTRUM_LABELS = ['Sub', 'Bass', 'Lo', 'Mid', 'Hi', 'Prs', 'Bri', 'Air'];
-const SPECTRUM_LABELS_COMPACT = ['Lo', 'M', 'Hi', 'Air'];
 
 function VUBar({ level, peak, label, compact }: { level: number; peak: number; label: string; compact?: boolean }) {
   const segments = compact ? VU_SEGMENTS_COMPACT : VU_SEGMENTS;
@@ -22,7 +21,7 @@ function VUBar({ level, peak, label, compact }: { level: number; peak: number; l
   return (
     <div className="flex items-center gap-1">
       <span className={cn("text-muted-foreground", compact ? "text-[7px] w-2" : "text-[8px] w-3")}>{label}</span>
-      <div className={cn("flex-1 flex items-center gap-[1px] relative", compact ? "h-2" : "h-3")}>
+      <div className={cn("flex-1 flex items-center gap-[1px] relative", compact ? "h-2.5" : "h-3")}>
         {Array.from({ length: segments }).map((_, i) => {
           const threshold = i / segments;
           const isActive = level > threshold;
@@ -67,11 +66,11 @@ function SpectrumBar({ level, label, compact }: { level: number; label: string; 
   
   return (
     <div className="flex flex-col items-center gap-0.5 flex-1">
-      <div className={cn("w-full flex items-end justify-center", compact ? "h-4" : "h-6")}>
+      <div className={cn("w-full flex items-end justify-center", compact ? "h-5" : "h-6")}>
         <div 
           className={cn(
             "w-full rounded-t-sm transition-all duration-75",
-            compact ? "max-w-[5px]" : "max-w-[8px]",
+            compact ? "max-w-[10px]" : "max-w-[8px]",
             isHigh 
               ? "bg-accent shadow-[0_0_6px_hsl(var(--accent)/0.5)]"
               : isMid
@@ -81,7 +80,7 @@ function SpectrumBar({ level, label, compact }: { level: number; label: string; 
           style={{ height: `${height}%` }}
         />
       </div>
-      {!compact && <span className="text-[6px] text-muted-foreground/60">{label}</span>}
+      <span className={cn("text-muted-foreground/60", compact ? "text-[5px]" : "text-[6px]")}>{label}</span>
     </div>
   );
 }
@@ -96,11 +95,9 @@ export function FXVisualizer({
   compact,
   className 
 }: FXVisualizerProps) {
-  // In compact mode, show reduced spectrum bands
-  const displaySpectrum = compact 
-    ? [spectrum[0], spectrum[3], spectrum[5], spectrum[7]] 
-    : spectrum;
-  const displayLabels = compact ? SPECTRUM_LABELS_COMPACT : SPECTRUM_LABELS;
+  // Always show all 8 spectrum bands
+  const displaySpectrum = spectrum;
+  const displayLabels = SPECTRUM_LABELS;
   
   if (compact) {
     return (
