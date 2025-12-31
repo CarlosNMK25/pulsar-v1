@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { audioEngine, GlitchTarget } from '@/audio/AudioEngine';
-import { SynthVoice, WaveformType } from '@/audio/SynthVoice';
+import { SynthVoice, WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
 import { SampleEngine, SampleParams } from '@/audio/SampleEngine';
@@ -61,6 +61,7 @@ interface UseAudioEngineProps {
     release: number;
     detune: number;
     lfoRate: number;
+    lfoSyncDivision: LfoSyncDivision;
   };
   synthMuted: boolean;
   drumParams: {
@@ -106,6 +107,13 @@ interface UseAudioEngineProps {
   sampleMuted: boolean;
   sampleIsPlaying: boolean;
   fillActive?: boolean;  // FILL button state for conditional triggers
+  autoFillConfig?: {
+    enabled: boolean;
+    interval: number;   // Every N bars (4, 8, 16, 32)
+    duration: number;   // Fill lasts N bars (1, 2)
+    probability: number; // 0-100
+  };
+  onAutoFillTrigger?: (active: boolean) => void;  // Callback to sync UI
 }
 
 // Evaluate conditional trigger
@@ -164,6 +172,8 @@ export const useAudioEngine = ({
   sampleMuted,
   sampleIsPlaying,
   fillActive = false,
+  autoFillConfig,
+  onAutoFillTrigger,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -197,6 +207,14 @@ export const useAudioEngine = ({
   useEffect(() => {
     fillActiveRef.current = fillActive;
   }, [fillActive]);
+
+  // Auto-fill config ref for scheduler callback
+  const autoFillConfigRef = useRef(autoFillConfig);
+  const onAutoFillTriggerRef = useRef(onAutoFillTrigger);
+  useEffect(() => {
+    autoFillConfigRef.current = autoFillConfig;
+    onAutoFillTriggerRef.current = onAutoFillTrigger;
+  }, [autoFillConfig, onAutoFillTrigger]);
 
   // Initialize audio engine
   const initAudio = useCallback(async () => {
@@ -284,12 +302,14 @@ export const useAudioEngine = ({
     }
   }, [isInitialized]);
 
-  // Update BPM
+  // Update BPM and sync LFO
   useEffect(() => {
     scheduler.setBpm(bpm);
     // Optionally sync delay to BPM
     if (isInitialized) {
       fxEngine.syncDelayToBpm(bpm);
+      // Sync LFO to BPM if using synced division
+      synthRef.current?.setLfoSync(bpm);
     }
   }, [bpm, isInitialized]);
 
@@ -315,8 +335,14 @@ export const useAudioEngine = ({
       release: 0.05 + (synthParams.release / 100) * 1,
       detune: (synthParams.detune / 100) * 50,
       lfoRate: synthParams.lfoRate,
+      lfoSyncDivision: synthParams.lfoSyncDivision,
     });
-  }, [synthParams]);
+    
+    // Re-sync LFO when division changes
+    if (synthParams.lfoSyncDivision !== 'free') {
+      synthRef.current.setLfoSync(bpm, synthParams.lfoSyncDivision);
+    }
+  }, [synthParams, bpm]);
 
   // Update synth mute
   useEffect(() => {
@@ -520,10 +546,16 @@ export const useAudioEngine = ({
       if (shouldStepFire(synth, 'synth', step)) {
         anyFiredThisStep = true;
         const synthTrigger = () => {
-          const note = synthNotes[step % synthNotes.length];
+          let note = synthNotes[step % synthNotes.length];
+          
+          // Apply Pitch P-Lock: map 0-100 to -12 to +12 semitones (50 = no change)
+          if (synth.pLocks?.pitch !== undefined) {
+            const pitchOffset = Math.round((synth.pLocks.pitch - 50) / 50 * 12);
+            note = note + pitchOffset;
+          }
           
           // Apply P-Locks temporarily if present
-          let originalParams: { cutoff?: number; resonance?: number } | null = null;
+          let originalParams: { cutoff?: number; resonance?: number; release?: number } | null = null;
           if (synth.pLocks) {
             originalParams = {};
             if (synth.pLocks.cutoff !== undefined) {
@@ -533,6 +565,11 @@ export const useAudioEngine = ({
             if (synth.pLocks.resonance !== undefined) {
               originalParams.resonance = synthRef.current?.getParams?.().resonance;
               synthRef.current?.setParams({ resonance: (synth.pLocks.resonance / 100) * 20 });
+            }
+            // Apply Decay P-Lock: map 0-100 to 0.05-1.0 seconds
+            if (synth.pLocks.decay !== undefined) {
+              originalParams.release = synthRef.current?.getParams?.().release;
+              synthRef.current?.setParams({ release: 0.05 + (synth.pLocks.decay / 100) * 0.95 });
             }
           }
           
@@ -552,6 +589,9 @@ export const useAudioEngine = ({
               if (originalParams.resonance !== undefined) {
                 synthRef.current?.setParams({ resonance: originalParams.resonance });
               }
+              if (originalParams.release !== undefined) {
+                synthRef.current?.setParams({ release: originalParams.release });
+              }
             }
           }, stepDuration * 0.8 * 1000);
         };
@@ -564,6 +604,41 @@ export const useAudioEngine = ({
     };
 
     const unsubscribe = scheduler.onStep(stepCallback);
+    return unsubscribe;
+  }, [isInitialized]);
+
+  // Auto-Fill: Trigger FILL automatically every N bars
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const barCallback = (barNumber: number) => {
+      const config = autoFillConfigRef.current;
+      if (!config?.enabled) return;
+
+      // Check probability
+      if (config.probability < 100 && Math.random() * 100 > config.probability) {
+        return;
+      }
+
+      // Check if this bar should trigger fill (every N bars)
+      if (barNumber % config.interval === 0) {
+        // Activate fill
+        fillActiveRef.current = true;
+        onAutoFillTriggerRef.current?.(true);
+
+        // Calculate fill duration in ms
+        const barDurationMs = (60 / scheduler.getBpm()) * 4 * 1000; // 4 beats per bar
+        const fillDurationMs = barDurationMs * config.duration;
+
+        // Deactivate fill after duration
+        setTimeout(() => {
+          fillActiveRef.current = false;
+          onAutoFillTriggerRef.current?.(false);
+        }, fillDurationMs);
+      }
+    };
+
+    const unsubscribe = scheduler.onBar(barCallback);
     return unsubscribe;
   }, [isInitialized]);
 

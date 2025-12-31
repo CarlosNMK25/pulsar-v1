@@ -3,6 +3,17 @@ import { fxEngine } from './FXEngine';
 
 export type WaveformType = 'sine' | 'saw' | 'square' | 'tri';
 
+// LFO sync divisions for BPM-synced modulation
+export type LfoSyncDivision = 
+  | 'free'      // Hz libre (actual)
+  | '1/1'       // 1 bar = 4 beats
+  | '1/2'       // half note = 2 beats
+  | '1/4'       // quarter = 1 beat
+  | '1/8'       // eighth = 0.5 beat
+  | '1/16'      // sixteenth = 0.25 beat
+  | '3/16'      // IDM triplet feel
+  | '5/16';     // IDM polymetric
+
 interface VoiceParams {
   frequency: number;
   velocity: number;
@@ -43,13 +54,14 @@ export class SynthVoice {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
-  private params: Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number };
+  private params: Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision };
   private fxConnected = false;
   private muted = false;
   private lfo: OscillatorNode | null = null;
   private lfoGain: GainNode | null = null;
   private lastNote: number | null = null;
   private slideVoice: Voice | null = null;
+  private currentBpm: number = 120;
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -73,6 +85,7 @@ export class SynthVoice {
       cutoff: 2000,
       resonance: 5,
       lfoRate: 2,
+      lfoSyncDivision: 'free',
     };
 
     // Setup LFO for filter modulation
@@ -83,6 +96,36 @@ export class SynthVoice {
     this.lfoGain.gain.value = 500; // LFO depth in Hz
     this.lfo.connect(this.lfoGain);
     this.lfo.start();
+  }
+
+  // Set LFO to sync with BPM using division
+  setLfoSync(bpm: number, division?: LfoSyncDivision): void {
+    this.currentBpm = bpm;
+    const syncDiv = division ?? this.params.lfoSyncDivision ?? 'free';
+    this.params.lfoSyncDivision = syncDiv;
+    
+    if (syncDiv === 'free' || !this.lfo) return;
+    
+    // Calculate Hz from BPM and division
+    // BPM / 60 = beats per second
+    // division tells us how many beats per LFO cycle
+    const beatsPerSecond = bpm / 60;
+    let divisionValue: number;
+    
+    switch (syncDiv) {
+      case '1/1':  divisionValue = 4;    break; // 4 beats = 1 bar
+      case '1/2':  divisionValue = 2;    break; // 2 beats
+      case '1/4':  divisionValue = 1;    break; // 1 beat
+      case '1/8':  divisionValue = 0.5;  break; // half beat
+      case '1/16': divisionValue = 0.25; break; // quarter beat
+      case '3/16': divisionValue = 0.75; break; // IDM triplet
+      case '5/16': divisionValue = 1.25; break; // IDM poly
+      default:     return;
+    }
+    
+    const lfoHz = beatsPerSecond / divisionValue;
+    const ctx = audioEngine.getContext();
+    this.lfo.frequency.setTargetAtTime(lfoHz, ctx.currentTime, 0.05);
   }
 
   setMuted(muted: boolean): void {
@@ -102,17 +145,26 @@ export class SynthVoice {
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
-  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number } {
+  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision } {
     return { ...this.params };
   }
 
-  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number }>): void {
+  getLfoSyncDivision(): LfoSyncDivision {
+    return this.params.lfoSyncDivision ?? 'free';
+  }
+
+  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision }>): void {
     this.params = { ...this.params, ...params };
     
     const ctx = audioEngine.getContext();
     
-    // Update LFO rate
-    if (params.lfoRate !== undefined && this.lfo) {
+    // Handle LFO sync division change
+    if (params.lfoSyncDivision !== undefined) {
+      this.setLfoSync(this.currentBpm, params.lfoSyncDivision);
+    }
+    
+    // Update LFO rate (only when in 'free' mode)
+    if (params.lfoRate !== undefined && this.lfo && this.params.lfoSyncDivision === 'free') {
       // Map 0-100 to 0.1-20 Hz
       const rate = 0.1 + (params.lfoRate / 100) * 19.9;
       this.lfo.frequency.setTargetAtTime(rate, ctx.currentTime, 0.05);

@@ -23,6 +23,8 @@ import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SampleModule } from '@/components/synth/SampleModule';
 
+import { AutoFillConfig } from '@/components/synth/TransportControls';
+
 const Index = () => {
   // Transport state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -30,6 +32,12 @@ const Index = () => {
   const [swing, setSwing] = useState(0);
   const [humanize, setHumanize] = useState(0);
   const [fillActive, setFillActive] = useState(false);
+  const [autoFillConfig, setAutoFillConfig] = useState<AutoFillConfig>({
+    enabled: false,
+    interval: 8,
+    duration: 1,
+    probability: 100,
+  });
   
   // Glitch targets state
   const [glitchTargets, setGlitchTargets] = useState<GlitchTarget[]>(['master']);
@@ -110,6 +118,8 @@ const Index = () => {
     sampleMuted: sampleState.sampleMuted,
     sampleIsPlaying,
     fillActive,
+    autoFillConfig,
+    onAutoFillTrigger: setFillActive,
   });
 
   const handlePlayPause = useCallback(async () => {
@@ -168,6 +178,8 @@ const Index = () => {
               onRecordStart={startRecording}
               onRecordStop={stopRecording}
               onFillActivate={setFillActive}
+              autoFillConfig={autoFillConfig}
+              onAutoFillConfigChange={setAutoFillConfig}
             />
             <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
           </div>
