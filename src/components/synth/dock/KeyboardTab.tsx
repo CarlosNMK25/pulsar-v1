@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 interface KeyboardTabProps {
   onNoteOn?: (note: number, velocity?: number) => void;
   onNoteOff?: (note: number) => void;
+  isAudioReady?: boolean;
+  onInitAudio?: () => Promise<void>;
 }
 
 const KEYBOARD_MAP: Record<string, { note: string; octaveOffset: number }> = {
@@ -47,14 +49,24 @@ const noteToMidi = (note: string, octave: number): number => {
   return (octave + 1) * 12 + noteMap[note];
 };
 
-export const KeyboardTab = ({ onNoteOn, onNoteOff }: KeyboardTabProps) => {
+export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitAudio }: KeyboardTabProps) => {
   const [octave, setOctave] = useState(3);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const ensureAudioReady = useCallback(async () => {
+    if (!isAudioReady && onInitAudio && !isInitializing) {
+      setIsInitializing(true);
+      await onInitAudio();
+      setIsInitializing(false);
+    }
+  }, [isAudioReady, onInitAudio, isInitializing]);
+
+  const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
     if (KEYBOARD_MAP[key] && !e.repeat) {
+      await ensureAudioReady();
       const { note, octaveOffset } = KEYBOARD_MAP[key];
       const fullNote = `${note}${octave + octaveOffset}`;
       const midiNote = noteToMidi(note, octave + octaveOffset);
@@ -63,7 +75,7 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff }: KeyboardTabProps) => {
       setPressedMidi(prev => new Set(prev).add(midiNote));
       onNoteOn?.(midiNote, 100);
     }
-  }, [octave, onNoteOn]);
+  }, [octave, onNoteOn, ensureAudioReady]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
@@ -96,13 +108,14 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff }: KeyboardTabProps) => {
   }, [handleKeyDown, handleKeyUp]);
 
   // Mouse/touch handlers for visual keys
-  const handleMouseDown = useCallback((note: string, oct: number) => {
+  const handleMouseDown = useCallback(async (note: string, oct: number) => {
+    await ensureAudioReady();
     const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
     setPressedKeys(prev => new Set(prev).add(fullNote));
     setPressedMidi(prev => new Set(prev).add(midiNote));
     onNoteOn?.(midiNote, 100);
-  }, [onNoteOn]);
+  }, [onNoteOn, ensureAudioReady]);
 
   const handleMouseUp = useCallback((note: string, oct: number) => {
     const fullNote = `${note}${oct}`;
@@ -191,9 +204,14 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff }: KeyboardTabProps) => {
         {renderOctave(octave + 1)}
       </div>
       
-      <div className="text-xs text-muted-foreground ml-4">
+      <div className="text-xs text-muted-foreground ml-4 space-y-1">
         <div>Lower: Z-M</div>
         <div>Upper: Q-U</div>
+        {!isAudioReady && (
+          <div className="text-primary/70 text-[10px]">
+            {isInitializing ? 'Starting...' : 'Press key to init'}
+          </div>
+        )}
       </div>
     </div>
   );
