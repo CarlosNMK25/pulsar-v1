@@ -82,6 +82,7 @@ export const useSceneManager = ({
       reverbParams: fxState.reverbParams,
       delayParams: fxState.delayParams,
       masterFilterParams: fxState.masterFilterParams,
+      sendLevels: fxState.sendLevels,
       bpm,
       swing,
     };
@@ -107,7 +108,7 @@ export const useSceneManager = ({
     setSwing(params.swing);
   }, [drumState, synthState, textureState, fxState, setBpm, setSwing]);
 
-  // Apply discrete params (steps, mutes, waveform, mode)
+  // Apply discrete params (steps, mutes, waveform, mode, sendLevels)
   const applyDiscreteParams = useCallback((scene: SceneData) => {
     drumState.setKickSteps(scene.drumSteps.kick);
     drumState.setSnareSteps(scene.drumSteps.snare);
@@ -118,7 +119,11 @@ export const useSceneManager = ({
     synthState.setSynthMuted(scene.synthMuted);
     textureState.setTextureMode(scene.textureMode);
     textureState.setTextureMuted(scene.textureMuted);
-  }, [drumState, synthState, textureState]);
+    // Apply sendLevels if present
+    if (scene.sendLevels) {
+      fxState.setSendLevels(scene.sendLevels);
+    }
+  }, [drumState, synthState, textureState, fxState]);
 
   // Transition to a scene with smooth animation
   const transitionToScene = useCallback((targetScene: SceneData, duration: number = TRANSITION_DURATION) => {

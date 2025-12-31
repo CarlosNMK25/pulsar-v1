@@ -3,6 +3,7 @@ import { WaveformType, LfoSyncDivision } from './SynthVoice';
 import { TextureMode } from './TextureEngine';
 import { DistortionCurve } from './WaveshaperEngine';
 import { factoryPresets, FactoryPresetName } from './factoryPresets';
+import type { TrackSendLevels } from '@/hooks/useFXState';
 
 export interface Step {
   active: boolean;
@@ -95,6 +96,7 @@ export interface SceneData {
   reverbParams: ReverbParams;
   delayParams: DelayParams;
   masterFilterParams: MasterFilterParams;
+  sendLevels?: TrackSendLevels;  // Optional for backward compatibility
   
   // Global
   bpm: number;

@@ -65,10 +65,10 @@ export const defaultRoutingState: TrackRoutingState = {
 };
 
 export const defaultSendLevels: TrackSendLevels = {
-  drums: { reverb: 0.2, delay: 0.15 },
-  synth: { reverb: 0.25, delay: 0.2 },
-  texture: { reverb: 0.3, delay: 0.1 },
-  sample: { reverb: 0.2, delay: 0.25 },
+  drums: { reverb: 0.4, delay: 0.3 },
+  synth: { reverb: 0.4, delay: 0.35 },
+  texture: { reverb: 0.5, delay: 0.3 },
+  sample: { reverb: 0.35, delay: 0.3 },
 };
 
 export interface FXState {

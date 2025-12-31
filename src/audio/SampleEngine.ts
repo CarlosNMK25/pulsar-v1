@@ -23,7 +23,7 @@ export class SampleEngine {
   private fxConnected = false;
   private muted = false;
   private fxBypassed = false;
-  private savedFxLevels = { reverb: 0.2, delay: 0.15 };
+  private savedFxLevels = { reverb: 0.35, delay: 0.3 };
 
   private params: SampleParams = {
     pitch: 1.0,
@@ -43,10 +43,10 @@ export class SampleEngine {
 
     // FX send nodes
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = 0.2;
+    this.reverbSend.gain.value = 0.35;
 
     this.delaySend = ctx.createGain();
-    this.delaySend.gain.value = 0.15;
+    this.delaySend.gain.value = 0.3;
   }
 
   connectFX(): void {

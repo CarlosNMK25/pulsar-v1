@@ -14,7 +14,7 @@ export class TextureEngine {
   private fxConnected = false;
   private muted = false;
   private fxBypassed = false;
-  private savedFxLevels = { reverb: 0.4, delay: 0.15 };
+  private savedFxLevels = { reverb: 0.5, delay: 0.3 };
 
   // Feedback routing
   private feedbackDelay: DelayNode;
@@ -50,10 +50,10 @@ export class TextureEngine {
 
     // FX send nodes
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = 0.4;
+    this.reverbSend.gain.value = 0.5;
 
     this.delaySend = ctx.createGain();
-    this.delaySend.gain.value = 0.15;
+    this.delaySend.gain.value = 0.3;
 
     // Feedback delay for resonance
     this.feedbackDelay = ctx.createDelay(1);
