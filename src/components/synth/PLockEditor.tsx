@@ -7,39 +7,51 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { X } from 'lucide-react';
-import type { PLocks, AcidModifiers } from '@/hooks/useAudioEngine';
+import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 import { cn } from '@/lib/utils';
 
 interface PLockEditorProps {
   stepIndex: number;
   pLocks?: PLocks;
   acid?: AcidModifiers;
+  condition?: ConditionType;
   onPLocksChange: (pLocks: PLocks | undefined) => void;
   onAcidChange?: (acid: AcidModifiers | undefined) => void;
+  onConditionChange?: (condition: ConditionType) => void;
   showAcid?: boolean;
+  showConditions?: boolean;
   trigger: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const RATIO_CONDITIONS: ConditionType[] = ['1:2', '1:3', '1:4', '2:3', '2:4', '3:4'];
+const INVERSE_CONDITIONS: ConditionType[] = ['!1:2', '!1:3', '!1:4'];
+const SPECIAL_CONDITIONS: ConditionType[] = ['FILL', '!FILL', 'PRE', '!PRE'];
+
 export const PLockEditor = ({
   stepIndex,
   pLocks,
   acid,
+  condition,
   onPLocksChange,
   onAcidChange,
+  onConditionChange,
   showAcid = false,
+  showConditions = false,
   trigger,
   open,
   onOpenChange,
 }: PLockEditorProps) => {
   const [localPLocks, setLocalPLocks] = useState<PLocks>(pLocks || {});
   const [localAcid, setLocalAcid] = useState<AcidModifiers>(acid || {});
+  const [localCondition, setLocalCondition] = useState<ConditionType>(condition || null);
 
   useEffect(() => {
     setLocalPLocks(pLocks || {});
     setLocalAcid(acid || {});
-  }, [pLocks, acid, stepIndex]);
+    setLocalCondition(condition || null);
+  }, [pLocks, acid, condition, stepIndex]);
 
   const handlePLockChange = (key: keyof PLocks, value: number) => {
     const updated = { ...localPLocks, [key]: value };
@@ -53,6 +65,12 @@ export const PLockEditor = ({
     onAcidChange?.(Object.values(updated).some(v => v) ? updated : undefined);
   };
 
+  const handleConditionChange = (cond: ConditionType) => {
+    const newCondition = localCondition === cond ? null : cond;
+    setLocalCondition(newCondition);
+    onConditionChange?.(newCondition);
+  };
+
   const clearPLock = (key: keyof PLocks) => {
     const updated = { ...localPLocks };
     delete updated[key];
@@ -63,18 +81,21 @@ export const PLockEditor = ({
   const clearAll = () => {
     setLocalPLocks({});
     setLocalAcid({});
+    setLocalCondition(null);
     onPLocksChange(undefined);
     onAcidChange?.(undefined);
+    onConditionChange?.(null);
   };
 
   const hasPLocks = Object.keys(localPLocks).length > 0;
   const hasAcid = Object.values(localAcid).some(v => v);
+  const hasCondition = localCondition !== null;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent 
-        className="w-64 p-3 bg-card border-border" 
+        className="w-72 p-3 bg-card border-border" 
         side="top"
         align="center"
         onContextMenu={(e) => e.preventDefault()}
@@ -84,7 +105,7 @@ export const PLockEditor = ({
             <span className="text-xs font-medium text-foreground">
               Step {stepIndex + 1} P-Locks
             </span>
-            {(hasPLocks || hasAcid) && (
+            {(hasPLocks || hasAcid || hasCondition) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -246,6 +267,67 @@ export const PLockEditor = ({
                 >
                   ─ Tie
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Conditional Triggers */}
+          {showConditions && (
+            <div className="pt-2 border-t border-border">
+              <span className="text-xs text-muted-foreground mb-2 block">Condition</span>
+              
+              {/* Ratio conditions */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {RATIO_CONDITIONS.map(cond => (
+                  <button
+                    key={cond}
+                    onClick={() => handleConditionChange(cond)}
+                    className={cn(
+                      'px-2 py-1 text-xs rounded border transition-colors font-mono',
+                      localCondition === cond 
+                        ? 'border-cyan-400 bg-cyan-400/20 text-cyan-400' 
+                        : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                    )}
+                  >
+                    {cond}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Inverse conditions */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                {INVERSE_CONDITIONS.map(cond => (
+                  <button
+                    key={cond}
+                    onClick={() => handleConditionChange(cond)}
+                    className={cn(
+                      'px-2 py-1 text-xs rounded border transition-colors font-mono',
+                      localCondition === cond 
+                        ? 'border-purple-400 bg-purple-400/20 text-purple-400' 
+                        : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                    )}
+                  >
+                    {cond}
+                  </button>
+                ))}
+              </div>
+              
+              {/* FILL and PRE conditions */}
+              <div className="flex gap-1">
+                {SPECIAL_CONDITIONS.map(cond => (
+                  <button
+                    key={cond}
+                    onClick={() => handleConditionChange(cond)}
+                    className={cn(
+                      'flex-1 py-1 text-xs rounded border transition-colors font-mono',
+                      localCondition === cond 
+                        ? 'border-orange-400 bg-orange-400/20 text-orange-400' 
+                        : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                    )}
+                  >
+                    {cond}
+                  </button>
+                ))}
               </div>
             </div>
           )}

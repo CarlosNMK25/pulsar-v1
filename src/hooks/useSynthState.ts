@@ -1,11 +1,15 @@
 import { useState, useCallback } from 'react';
 import { WaveformType } from '@/audio/SynthVoice';
 import { createInitialSteps, defaultSynthParams, defaultSynthPattern } from '@/constants/initialState';
+import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
 export interface Step {
   active: boolean;
   velocity: number;
   probability: number;
+  pLocks?: PLocks;
+  acid?: AcidModifiers;
+  condition?: ConditionType;
 }
 
 export interface SynthParams {

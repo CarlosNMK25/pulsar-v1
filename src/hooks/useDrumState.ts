@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { createInitialSteps, defaultDrumParams, defaultKickPattern, defaultSnarePattern, defaultHatPattern } from '@/constants/initialState';
+import type { ConditionType } from '@/hooks/useAudioEngine';
 
 export interface Step {
   active: boolean;
   velocity: number;
   probability: number;
+  condition?: ConditionType;
 }
 
 export interface DrumParams {

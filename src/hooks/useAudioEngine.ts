@@ -10,6 +10,15 @@ import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
 import { TrackSendLevels } from '@/hooks/useFXState';
+// Conditional Trigger types (Elektron-style)
+export type ConditionType = 
+  | '1:2' | '1:3' | '1:4'           // X of every N repetitions
+  | '2:3' | '2:4' | '3:4'           // Nth of every N
+  | '!1:2' | '!1:3' | '!1:4'        // Inverse ratios
+  | 'FILL' | '!FILL'                // When FILL is active/inactive
+  | 'PRE' | '!PRE'                  // If previous step fired/didn't fire
+  | null;                            // No condition (always fires)
+
 // P-Lock parameters that can be locked per step
 export interface PLocks {
   cutoff?: number;
@@ -32,6 +41,7 @@ export interface Step {
   probability: number;
   pLocks?: PLocks;
   acid?: AcidModifiers;
+  condition?: ConditionType;  // Conditional trigger
 }
 
 interface UseAudioEngineProps {
@@ -95,6 +105,34 @@ interface UseAudioEngineProps {
   sampleParams: SampleParams;
   sampleMuted: boolean;
   sampleIsPlaying: boolean;
+  fillActive?: boolean;  // FILL button state for conditional triggers
+}
+
+// Evaluate conditional trigger
+function evaluateCondition(
+  condition: ConditionType,
+  repetitionCount: number,
+  fillActive: boolean,
+  prevFired: boolean
+): boolean {
+  if (!condition) return true;
+  
+  switch (condition) {
+    case '1:2': return repetitionCount % 2 === 0;
+    case '1:3': return repetitionCount % 3 === 0;
+    case '1:4': return repetitionCount % 4 === 0;
+    case '2:3': return repetitionCount % 3 === 1;
+    case '2:4': return repetitionCount % 4 === 1;
+    case '3:4': return repetitionCount % 4 === 2;
+    case '!1:2': return repetitionCount % 2 !== 0;
+    case '!1:3': return repetitionCount % 3 !== 0;
+    case '!1:4': return repetitionCount % 4 !== 0;
+    case 'FILL': return fillActive;
+    case '!FILL': return !fillActive;
+    case 'PRE': return prevFired;
+    case '!PRE': return !prevFired;
+    default: return true;
+  }
 }
 
 // Note sequence for synth (C minor pentatonic)
@@ -125,6 +163,7 @@ export const useAudioEngine = ({
   sampleParams,
   sampleMuted,
   sampleIsPlaying,
+  fillActive = false,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -148,6 +187,16 @@ export const useAudioEngine = ({
   useEffect(() => {
     stepsRef.current = { kickSteps, snareSteps, hatSteps, synthSteps };
   }, [kickSteps, snareSteps, hatSteps, synthSteps]);
+
+  // Conditional trigger tracking
+  const stepRepetitionCount = useRef<Map<string, number>>(new Map());
+  const previousStepFired = useRef<boolean>(false);
+  const fillActiveRef = useRef<boolean>(false);
+  
+  // Keep fillActive ref in sync
+  useEffect(() => {
+    fillActiveRef.current = fillActive;
+  }, [fillActive]);
 
   // Initialize audio engine
   const initAudio = useCallback(async () => {
@@ -394,20 +443,54 @@ export const useAudioEngine = ({
       // Update UI step indicator
       setCurrentStep(step);
 
+      // Track if any step fired this round (for PRE condition)
+      let anyFiredThisStep = false;
+
+      // Helper to check if step should fire based on all conditions
+      const shouldStepFire = (stepData: Step, trackId: string, stepIndex: number): boolean => {
+        if (!stepData.active) return false;
+        
+        // Probability check
+        if (stepData.probability < 100 && Math.random() * 100 > stepData.probability) {
+          return false;
+        }
+        
+        // Conditional trigger check
+        if (stepData.condition) {
+          const stepKey = `${trackId}-${stepIndex}`;
+          const count = stepRepetitionCount.current.get(stepKey) || 0;
+          
+          if (!evaluateCondition(
+            stepData.condition,
+            count,
+            fillActiveRef.current,
+            previousStepFired.current
+          )) {
+            // Increment repetition count even if condition fails
+            stepRepetitionCount.current.set(stepKey, count + 1);
+            return false;
+          }
+          
+          // Increment repetition count on successful evaluation
+          stepRepetitionCount.current.set(stepKey, count + 1);
+        }
+        
+        return true;
+      };
+
       // Helper to trigger with micro-timing offset
       const triggerWithMicroTiming = (callback: () => void, microTimingMs?: number) => {
         if (microTimingMs && microTimingMs > 0) {
-          // Positive offset: delay the trigger
           setTimeout(callback, microTimingMs);
         } else {
-          // No offset or negative (negative would need pre-scheduling, so we just trigger immediately)
           callback();
         }
       };
 
       // Drums - use Web Audio time for precise scheduling with micro-timing
       const kick = kickSteps[step];
-      if (kick.active && Math.random() * 100 < kick.probability) {
+      if (shouldStepFire(kick, 'kick', step)) {
+        anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('kick', kick.velocity),
           kick.pLocks?.microTiming
@@ -415,7 +498,8 @@ export const useAudioEngine = ({
       }
 
       const snare = snareSteps[step];
-      if (snare.active && Math.random() * 100 < snare.probability) {
+      if (shouldStepFire(snare, 'snare', step)) {
+        anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('snare', snare.velocity),
           snare.pLocks?.microTiming
@@ -423,7 +507,8 @@ export const useAudioEngine = ({
       }
 
       const hat = hatSteps[step];
-      if (hat.active && Math.random() * 100 < hat.probability) {
+      if (shouldStepFire(hat, 'hat', step)) {
+        anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('hat', hat.velocity),
           hat.pLocks?.microTiming
@@ -432,7 +517,8 @@ export const useAudioEngine = ({
 
       // Synth with P-Locks, Acid 303 support, and micro-timing
       const synth = synthSteps[step];
-      if (synth.active && Math.random() * 100 < synth.probability) {
+      if (shouldStepFire(synth, 'synth', step)) {
+        anyFiredThisStep = true;
         const synthTrigger = () => {
           const note = synthNotes[step % synthNotes.length];
           
@@ -472,6 +558,9 @@ export const useAudioEngine = ({
         
         triggerWithMicroTiming(synthTrigger, synth.pLocks?.microTiming);
       }
+
+      // Update previousStepFired for next step's PRE condition
+      previousStepFired.current = anyFiredThisStep;
     };
 
     const unsubscribe = scheduler.onStep(stepCallback);

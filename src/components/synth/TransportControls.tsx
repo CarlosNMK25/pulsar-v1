@@ -16,6 +16,7 @@ interface TransportControlsProps {
   humanize: number;
   isRecording?: boolean;
   recordingTime?: number;
+  fillActive?: boolean;
   onPlayPause: () => void;
   onStop: () => void;
   onBpmChange: (bpm: number) => void;
@@ -23,6 +24,7 @@ interface TransportControlsProps {
   onHumanizeChange: (humanize: number) => void;
   onRecordStart?: () => void;
   onRecordStop?: () => void;
+  onFillActivate?: (active: boolean) => void;
 }
 
 export const TransportControls = ({
@@ -32,6 +34,7 @@ export const TransportControls = ({
   humanize,
   isRecording = false,
   recordingTime = 0,
+  fillActive = false,
   onPlayPause,
   onStop,
   onBpmChange,
@@ -39,6 +42,7 @@ export const TransportControls = ({
   onHumanizeChange,
   onRecordStart,
   onRecordStop,
+  onFillActivate,
 }: TransportControlsProps) => {
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -212,6 +216,29 @@ export const TransportControls = ({
           variant="secondary"
         />
       </div>
+
+      {/* Divider */}
+      <div className="w-px h-8 bg-border" />
+
+      {/* FILL Button - momentary */}
+      {onFillActivate && (
+        <button
+          onMouseDown={() => onFillActivate(true)}
+          onMouseUp={() => onFillActivate(false)}
+          onMouseLeave={() => onFillActivate(false)}
+          onTouchStart={() => onFillActivate(true)}
+          onTouchEnd={() => onFillActivate(false)}
+          className={cn(
+            'px-4 py-2 rounded border text-xs font-bold uppercase tracking-wider transition-all',
+            fillActive 
+              ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_12px_rgba(251,146,60,0.5)]' 
+              : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+          )}
+          title="Hold for FILL mode (triggers steps with FILL condition)"
+        >
+          FILL
+        </button>
+      )}
 
       {/* Play indicator */}
       {isPlaying && (

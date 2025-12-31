@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { EuclideanControls } from './EuclideanControls';
 import { PatternLengthSelector } from './PatternLengthSelector';
 import { PLockEditor } from './PLockEditor';
-import type { PLocks, AcidModifiers } from '@/hooks/useAudioEngine';
+import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
 export interface Step {
   active: boolean;
@@ -11,6 +11,7 @@ export interface Step {
   probability: number;
   pLocks?: PLocks;
   acid?: AcidModifiers;
+  condition?: ConditionType;
 }
 
 interface StepSequencerProps {
@@ -20,6 +21,7 @@ interface StepSequencerProps {
   onStepVelocity?: (index: number, velocity: number) => void;
   onStepPLocks?: (index: number, pLocks: PLocks | undefined) => void;
   onStepAcid?: (index: number, acid: AcidModifiers | undefined) => void;
+  onStepCondition?: (index: number, condition: ConditionType) => void;
   onPatternGenerate?: (steps: Step[]) => void;
   onLengthChange?: (length: number) => void;
   patternLength?: number;
@@ -27,6 +29,7 @@ interface StepSequencerProps {
   showLengthSelector?: boolean;
   showPLocks?: boolean;
   showAcid?: boolean;
+  showConditions?: boolean;
   label?: string;
   variant?: 'primary' | 'secondary' | 'muted';
   swing?: number;
@@ -39,6 +42,7 @@ export const StepSequencer = ({
   onStepToggle,
   onStepPLocks,
   onStepAcid,
+  onStepCondition,
   onPatternGenerate,
   onLengthChange,
   patternLength,
@@ -46,6 +50,7 @@ export const StepSequencer = ({
   showLengthSelector = false,
   showPLocks = false,
   showAcid = false,
+  showConditions = false,
   label,
   variant = 'primary',
   swing = 0,
@@ -62,13 +67,23 @@ export const StepSequencer = ({
   const currentGroup = Math.floor(currentStep / 4);
 
   const handleContextMenu = (e: React.MouseEvent, index: number) => {
-    if (!showPLocks && !showAcid) return;
+    if (!showPLocks && !showAcid && !showConditions) return;
     e.preventDefault();
     setEditingStep(index);
   };
 
   const hasPLocks = (step: Step) => step.pLocks && Object.keys(step.pLocks).length > 0;
   const hasAcid = (step: Step) => step.acid && Object.values(step.acid).some(v => v);
+  const hasCondition = (step: Step) => step.condition !== null && step.condition !== undefined;
+
+  // Get condition display color
+  const getConditionColor = (condition: ConditionType) => {
+    if (!condition) return '';
+    if (condition.startsWith('!') && !condition.includes(':')) return 'text-orange-400'; // !FILL, !PRE
+    if (condition === 'FILL' || condition === 'PRE') return 'text-orange-400';
+    if (condition.startsWith('!')) return 'text-purple-400'; // !1:2, etc
+    return 'text-cyan-400'; // ratio conditions
+  };
 
   return (
     <div className="space-y-2">
@@ -128,6 +143,19 @@ export const StepSequencer = ({
                 opacity: step.active ? 0.5 + (step.velocity / 127) * 0.5 : 1,
               }}
             >
+              {/* Condition indicator - top left */}
+              {step.active && hasCondition(step) && (
+                <div 
+                  className={cn(
+                    "absolute top-0 left-0 px-0.5 text-[5px] font-mono leading-none font-bold",
+                    getConditionColor(step.condition)
+                  )}
+                  title={`Condition: ${step.condition}`}
+                >
+                  {step.condition}
+                </div>
+              )}
+              
               {/* Micro-timing indicator - shows timing offset visually */}
               {step.active && step.pLocks?.microTiming !== undefined && step.pLocks.microTiming !== 0 && (
                 <div 
@@ -147,7 +175,15 @@ export const StepSequencer = ({
               )}
               
               {/* P-Lock indicator */}
-              {step.active && hasPLocks(step) && (
+              {step.active && hasPLocks(step) && !hasCondition(step) && (
+                <div 
+                  className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-yellow-400"
+                  title="P-Lock active"
+                />
+              )}
+              
+              {/* P-Lock indicator when condition is present */}
+              {step.active && hasPLocks(step) && hasCondition(step) && (
                 <div 
                   className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-yellow-400"
                   title="P-Lock active"
@@ -170,7 +206,7 @@ export const StepSequencer = ({
               )}
               
               {/* Probability indicator */}
-              {step.active && step.probability < 100 && !hasPLocks(step) && (
+              {step.active && step.probability < 100 && !hasPLocks(step) && !hasCondition(step) && (
                 <div 
                   className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-secondary"
                   title={`${step.probability}% probability`}
@@ -206,16 +242,19 @@ export const StepSequencer = ({
           );
 
           // Wrap with PLockEditor if editing is enabled
-          if ((showPLocks || showAcid) && onStepPLocks) {
+          if ((showPLocks || showAcid || showConditions) && onStepPLocks) {
             return (
               <PLockEditor
                 key={index}
                 stepIndex={index}
                 pLocks={step.pLocks}
                 acid={step.acid}
+                condition={step.condition}
                 onPLocksChange={(pLocks) => onStepPLocks(index, pLocks)}
                 onAcidChange={onStepAcid ? (acid) => onStepAcid(index, acid) : undefined}
+                onConditionChange={onStepCondition ? (cond) => onStepCondition(index, cond) : undefined}
                 showAcid={showAcid}
+                showConditions={showConditions}
                 trigger={stepButton}
                 open={editingStep === index}
                 onOpenChange={(open) => setEditingStep(open ? index : null)}
@@ -228,9 +267,9 @@ export const StepSequencer = ({
       </div>
       
       {/* Right-click hint */}
-      {(showPLocks || showAcid) && (
+      {(showPLocks || showAcid || showConditions) && (
         <div className="text-[10px] text-muted-foreground/50 text-right">
-          Right-click step for P-Locks
+          Right-click step for P-Locks{showConditions && ' & Conditions'}
         </div>
       )}
     </div>
