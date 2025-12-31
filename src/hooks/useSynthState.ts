@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { WaveformType } from '@/audio/SynthVoice';
+import { WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import { createInitialSteps, defaultSynthParams, defaultSynthPattern } from '@/constants/initialState';
 import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
@@ -20,6 +20,7 @@ export interface SynthParams {
   release: number;
   detune: number;
   lfoRate: number;
+  lfoSyncDivision: LfoSyncDivision;
 }
 
 export interface SynthState {

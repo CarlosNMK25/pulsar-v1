@@ -4,7 +4,7 @@ import { ModuleCard } from './ModuleCard';
 import { StepSequencer } from './StepSequencer';
 import { Knob } from './Knob';
 import { cn } from '@/lib/utils';
-import { WaveformType } from '@/audio/SynthVoice';
+import { WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
 interface Step {
@@ -30,6 +30,7 @@ interface SynthModuleProps {
     release: number;
     detune: number;
     lfoRate: number;
+    lfoSyncDivision: LfoSyncDivision;
   };
   onParamsChange: (params: SynthModuleProps['params']) => void;
   muted: boolean;
@@ -39,6 +40,7 @@ interface SynthModuleProps {
 }
 
 const waveforms: WaveformType[] = ['sine', 'saw', 'square', 'tri'];
+const lfoSyncDivisions: LfoSyncDivision[] = ['free', '1/1', '1/2', '1/4', '1/8', '1/16', '3/16', '5/16'];
 
 export const SynthModule = ({ 
   currentStep, 
@@ -59,7 +61,7 @@ export const SynthModule = ({
     ));
   };
 
-  const updateParam = (key: keyof typeof params, value: number | WaveformType) => {
+  const updateParam = <K extends keyof typeof params>(key: K, value: typeof params[K]) => {
     onParamsChange({ ...params, [key]: value });
   };
 
@@ -165,13 +167,37 @@ export const SynthModule = ({
             label="Release"
             size="sm"
           />
-          <Knob
-            value={params.lfoRate}
-            onChange={(v) => updateParam('lfoRate', v)}
-            label="LFO"
-            size="sm"
-            variant="secondary"
-          />
+          <div className="flex flex-col items-center gap-1">
+            {params.lfoSyncDivision === 'free' ? (
+              <Knob
+                value={params.lfoRate}
+                onChange={(v) => updateParam('lfoRate', v)}
+                label="LFO"
+                size="sm"
+                variant="secondary"
+              />
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-secondary/20 border border-secondary/50 flex items-center justify-center">
+                  <span className="text-xs font-medium text-secondary">{params.lfoSyncDivision}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1">LFO</span>
+              </div>
+            )}
+            {/* LFO Sync Division Selector */}
+            <select
+              value={params.lfoSyncDivision}
+              onChange={(e) => updateParam('lfoSyncDivision', e.target.value as LfoSyncDivision)}
+              className="w-full text-[10px] bg-surface-sunken border border-border rounded px-1 py-0.5 text-center focus:outline-none focus:border-primary"
+              title="LFO Sync to BPM"
+            >
+              {lfoSyncDivisions.map((div) => (
+                <option key={div} value={div}>
+                  {div === 'free' ? 'Free' : div}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </ModuleCard>

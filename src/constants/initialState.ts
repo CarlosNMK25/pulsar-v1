@@ -1,4 +1,4 @@
-import { WaveformType } from '@/audio/SynthVoice';
+import { WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import { TextureMode } from '@/audio/TextureEngine';
 
 // Scene configuration
@@ -47,6 +47,7 @@ export const defaultSynthParams = {
   release: 45,
   detune: 25,
   lfoRate: 30,
+  lfoSyncDivision: 'free' as LfoSyncDivision,
 };
 
 export const defaultTextureParams = {

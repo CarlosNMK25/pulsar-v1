@@ -9,6 +9,13 @@ function formatTime(seconds: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
+export interface AutoFillConfig {
+  enabled: boolean;
+  interval: number;   // Every N bars (4, 8, 16, 32)
+  duration: number;   // Fill lasts N bars (1, 2)
+  probability: number; // 0-100
+}
+
 interface TransportControlsProps {
   isPlaying: boolean;
   bpm: number;
@@ -17,6 +24,7 @@ interface TransportControlsProps {
   isRecording?: boolean;
   recordingTime?: number;
   fillActive?: boolean;
+  autoFillConfig?: AutoFillConfig;
   onPlayPause: () => void;
   onStop: () => void;
   onBpmChange: (bpm: number) => void;
@@ -25,6 +33,7 @@ interface TransportControlsProps {
   onRecordStart?: () => void;
   onRecordStop?: () => void;
   onFillActivate?: (active: boolean) => void;
+  onAutoFillConfigChange?: (config: AutoFillConfig) => void;
 }
 
 export const TransportControls = ({
@@ -35,6 +44,7 @@ export const TransportControls = ({
   isRecording = false,
   recordingTime = 0,
   fillActive = false,
+  autoFillConfig,
   onPlayPause,
   onStop,
   onBpmChange,
@@ -43,6 +53,7 @@ export const TransportControls = ({
   onRecordStart,
   onRecordStop,
   onFillActivate,
+  onAutoFillConfigChange,
 }: TransportControlsProps) => {
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -222,22 +233,55 @@ export const TransportControls = ({
 
       {/* FILL Button - momentary */}
       {onFillActivate && (
-        <button
-          onMouseDown={() => onFillActivate(true)}
-          onMouseUp={() => onFillActivate(false)}
-          onMouseLeave={() => onFillActivate(false)}
-          onTouchStart={() => onFillActivate(true)}
-          onTouchEnd={() => onFillActivate(false)}
-          className={cn(
-            'px-4 py-2 rounded border text-xs font-bold uppercase tracking-wider transition-all',
-            fillActive 
-              ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_12px_rgba(251,146,60,0.5)]' 
-              : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+        <div className="flex items-center gap-2">
+          <button
+            onMouseDown={() => onFillActivate(true)}
+            onMouseUp={() => onFillActivate(false)}
+            onMouseLeave={() => onFillActivate(false)}
+            onTouchStart={() => onFillActivate(true)}
+            onTouchEnd={() => onFillActivate(false)}
+            className={cn(
+              'px-4 py-2 rounded border text-xs font-bold uppercase tracking-wider transition-all',
+              fillActive 
+                ? 'border-orange-400 bg-orange-400 text-black shadow-[0_0_12px_rgba(251,146,60,0.5)]' 
+                : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+            )}
+            title="Hold for FILL mode (triggers steps with FILL condition)"
+          >
+            FILL
+          </button>
+
+          {/* Auto-Fill Toggle */}
+          {onAutoFillConfigChange && autoFillConfig && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onAutoFillConfigChange({ ...autoFillConfig, enabled: !autoFillConfig.enabled })}
+                className={cn(
+                  'px-2 py-1 rounded border text-[10px] font-medium uppercase tracking-wider transition-all',
+                  autoFillConfig.enabled 
+                    ? 'border-orange-400/50 bg-orange-400/20 text-orange-400' 
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                )}
+                title="Auto-trigger FILL every N bars"
+              >
+                AUTO
+              </button>
+              {autoFillConfig.enabled && (
+                <select
+                  value={autoFillConfig.interval}
+                  onChange={(e) => onAutoFillConfigChange({ ...autoFillConfig, interval: parseInt(e.target.value) })}
+                  className="text-[10px] bg-surface-sunken border border-border rounded px-1 py-0.5 text-center focus:outline-none focus:border-orange-400"
+                  title="Auto-fill every N bars"
+                >
+                  <option value="4">4 bars</option>
+                  <option value="8">8 bars</option>
+                  <option value="16">16 bars</option>
+                  <option value="32">32 bars</option>
+                </select>
+              )}
+            </div>
           )}
-          title="Hold for FILL mode (triggers steps with FILL condition)"
-        >
-          FILL
-        </button>
+        </div>
       )}
 
       {/* Play indicator */}
