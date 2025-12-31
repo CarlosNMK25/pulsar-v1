@@ -16,6 +16,8 @@ interface BottomDockProps {
   // Keyboard callbacks
   onNoteOn?: (note: number, velocity?: number) => void;
   onNoteOff?: (note: number) => void;
+  isAudioReady?: boolean;
+  onInitAudio?: () => Promise<void>;
   // Mixer data
   drumMuted?: boolean;
   synthMuted?: boolean;
@@ -50,6 +52,8 @@ export const BottomDock = ({
   analyserData,
   onNoteOn,
   onNoteOff,
+  isAudioReady = false,
+  onInitAudio,
   drumMuted = false,
   synthMuted = false,
   textureMuted = false,
@@ -135,7 +139,9 @@ export const BottomDock = ({
           {activeTab === 'keys' && (
             <KeyboardTab 
               onNoteOn={onNoteOn} 
-              onNoteOff={onNoteOff} 
+              onNoteOff={onNoteOff}
+              isAudioReady={isAudioReady}
+              onInitAudio={onInitAudio}
             />
           )}
           {activeTab === 'mixer' && (

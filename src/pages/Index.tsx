@@ -413,6 +413,8 @@ const Index = () => {
         analyserData={analyserData}
         onNoteOn={playNote}
         onNoteOff={stopNote}
+        isAudioReady={isInitialized}
+        onInitAudio={initAudio}
         drumMuted={drumState.drumMuted}
         synthMuted={synthState.synthMuted}
         textureMuted={textureState.textureMuted}
