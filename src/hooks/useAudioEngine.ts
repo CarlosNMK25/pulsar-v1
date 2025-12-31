@@ -9,6 +9,7 @@ import { fxEngine } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
+import { TrackSendLevels } from '@/hooks/useFXState';
 // P-Lock parameters that can be locked per step
 export interface PLocks {
   cutoff?: number;
@@ -88,6 +89,7 @@ interface UseAudioEngineProps {
     lowpass: number;
     highpass: number;
   };
+  sendLevels: TrackSendLevels;
   glitchTargets: GlitchTarget[];
   sampleBuffer: AudioBuffer | null;
   sampleParams: SampleParams;
@@ -117,6 +119,7 @@ export const useAudioEngine = ({
   reverbParams,
   delayParams,
   masterFilterParams,
+  sendLevels,
   glitchTargets,
   sampleBuffer,
   sampleParams,
@@ -319,6 +322,23 @@ export const useAudioEngine = ({
     if (!isInitialized) return;
     fxEngine.setMasterFilterParams(masterFilterParams);
   }, [masterFilterParams, isInitialized]);
+
+  // Sync send levels to engines
+  useEffect(() => {
+    if (!isInitialized) return;
+    if (drumRef.current) {
+      drumRef.current.setFXSend(sendLevels.drums.reverb, sendLevels.drums.delay);
+    }
+    if (synthRef.current) {
+      synthRef.current.setFXSend(sendLevels.synth.reverb, sendLevels.synth.delay);
+    }
+    if (textureRef.current) {
+      textureRef.current.setFXSend(sendLevels.texture.reverb, sendLevels.texture.delay);
+    }
+    if (sampleRef.current) {
+      sampleRef.current.setFXSend(sendLevels.sample.reverb, sendLevels.sample.delay);
+    }
+  }, [sendLevels, isInitialized]);
 
   // Handle texture mute and playback
   useEffect(() => {

@@ -92,6 +92,7 @@ const Index = () => {
     reverbParams: fxState.reverbParams,
     delayParams: fxState.delayParams,
     masterFilterParams: fxState.masterFilterParams,
+    sendLevels: fxState.sendLevels,
     glitchTargets,
     sampleBuffer: sampleState.sampleBuffer,
     sampleParams: sampleState.sampleParams,
@@ -235,15 +236,17 @@ const Index = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="min-h-[200px]">
-                <FXModule
+              <FXModule
                   reverbParams={fxState.reverbParams}
                   delayParams={fxState.delayParams}
                   masterFilterParams={fxState.masterFilterParams}
+                  sendLevels={fxState.sendLevels}
                   bpm={bpm}
                   isPlaying={isPlaying}
                   onReverbChange={fxState.updateReverbParams}
                   onDelayChange={fxState.updateDelayParams}
                   onMasterFilterChange={fxState.updateMasterFilterParams}
+                  onSendChange={fxState.updateSendLevel}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">
