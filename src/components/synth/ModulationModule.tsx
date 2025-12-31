@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { 
@@ -87,6 +87,17 @@ export function ModulationModule({
   const isActive = routingMode === 'master' || targets.length > 0;
   const showNoTargetWarning = routingMode === 'individual' && targets.length === 0;
 
+  // Determine which track is being edited (like FX module)
+  const editingTrack: ModTarget = useMemo(() => {
+    if (routingMode === 'master') return 'drums';
+    if (selectedEditTrack && targets.includes(selectedEditTrack)) {
+      return selectedEditTrack;
+    }
+    return targets[0] || 'drums';
+  }, [routingMode, targets, selectedEditTrack]);
+
+  const multipleTracksSelected = routingMode === 'individual' && targets.length > 1;
+
   // Check if any effect is active (not bypassed)
   const hasActiveEffect = Object.values(bypassed).some(b => !b);
 
@@ -95,12 +106,22 @@ export function ModulationModule({
     modulationEngine.setBypass(effect, !bypassed[effect]);
   };
 
+  // Handle track click - toggle AND select for editing
+  const handleTrackClick = (target: ModTarget) => {
+    const isCurrentlyActive = targets.includes(target);
+    onTargetToggle(target);
+    // If activating, auto-select for editing
+    if (!isCurrentlyActive) {
+      setSelectedEditTrack(target);
+    }
+  };
+
   // Get current track's offsets for the active effect
-  const currentTrackOffsets = modOffsetsPerTrack[selectedEditTrack][activeTab];
+  const currentTrackOffsets = modOffsetsPerTrack[editingTrack][activeTab];
 
   // Render offset knobs based on active effect
   const renderTrackOffsets = () => {
-    const track = selectedEditTrack;
+    const track = editingTrack;
     const effect = activeTab;
 
     switch (effect) {
@@ -300,26 +321,36 @@ export function ModulationModule({
           
           {/* Individual track selectors */}
           {routingMode === 'individual' && (
-            <div className="flex gap-1">
-              {targetButtons.map(({ id, label }) => {
-                const isActiveTarget = targets.includes(id);
-                return (
-                  <Button
-                    key={id}
-                    variant={isActiveTarget ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => onTargetToggle(id)}
-                    className={cn(
-                      'flex-1 h-6 text-[10px] font-mono transition-all',
-                      isActiveTarget 
-                        ? 'bg-primary/80 text-primary-foreground border-primary' 
-                        : 'opacity-60 hover:opacity-100'
-                    )}
-                  >
-                    {label}
-                  </Button>
-                );
-              })}
+            <div className="flex flex-col gap-1">
+              <div className="flex gap-1">
+                {targetButtons.map(({ id, label }) => {
+                  const isActiveTarget = targets.includes(id);
+                  const isEditing = isActiveTarget && id === editingTrack;
+                  return (
+                    <Button
+                      key={id}
+                      variant={isActiveTarget ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleTrackClick(id)}
+                      className={cn(
+                        'flex-1 h-6 text-[10px] font-mono transition-all',
+                        isActiveTarget 
+                          ? 'bg-primary/80 text-primary-foreground border-primary' 
+                          : 'opacity-60 hover:opacity-100',
+                        isEditing && 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-background'
+                      )}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {multipleTracksSelected && (
+                <div className="text-[9px] text-yellow-400 text-center flex items-center justify-center gap-1">
+                  <span>Editing:</span>
+                  <span className="font-mono uppercase">{editingTrack}</span>
+                </div>
+              )}
             </div>
           )}
           
@@ -729,31 +760,15 @@ export function ModulationModule({
         {routingMode === 'individual' && targets.length > 0 && (
           <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">Track Offsets</span>
-                <div className="flex gap-0.5">
-                  {targets.map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setSelectedEditTrack(t)}
-                      className={cn(
-                        'px-1.5 h-5 text-[9px] font-mono rounded transition-all',
-                        selectedEditTrack === t
-                          ? 'bg-accent text-accent-foreground ring-1 ring-accent'
-                          : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                      )}
-                    >
-                      {t.charAt(0).toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <span className="text-[10px] text-muted-foreground">
+                Track Offsets {multipleTracksSelected && `(${editingTrack})`}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onResetTrackModOffsets(selectedEditTrack)}
+                onClick={() => onResetTrackModOffsets(editingTrack)}
                 className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
-                title={`Reset ${selectedEditTrack} offsets`}
+                title={`Reset ${editingTrack} offsets`}
               >
                 <RotateCcw className="w-3 h-3" />
               </Button>
