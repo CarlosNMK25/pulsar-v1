@@ -5,6 +5,10 @@ import { audioEngine, GlitchTarget } from './AudioEngine';
 import { scheduler } from './Scheduler';
 import { StutterParams, BitcrushParams, TapeStopCurve } from './GlitchEngine';
 
+export type CrushCurve = 'soft' | 'hard' | 'fold' | 'tube';
+export type NoiseType = 'white' | 'pink' | 'brown';
+export type JitterMode = 'random' | 'sine' | 'tape';
+
 export class GlitchBus {
   private track: 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
   private inputNode: GainNode | null = null;
@@ -20,6 +24,29 @@ export class GlitchBus {
   // Bitcrush state
   private bitcrushPhase = 0;
   private bitcrushLastSample = 0;
+  
+  // Lo-Fi Degradation Engine nodes
+  private crushWaveshaper: WaveShaperNode | null = null;
+  private crushInputGain: GainNode | null = null;
+  private crushOutputGain: GainNode | null = null;
+  private crushFilter: BiquadFilterNode | null = null;
+  
+  // Noise generator
+  private noiseBuffers: Map<string, AudioBuffer> = new Map();
+  private noiseSource: AudioBufferSourceNode | null = null;
+  private noiseGain: GainNode | null = null;
+  private noiseFilter: BiquadFilterNode | null = null;
+  private currentNoiseType: NoiseType = 'white';
+  
+  // Jitter buffer for temporal effects
+  private jitterBuffer: Float32Array | null = null;
+  private jitterBufferR: Float32Array | null = null;
+  private jitterWritePos = 0;
+  private jitterSmoothNoise = 0;
+  private jitterPhase = 0;
+  
+  // Sustained crush mode
+  private crushSustainActive = false;
   
   // Reverse effect state
   private reverseProcessor: ScriptProcessorNode | null = null;
@@ -51,7 +78,19 @@ export class GlitchBus {
 
   private params = {
     stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5, repeatCount: 8, probability: 1.0 },
-    bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5, drive: 0, curve: 'soft' as const, noise: 0, noiseType: 'white' as const, filter: 1.0, jitter: 0, jitterMode: 'random' as const, probability: 1.0 },
+    bitcrush: { 
+      bits: 8, 
+      sampleRate: 0.5, 
+      mix: 0.5, 
+      drive: 0, 
+      curve: 'soft' as CrushCurve, 
+      noise: 0, 
+      noiseType: 'white' as NoiseType, 
+      filter: 1.0, 
+      jitter: 0, 
+      jitterMode: 'random' as JitterMode, 
+      probability: 1.0 
+    },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5, curve: 'exp' as TapeStopCurve, wobble: 0, probability: 1.0 },
     granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.3, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, detune: 0.5, scatter: 0.2, reverse: false, probability: 1.0 },
     reverse: { duration: 0.5, mix: 0.7, position: 0, crossfade: 0.3, speed: 0.5, feedback: 0, loop: 0, probability: 1.0 },
@@ -78,11 +117,47 @@ export class GlitchBus {
     this.stutterGain = ctx.createGain();
     this.stutterGain.gain.value = 1;
     
-    // Bitcrush
+    // Lo-Fi Degradation Engine - Pre-distortion waveshaper
+    this.crushWaveshaper = ctx.createWaveShaper();
+    this.crushWaveshaper.oversample = '2x';
+    this.crushInputGain = ctx.createGain();
+    this.crushInputGain.gain.value = 1;
+    this.crushOutputGain = ctx.createGain();
+    this.crushOutputGain.gain.value = 1;
+    this.setCrushCurve('soft');
+    
+    // Post-filter lowpass
+    this.crushFilter = ctx.createBiquadFilter();
+    this.crushFilter.type = 'lowpass';
+    this.crushFilter.frequency.value = 20000;
+    this.crushFilter.Q.value = 0.7;
+    
+    // Jitter buffer (~100ms max)
+    const maxJitterSamples = Math.floor(ctx.sampleRate * 0.1);
+    this.jitterBuffer = new Float32Array(maxJitterSamples + 4096);
+    this.jitterBufferR = new Float32Array(maxJitterSamples + 4096);
+    this.jitterWritePos = 0;
+    
+    // Initialize noise generator
+    this.initNoiseGenerator(ctx);
+    
+    // Bitcrush chain: crushInputGain → crushWaveshaper → bitcrusher → crushFilter → crushOutputGain → bitcrushGain
     this.bitcrushGain = ctx.createGain();
     this.bitcrushGain.gain.value = 0;
     this.bitcrusher = ctx.createScriptProcessor(4096, 2, 2);
     this.bitcrusher.onaudioprocess = this.processBitcrush.bind(this);
+    
+    // Connect crush chain
+    this.crushInputGain.connect(this.crushWaveshaper);
+    this.crushWaveshaper.connect(this.bitcrusher);
+    this.bitcrusher.connect(this.crushFilter);
+    this.crushFilter.connect(this.crushOutputGain);
+    this.crushOutputGain.connect(this.bitcrushGain);
+    
+    // Connect noise to bitcrush output
+    if (this.noiseGain && this.noiseFilter) {
+      this.noiseFilter.connect(this.bitcrushGain);
+    }
     
     // Reverse
     this.reverseGain = ctx.createGain();
@@ -107,8 +182,8 @@ export class GlitchBus {
     this.inputNode.connect(this.stutterGain);
     this.stutterGain.connect(this.wetNode);
     
-    this.inputNode.connect(this.bitcrusher);
-    this.bitcrusher.connect(this.bitcrushGain);
+    // Bitcrush routing through Lo-Fi chain
+    this.inputNode.connect(this.crushInputGain);
     this.bitcrushGain.connect(this.wetNode);
     
     this.inputNode.connect(this.reverseProcessor);
@@ -132,7 +207,152 @@ export class GlitchBus {
     }
     
     this.isConnected = true;
-    console.log(`[GlitchBus:${this.track}] Initialized`);
+    console.log(`[GlitchBus:${this.track}] Initialized with Lo-Fi Engine`);
+  }
+  
+  // ============ NOISE GENERATOR ============
+  
+  private createNoiseBuffer(ctx: AudioContext, type: NoiseType, duration: number): AudioBuffer {
+    const samples = Math.floor(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(1, samples, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    if (type === 'white') {
+      for (let i = 0; i < samples; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+    } else if (type === 'pink') {
+      // Voss-McCartney algorithm for pink noise
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < samples; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+        b6 = white * 0.115926;
+      }
+    } else if (type === 'brown') {
+      // Brownian/red noise
+      let lastOut = 0;
+      for (let i = 0; i < samples; i++) {
+        const white = Math.random() * 2 - 1;
+        lastOut = (lastOut + (0.02 * white)) / 1.02;
+        data[i] = lastOut * 3.5;
+      }
+    }
+    
+    return buffer;
+  }
+  
+  private initNoiseGenerator(ctx: AudioContext): void {
+    // Pre-generate noise buffers
+    (['white', 'pink', 'brown'] as NoiseType[]).forEach(type => {
+      this.noiseBuffers.set(type, this.createNoiseBuffer(ctx, type, 2));
+    });
+    
+    this.noiseGain = ctx.createGain();
+    this.noiseGain.gain.value = 0;
+    
+    this.noiseFilter = ctx.createBiquadFilter();
+    this.noiseFilter.type = 'highpass';
+    this.noiseFilter.frequency.value = 80;
+    
+    this.noiseGain.connect(this.noiseFilter);
+  }
+  
+  private startNoiseSource(type: NoiseType): void {
+    const ctx = audioEngine.getContext();
+    
+    // Stop previous source
+    if (this.noiseSource) {
+      try {
+        this.noiseSource.stop();
+        this.noiseSource.disconnect();
+      } catch {}
+      this.noiseSource = null;
+    }
+    
+    const buffer = this.noiseBuffers.get(type);
+    if (!buffer || !this.noiseGain) return;
+    
+    this.noiseSource = ctx.createBufferSource();
+    this.noiseSource.buffer = buffer;
+    this.noiseSource.loop = true;
+    this.noiseSource.connect(this.noiseGain);
+    this.noiseSource.start();
+    this.currentNoiseType = type;
+  }
+  
+  private setNoiseAmount(amount: number): void {
+    if (!this.noiseGain) return;
+    const ctx = audioEngine.getContext();
+    // Logarithmic scaling for more natural control
+    const gain = amount > 0 ? Math.pow(amount, 2) * 0.5 : 0;
+    this.noiseGain.gain.setTargetAtTime(gain, ctx.currentTime, 0.02);
+  }
+  
+  // ============ WAVESHAPER / DRIVE ============
+  
+  private setCrushDrive(drive: number): void {
+    if (!this.crushInputGain || !this.crushOutputGain) return;
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    const inputGain = 1 + drive * 4;
+    const outputGain = 1 / Math.sqrt(inputGain);
+    this.crushInputGain.gain.setTargetAtTime(inputGain, now, 0.02);
+    this.crushOutputGain.gain.setTargetAtTime(outputGain, now, 0.02);
+    
+    // Regenerate curve with new drive
+    this.setCrushCurve(this.params.bitcrush.curve, drive);
+  }
+  
+  private setCrushCurve(curve: CrushCurve, drive?: number): void {
+    if (!this.crushWaveshaper) return;
+    const driveAmount = drive ?? this.params.bitcrush.drive;
+    const samples = 256;
+    const curveData = new Float32Array(samples);
+    const intensity = 1 + driveAmount * 3;
+    
+    for (let i = 0; i < samples; i++) {
+      const x = (i / (samples - 1)) * 2 - 1;
+      const scaled = x * intensity;
+      
+      switch (curve) {
+        case 'soft':
+          curveData[i] = Math.tanh(scaled);
+          break;
+        case 'hard':
+          curveData[i] = Math.max(-1, Math.min(1, scaled));
+          break;
+        case 'fold':
+          let folded = scaled;
+          while (Math.abs(folded) > 1) {
+            folded = folded > 1 ? 2 - folded : folded < -1 ? -2 - folded : folded;
+          }
+          curveData[i] = folded;
+          break;
+        case 'tube':
+          curveData[i] = (3 + 10) * scaled / (1 + 10 * Math.abs(scaled)) * 0.5;
+          break;
+      }
+    }
+    this.crushWaveshaper.curve = curveData;
+  }
+  
+  // ============ POST-FILTER ============
+  
+  private setCrushFilterFreq(amount: number): void {
+    if (!this.crushFilter) return;
+    const ctx = audioEngine.getContext();
+    // Map 0-1 to 500Hz-20kHz logarithmically
+    const minFreq = 500;
+    const maxFreq = 20000;
+    const freq = minFreq * Math.pow(maxFreq / minFreq, amount);
+    this.crushFilter.frequency.setTargetAtTime(freq, ctx.currentTime, 0.02);
   }
 
   setBypass(bypass: boolean): void {
@@ -158,10 +378,54 @@ export class GlitchBus {
     if (params.probability !== undefined) this.params.stutter.probability = params.probability;
   }
 
-  setBitcrushParams(params: Partial<{ bits: number; sampleRate: number; mix: number }>): void {
+  setBitcrushParams(params: Partial<{ 
+    bits: number; 
+    sampleRate: number; 
+    mix: number;
+    drive: number;
+    curve: CrushCurve;
+    noise: number;
+    noiseType: NoiseType;
+    filter: number;
+    jitter: number;
+    jitterMode: JitterMode;
+    probability: number;
+  }>): void {
+    // Core bitcrush params
     if (params.bits !== undefined) this.params.bitcrush.bits = params.bits;
     if (params.sampleRate !== undefined) this.params.bitcrush.sampleRate = params.sampleRate;
     if (params.mix !== undefined) this.params.bitcrush.mix = params.mix;
+    if (params.probability !== undefined) this.params.bitcrush.probability = params.probability;
+    
+    // Lo-Fi Degradation params
+    if (params.drive !== undefined) {
+      this.params.bitcrush.drive = params.drive;
+      this.setCrushDrive(params.drive);
+    }
+    if (params.curve !== undefined) {
+      this.params.bitcrush.curve = params.curve;
+      this.setCrushCurve(params.curve);
+    }
+    if (params.noise !== undefined) {
+      this.params.bitcrush.noise = params.noise;
+      this.setNoiseAmount(params.noise);
+      // Start noise if amount > 0 and crush is active
+      if (params.noise > 0 && this.crushSustainActive) {
+        this.startNoiseSource(this.params.bitcrush.noiseType);
+      }
+    }
+    if (params.noiseType !== undefined) {
+      this.params.bitcrush.noiseType = params.noiseType;
+      if (this.params.bitcrush.noise > 0 && this.crushSustainActive) {
+        this.startNoiseSource(params.noiseType);
+      }
+    }
+    if (params.filter !== undefined) {
+      this.params.bitcrush.filter = params.filter;
+      this.setCrushFilterFreq(params.filter);
+    }
+    if (params.jitter !== undefined) this.params.bitcrush.jitter = params.jitter;
+    if (params.jitterMode !== undefined) this.params.bitcrush.jitterMode = params.jitterMode;
   }
 
   setTapeStopParams(params: Partial<{ speed: number; duration: number; mix: number; curve: TapeStopCurve; wobble: number; probability: number }>): void {
@@ -330,9 +594,23 @@ export class GlitchBus {
   triggerBitcrush(duration?: number): void {
     if (this.bypass || !this.bitcrushGain || !this.wetNode || !this.dryNode) return;
     
+    // Probability check
+    if (Math.random() > this.params.bitcrush.probability) return;
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     const crushDuration = duration || 0.5;
+    
+    // Apply Lo-Fi configuration
+    this.setCrushDrive(this.params.bitcrush.drive);
+    this.setCrushCurve(this.params.bitcrush.curve);
+    this.setCrushFilterFreq(this.params.bitcrush.filter);
+    
+    // Start noise if configured
+    if (this.params.bitcrush.noise > 0) {
+      this.setNoiseAmount(this.params.bitcrush.noise);
+      this.startNoiseSource(this.params.bitcrush.noiseType);
+    }
     
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);
@@ -346,23 +624,136 @@ export class GlitchBus {
     this.bitcrushGain.gain.setValueAtTime(0, endTime);
     this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
+    
+    // Stop noise after duration
+    setTimeout(() => {
+      if (this.noiseSource && !this.crushSustainActive) {
+        try {
+          this.noiseSource.stop();
+          this.noiseSource.disconnect();
+        } catch {}
+        this.noiseSource = null;
+        this.noiseGain?.gain.setValueAtTime(0, ctx.currentTime);
+      }
+    }, crushDuration * 1000);
+  }
+  
+  // ============ SUSTAINED BITCRUSH ============
+  
+  startSustainedBitcrush(): void {
+    if (this.crushSustainActive || this.bypass || !this.wetNode || !this.dryNode || !this.bitcrushGain) return;
+    
+    this.crushSustainActive = true;
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    
+    // Apply Lo-Fi configuration
+    this.setCrushDrive(this.params.bitcrush.drive);
+    this.setCrushCurve(this.params.bitcrush.curve);
+    this.setCrushFilterFreq(this.params.bitcrush.filter);
+    
+    // Activate wet signal
+    this.wetNode.gain.setTargetAtTime(this.params.bitcrush.mix, now, 0.01);
+    this.dryNode.gain.setTargetAtTime(1 - this.params.bitcrush.mix * 0.5, now, 0.01);
+    this.bitcrushGain.gain.setValueAtTime(1, now);
+    
+    // Start noise if configured
+    if (this.params.bitcrush.noise > 0) {
+      this.setNoiseAmount(this.params.bitcrush.noise);
+      this.startNoiseSource(this.params.bitcrush.noiseType);
+    }
+    
+    console.log(`[GlitchBus:${this.track}] Sustained bitcrush started`);
+  }
+  
+  stopSustainedBitcrush(): void {
+    if (!this.crushSustainActive) return;
+    
+    this.crushSustainActive = false;
+    const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    
+    this.wetNode?.gain.setTargetAtTime(0, now, 0.1);
+    this.dryNode?.gain.setTargetAtTime(1, now, 0.1);
+    this.bitcrushGain?.gain.setTargetAtTime(0, now, 0.1);
+    
+    // Stop noise
+    if (this.noiseSource) {
+      try {
+        this.noiseSource.stop();
+        this.noiseSource.disconnect();
+      } catch {}
+      this.noiseSource = null;
+    }
+    this.noiseGain?.gain.setValueAtTime(0, now);
+    
+    console.log(`[GlitchBus:${this.track}] Sustained bitcrush stopped`);
+  }
+  
+  isCrushSustainActive(): boolean {
+    return this.crushSustainActive;
   }
 
   private processBitcrush(event: AudioProcessingEvent): void {
-    const bits = this.params.bitcrush.bits;
-    const sampleRateReduction = Math.floor(1 + (1 - this.params.bitcrush.sampleRate) * 32);
+    const { bits, sampleRate, jitter, jitterMode } = this.params.bitcrush;
+    const sampleRateReduction = Math.floor(1 + (1 - sampleRate) * 32);
     const levels = Math.pow(2, bits);
     
     for (let channel = 0; channel < event.outputBuffer.numberOfChannels; channel++) {
       const inputData = event.inputBuffer.getChannelData(channel);
       const outputData = event.outputBuffer.getChannelData(channel);
+      const jitterBuf = channel === 0 ? this.jitterBuffer : this.jitterBufferR;
       
       for (let i = 0; i < inputData.length; i++) {
+        let sample = inputData[i];
+        
+        // Apply jitter if enabled and buffer exists
+        if (jitter > 0 && jitterBuf) {
+          // Write to circular buffer
+          jitterBuf[this.jitterWritePos % jitterBuf.length] = sample;
+          
+          // Calculate jitter offset
+          const maxOffset = Math.floor(jitter * 0.05 * 44100);
+          let jitterOffset = 0;
+          
+          switch (jitterMode) {
+            case 'random':
+              this.jitterSmoothNoise += (Math.random() - 0.5) * 0.1;
+              this.jitterSmoothNoise *= 0.95;
+              jitterOffset = Math.floor(this.jitterSmoothNoise * maxOffset);
+              break;
+            case 'sine':
+              this.jitterPhase += 0.0003;
+              jitterOffset = Math.floor(Math.sin(this.jitterPhase) * maxOffset);
+              break;
+            case 'tape':
+              // Wow + flutter simulation
+              const wow = Math.sin(this.jitterPhase * 0.3) * 0.7;
+              const flutter = Math.sin(this.jitterPhase * 4.7) * 0.3;
+              this.jitterPhase += 0.001;
+              jitterOffset = Math.floor((wow + flutter) * maxOffset);
+              break;
+          }
+          
+          // Read with offset
+          const baseDelay = 1024;
+          const readPos = (this.jitterWritePos - baseDelay - jitterOffset + jitterBuf.length) % jitterBuf.length;
+          sample = jitterBuf[Math.floor(readPos)];
+          
+          if (channel === 0) {
+            this.jitterWritePos++;
+          }
+        }
+        
+        // Sample rate reduction + bit quantization
         if (this.bitcrushPhase % sampleRateReduction === 0) {
-          this.bitcrushLastSample = Math.round(inputData[i] * levels) / levels;
+          this.bitcrushLastSample = Math.round(sample * levels) / levels;
         }
         outputData[i] = this.bitcrushLastSample;
-        this.bitcrushPhase++;
+        
+        if (channel === 0) {
+          this.bitcrushPhase++;
+        }
       }
     }
   }
@@ -813,6 +1204,27 @@ export class GlitchBus {
 
   disconnect(): void {
     this.stopChaos();
+    this.stopSustainedBitcrush();
+    this.stopSustainedFreeze();
+    
+    // Stop noise source
+    if (this.noiseSource) {
+      try {
+        this.noiseSource.stop();
+        this.noiseSource.disconnect();
+      } catch {}
+      this.noiseSource = null;
+    }
+    
+    // Disconnect Lo-Fi nodes
+    this.crushWaveshaper?.disconnect();
+    this.crushInputGain?.disconnect();
+    this.crushOutputGain?.disconnect();
+    this.crushFilter?.disconnect();
+    this.noiseGain?.disconnect();
+    this.noiseFilter?.disconnect();
+    
+    // Disconnect core nodes
     this.inputNode?.disconnect();
     this.outputNode?.disconnect();
     this.dryNode?.disconnect();
@@ -822,6 +1234,9 @@ export class GlitchBus {
     this.bitcrushGain?.disconnect();
     this.reverseProcessor?.disconnect();
     this.reverseGain?.disconnect();
+    this.freezeCaptureNode?.disconnect();
+    
     this.isConnected = false;
+    console.log(`[GlitchBus:${this.track}] Disconnected`);
   }
 }
