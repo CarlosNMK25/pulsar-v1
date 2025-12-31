@@ -1,6 +1,7 @@
 // Glitch effects engine for IDM-style audio manipulation
 import { audioEngine } from './AudioEngine';
 import { scheduler } from './Scheduler';
+import { fxEngine } from './FXEngine';
 
 export interface GlitchEffectParams {
   active: boolean;
@@ -69,6 +70,11 @@ export class GlitchEngine {
   private chaosInterval: number | null = null;
   
   private bypass = true;
+  
+  // FX sends for glitch output
+  private reverbSend: GainNode | null = null;
+  private delaySend: GainNode | null = null;
+  private fxBypassed = true;
   private isConnected = false;
   
   // Reverse effect state
@@ -182,6 +188,59 @@ export class GlitchEngine {
     
     this.isConnected = true;
     console.log('[GlitchEngine] Initialized with Bitcrusher and Reverse');
+    
+    // Connect FX sends
+    this.connectFX();
+  }
+  
+  // Connect glitch output to FX sends
+  connectFX(): void {
+    if (this.reverbSend || !this.wetNode) return;
+    
+    const ctx = audioEngine.getContext();
+    
+    this.reverbSend = ctx.createGain();
+    this.delaySend = ctx.createGain();
+    
+    // Default send levels (can be controlled separately)
+    this.reverbSend.gain.value = this.fxBypassed ? 0 : 0.3;
+    this.delaySend.gain.value = this.fxBypassed ? 0 : 0.2;
+    
+    // Connect wet output to FX sends
+    this.wetNode.connect(this.reverbSend);
+    this.wetNode.connect(this.delaySend);
+    
+    // Connect to FX engine inputs
+    this.reverbSend.connect(fxEngine.getReverbSend());
+    this.delaySend.connect(fxEngine.getDelaySend());
+    
+    console.log('[GlitchEngine] Connected to FX sends');
+  }
+  
+  // Control FX bypass for glitch output
+  setFXBypass(bypass: boolean): void {
+    this.fxBypassed = bypass;
+    
+    if (!this.reverbSend || !this.delaySend) return;
+    
+    const ctx = audioEngine.getContext();
+    const targetValue = bypass ? 0 : 0.3;
+    const delayTarget = bypass ? 0 : 0.2;
+    
+    this.reverbSend.gain.setTargetAtTime(targetValue, ctx.currentTime, 0.02);
+    this.delaySend.gain.setTargetAtTime(delayTarget, ctx.currentTime, 0.02);
+    
+    console.log('[GlitchEngine] FX bypass:', bypass);
+  }
+  
+  // Set FX send levels
+  setFXSend(reverb: number, delay: number): void {
+    if (!this.reverbSend || !this.delaySend) return;
+    if (this.fxBypassed) return;
+    
+    const ctx = audioEngine.getContext();
+    this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.02);
+    this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.02);
   }
 
   getInputNode(): GainNode {

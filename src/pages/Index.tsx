@@ -142,6 +142,8 @@ const Index = () => {
     fillActive,
     autoFillConfig,
     onAutoFillTrigger: setFillActive,
+    fxRoutingMode: fxState.fxRoutingMode,
+    fxTargets: fxState.fxTargets,
   });
 
   const handlePlayPause = useCallback(async () => {
