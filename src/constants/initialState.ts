@@ -48,6 +48,8 @@ export const defaultSynthParams = {
   detune: 25,
   lfoRate: 30,
   lfoSyncDivision: 'free' as LfoSyncDivision,
+  fmAmount: 0,   // FM off by default (retrocompatible)
+  fmRatio: 50,   // ~2x ratio (octave harmonic)
 };
 
 export const defaultTextureParams = {

@@ -31,6 +31,8 @@ interface SynthModuleProps {
     detune: number;
     lfoRate: number;
     lfoSyncDivision: LfoSyncDivision;
+    fmAmount: number;
+    fmRatio: number;
   };
   onParamsChange: (params: SynthModuleProps['params']) => void;
   muted: boolean;
@@ -132,7 +134,7 @@ export const SynthModule = ({
         />
 
         {/* Parameters */}
-        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-border">
+        <div className="grid grid-cols-4 gap-3 pt-3 border-t border-border">
           <Knob
             value={params.cutoff}
             onChange={(v) => updateParam('cutoff', v)}
@@ -147,14 +149,22 @@ export const SynthModule = ({
             variant="secondary"
           />
           <Knob
-            value={params.detune}
-            onChange={(v) => updateParam('detune', v)}
-            label="Detune"
+            value={params.fmAmount}
+            onChange={(v) => updateParam('fmAmount', v)}
+            label="FM Amt"
             size="sm"
+            variant="accent"
+          />
+          <Knob
+            value={params.fmRatio}
+            onChange={(v) => updateParam('fmRatio', v)}
+            label="FM Ratio"
+            size="sm"
+            variant="accent"
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-3">
           <Knob
             value={params.attack}
             onChange={(v) => updateParam('attack', v)}
@@ -165,6 +175,12 @@ export const SynthModule = ({
             value={params.release}
             onChange={(v) => updateParam('release', v)}
             label="Release"
+            size="sm"
+          />
+          <Knob
+            value={params.detune}
+            onChange={(v) => updateParam('detune', v)}
+            label="Detune"
             size="sm"
           />
           <div className="flex flex-col items-center gap-1">

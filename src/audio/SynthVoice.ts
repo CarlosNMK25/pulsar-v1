@@ -23,6 +23,8 @@ interface VoiceParams {
   release: number;
   cutoff: number;
   resonance: number;
+  fmAmount: number;  // 0-100: FM modulation depth
+  fmRatio: number;   // 0-100: modulator/carrier ratio (maps to 0.5x-8x)
 }
 
 // Acid 303 options for noteOn
@@ -35,6 +37,8 @@ export interface AcidNoteOptions {
 interface Voice {
   oscillator1: OscillatorNode;
   oscillator2: OscillatorNode;
+  modulator?: OscillatorNode;  // FM modulator oscillator
+  fmGain?: GainNode;           // FM depth control
   gainNode: GainNode;
   filter: BiquadFilterNode;
   startTime: number;
@@ -86,6 +90,8 @@ export class SynthVoice {
       resonance: 5,
       lfoRate: 2,
       lfoSyncDivision: 'free',
+      fmAmount: 0,
+      fmRatio: 50,
     };
 
     // Setup LFO for filter modulation
@@ -145,7 +151,7 @@ export class SynthVoice {
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
-  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision } {
+  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number } {
     return { ...this.params };
   }
 
@@ -153,7 +159,7 @@ export class SynthVoice {
     return this.params.lfoSyncDivision ?? 'free';
   }
 
-  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision }>): void {
+  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number }>): void {
     this.params = { ...this.params, ...params };
     
     const ctx = audioEngine.getContext();
@@ -174,13 +180,24 @@ export class SynthVoice {
       }
     }
     
-    // Update active voices
+    // Update active voices (including FM parameters)
     this.voices.forEach((voice) => {
       voice.filter.frequency.setTargetAtTime(this.params.cutoff, ctx.currentTime, 0.01);
       voice.filter.Q.setTargetAtTime(this.params.resonance, ctx.currentTime, 0.01);
       voice.oscillator1.type = waveformMap[this.params.waveform];
       voice.oscillator2.type = waveformMap[this.params.waveform];
       voice.oscillator2.detune.setTargetAtTime(this.params.detune, ctx.currentTime, 0.01);
+      
+      // Update FM parameters for active voices
+      if (voice.fmGain && voice.modulator) {
+        const frequency = voice.oscillator1.frequency.value;
+        const fmAmount = this.params.fmAmount ?? 0;
+        const fmRatioNorm = this.params.fmRatio ?? 50;
+        const fmRatio = 0.5 + (fmRatioNorm / 100) * 7.5;
+        
+        voice.fmGain.gain.setTargetAtTime((fmAmount / 100) * frequency * 2, ctx.currentTime, 0.01);
+        voice.modulator.frequency.setTargetAtTime(frequency * fmRatio, ctx.currentTime, 0.01);
+      }
     });
   }
 
@@ -226,6 +243,32 @@ export class SynthVoice {
     osc1.frequency.value = frequency;
     osc2.frequency.value = frequency;
     osc2.detune.value = this.params.detune;
+
+    // FM Synthesis: Create modulator oscillator
+    let modulator: OscillatorNode | undefined;
+    let fmGain: GainNode | undefined;
+    
+    const fmAmount = this.params.fmAmount ?? 0;
+    const fmRatioNorm = this.params.fmRatio ?? 50;
+    
+    if (fmAmount > 0) {
+      modulator = ctx.createOscillator();
+      fmGain = ctx.createGain();
+      
+      // Ratio: map 0-100 to 0.5x - 8x of carrier frequency
+      const fmRatio = 0.5 + (fmRatioNorm / 100) * 7.5;
+      modulator.frequency.value = frequency * fmRatio;
+      modulator.type = 'sine'; // Sine modulator for classic FM
+      
+      // FM depth scales with frequency for consistent tonality
+      fmGain.gain.value = (fmAmount / 100) * frequency * 2;
+      
+      // Connect: modulator -> fmGain -> carrier frequencies
+      modulator.connect(fmGain);
+      fmGain.connect(osc1.frequency);
+      fmGain.connect(osc2.frequency);
+      modulator.start(now);
+    }
 
     // Create filter
     const filter = ctx.createBiquadFilter();
@@ -277,6 +320,8 @@ export class SynthVoice {
     const voice: Voice = {
       oscillator1: osc1,
       oscillator2: osc2,
+      modulator,
+      fmGain,
       gainNode: voiceGain,
       filter,
       startTime: now,
@@ -305,10 +350,15 @@ export class SynthVoice {
     const stopTime = now + this.params.release + 0.1;
     voice.oscillator1.stop(stopTime);
     voice.oscillator2.stop(stopTime);
+    if (voice.modulator) {
+      voice.modulator.stop(stopTime);
+    }
 
     setTimeout(() => {
       voice.oscillator1.disconnect();
       voice.oscillator2.disconnect();
+      if (voice.modulator) voice.modulator.disconnect();
+      if (voice.fmGain) voice.fmGain.disconnect();
       voice.filter.disconnect();
       voice.gainNode.disconnect();
       this.voices.delete(note);
