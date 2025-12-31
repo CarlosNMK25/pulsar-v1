@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface KeyboardTabProps {
@@ -61,87 +61,93 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
   const [octave, setOctave] = useState(3);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
-  // Track which physical key triggered which MIDI note
-  const [activeKeyMap, setActiveKeyMap] = useState<Map<string, number>>(new Map());
+  
+  // Use refs to avoid stale closures in event handlers
+  const activeKeyMapRef = useRef<Map<string, number>>(new Map());
+  const octaveRef = useRef(octave);
+  const onNoteOnRef = useRef(onNoteOn);
+  const onNoteOffRef = useRef(onNoteOff);
+  
+  // Keep refs in sync
+  useEffect(() => { octaveRef.current = octave; }, [octave]);
+  useEffect(() => { onNoteOnRef.current = onNoteOn; }, [onNoteOn]);
+  useEffect(() => { onNoteOffRef.current = onNoteOff; }, [onNoteOff]);
 
   // Initialize audio on first interaction (fire-and-forget)
   const ensureAudioReady = useCallback(() => {
     if (!isAudioReady && onInitAudio) {
-      onInitAudio(); // Don't await - let it init in background
+      onInitAudio();
     }
   }, [isAudioReady, onInitAudio]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const key = e.key.toLowerCase();
-    // Check if key is mapped and not already pressed
-    if (KEYBOARD_MAP[key] && !e.repeat && !activeKeyMap.has(key)) {
-      ensureAudioReady();
-      
-      const { note, octaveOffset } = KEYBOARD_MAP[key];
-      const midiNote = noteToMidi(note, octave + octaveOffset);
-      const fullNote = `${note}${octave + octaveOffset}`;
-      
-      // Store the mapping so keyup knows which MIDI note to release
-      setActiveKeyMap(prev => new Map(prev).set(key, midiNote));
-      setPressedKeys(prev => new Set(prev).add(fullNote));
-      setPressedMidi(prev => new Set(prev).add(midiNote));
-      onNoteOn?.(midiNote, 100);
-    }
-  }, [octave, onNoteOn, ensureAudioReady, activeKeyMap]);
-
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    const key = e.key.toLowerCase();
-    const midiNote = activeKeyMap.get(key);
-    
-    if (midiNote !== undefined) {
-      onNoteOff?.(midiNote);
-      
-      // Clean up mappings
-      setActiveKeyMap(prev => {
-        const next = new Map(prev);
-        next.delete(key);
-        return next;
-      });
-      
-      setPressedMidi(prev => {
-        const next = new Set(prev);
-        next.delete(midiNote);
-        return next;
-      });
-      
-      // Remove from visual pressed keys
-      const fullNote = midiToNoteName(midiNote);
-      setPressedKeys(prev => {
-        const next = new Set(prev);
-        next.delete(fullNote);
-        return next;
-      });
-    }
-  }, [activeKeyMap, onNoteOff]);
-
-  // Release all notes when window loses focus
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const keyMap = activeKeyMapRef.current;
+      
+      if (KEYBOARD_MAP[key] && !e.repeat && !keyMap.has(key)) {
+        ensureAudioReady();
+        
+        const { note, octaveOffset } = KEYBOARD_MAP[key];
+        const midiNote = noteToMidi(note, octaveRef.current + octaveOffset);
+        const fullNote = `${note}${octaveRef.current + octaveOffset}`;
+        
+        // Store mapping immediately (synchronous, no state batching issues)
+        keyMap.set(key, midiNote);
+        
+        setPressedKeys(prev => new Set(prev).add(fullNote));
+        setPressedMidi(prev => new Set(prev).add(midiNote));
+        onNoteOnRef.current?.(midiNote, 100);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const keyMap = activeKeyMapRef.current;
+      const midiNote = keyMap.get(key);
+      
+      if (midiNote !== undefined) {
+        // Remove mapping immediately
+        keyMap.delete(key);
+        
+        onNoteOffRef.current?.(midiNote);
+        
+        setPressedMidi(prev => {
+          const next = new Set(prev);
+          next.delete(midiNote);
+          return next;
+        });
+        
+        const fullNote = midiToNoteName(midiNote);
+        setPressedKeys(prev => {
+          const next = new Set(prev);
+          next.delete(fullNote);
+          return next;
+        });
+      }
+    };
+
     const handleBlur = () => {
-      activeKeyMap.forEach((midiNote) => {
-        onNoteOff?.(midiNote);
+      const keyMap = activeKeyMapRef.current;
+      keyMap.forEach((midiNote) => {
+        onNoteOffRef.current?.(midiNote);
       });
-      setActiveKeyMap(new Map());
+      keyMap.clear();
       setPressedKeys(new Set());
       setPressedMidi(new Set());
     };
-    
-    window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
-  }, [activeKeyMap, onNoteOff]);
 
-  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [ensureAudioReady]);
+
 
   // Mouse/touch handlers for visual keys
   const handleMouseDown = useCallback((note: string, oct: number) => {
