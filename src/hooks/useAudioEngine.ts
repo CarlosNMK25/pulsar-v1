@@ -9,7 +9,7 @@ import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
-import { TrackSendLevels, TrackRoutingState } from '@/hooks/useFXState';
+import { TrackSendLevels, TrackRoutingState, FXOffsetsPerTrack, TrackName } from '@/hooks/useFXState';
 // Conditional Trigger types (Elektron-style)
 export type ConditionType = 
   | '1:2' | '1:3' | '1:4'           // X of every N repetitions
@@ -104,6 +104,7 @@ interface UseAudioEngineProps {
   };
   sendLevels: TrackSendLevels;
   trackRouting: TrackRoutingState;
+  fxOffsetsPerTrack: FXOffsetsPerTrack;
   glitchTargets: GlitchTarget[];
   sampleBuffer: AudioBuffer | null;
   sampleParams: SampleParams;
@@ -173,6 +174,7 @@ export const useAudioEngine = ({
   masterFilterParams,
   sendLevels,
   trackRouting,
+  fxOffsetsPerTrack,
   glitchTargets,
   sampleBuffer,
   sampleParams,
@@ -407,22 +409,43 @@ export const useAudioEngine = ({
     fxEngine.setMasterFilterParams(masterFilterParams);
   }, [masterFilterParams, isInitialized]);
 
-  // Sync send levels to engines
+  // Sync send levels to engines with offset modulation
   useEffect(() => {
     if (!isInitialized) return;
-    if (drumRef.current) {
-      drumRef.current.setFXSend(sendLevels.drums.reverb, sendLevels.drums.delay);
-    }
-    if (synthRef.current) {
-      synthRef.current.setFXSend(sendLevels.synth.reverb, sendLevels.synth.delay);
-    }
-    if (textureRef.current) {
-      textureRef.current.setFXSend(sendLevels.texture.reverb, sendLevels.texture.delay);
-    }
-    if (sampleRef.current) {
-      sampleRef.current.setFXSend(sendLevels.sample.reverb, sendLevels.sample.delay);
-    }
-  }, [sendLevels, isInitialized]);
+    
+    // Helper to apply offset as a multiplier (offset -0.5 to +0.5 maps to 0.5x to 1.5x)
+    const applyOffsetModifier = (baseLevel: number, offset: number): number => {
+      const modifier = 1 + offset; // -0.5 -> 0.5, 0 -> 1, +0.5 -> 1.5
+      return Math.max(0, Math.min(1, baseLevel * modifier));
+    };
+    
+    // Apply offsets to send levels for each track
+    const tracks: TrackName[] = ['drums', 'synth', 'texture', 'sample'];
+    
+    tracks.forEach(track => {
+      const offsets = fxOffsetsPerTrack[track];
+      const levels = sendLevels[track];
+      
+      // Calculate modulated send levels using decay offset for reverb, feedback offset for delay
+      const reverbSend = applyOffsetModifier(levels.reverb, offsets.reverb.decay);
+      const delaySend = applyOffsetModifier(levels.delay, offsets.delay.feedback);
+      
+      switch (track) {
+        case 'drums':
+          drumRef.current?.setFXSend(reverbSend, delaySend);
+          break;
+        case 'synth':
+          synthRef.current?.setFXSend(reverbSend, delaySend);
+          break;
+        case 'texture':
+          textureRef.current?.setFXSend(reverbSend, delaySend);
+          break;
+        case 'sample':
+          sampleRef.current?.setFXSend(reverbSend, delaySend);
+          break;
+      }
+    });
+  }, [sendLevels, fxOffsetsPerTrack, isInitialized]);
 
   // Sync track routing (FX bypass) to engines based on fxRoutingMode
   useEffect(() => {

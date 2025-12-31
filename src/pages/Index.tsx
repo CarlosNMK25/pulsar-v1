@@ -136,6 +136,7 @@ const Index = () => {
     masterFilterParams: fxState.masterFilterParams,
     sendLevels: fxState.sendLevels,
     trackRouting: fxState.trackRouting,
+    fxOffsetsPerTrack: fxState.fxOffsetsPerTrack,
     glitchTargets,
     sampleBuffer: sampleState.sampleBuffer,
     sampleParams: sampleState.sampleParams,
@@ -328,12 +329,15 @@ const Index = () => {
                   isPlaying={isPlaying}
                   fxRoutingMode={fxState.fxRoutingMode}
                   fxTargets={fxState.fxTargets}
+                  fxOffsetsPerTrack={fxState.fxOffsetsPerTrack}
                   onReverbChange={fxState.updateReverbParams}
                   onDelayChange={fxState.updateDelayParams}
                   onMasterFilterChange={fxState.updateMasterFilterParams}
                   onSendChange={fxState.updateSendLevel}
                   onRoutingModeChange={fxState.setFxRoutingMode}
                   onTargetToggle={fxState.toggleFxTarget}
+                  onFXOffsetChange={fxState.updateFXOffset}
+                  onResetTrackOffsets={fxState.resetTrackOffsets}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">
