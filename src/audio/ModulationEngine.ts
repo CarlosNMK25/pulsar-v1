@@ -139,10 +139,10 @@ export class ModulationEngine {
     return ModulationEngine.instance;
   }
   
-  private ensureInitialized(): void {
+  ensureInitialized(externalCtx?: AudioContext): void {
     if (this.initialized) return;
     
-    const ctx = audioEngine.getContext();
+    const ctx = externalCtx ?? audioEngine.getContext();
     
     // Master routing
     this.masterInput = ctx.createGain();
