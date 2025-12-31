@@ -51,7 +51,7 @@ export class GlitchBus {
 
   private params = {
     stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5, repeatCount: 8, probability: 1.0 },
-    bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
+    bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5, drive: 0, curve: 'soft' as const, noise: 0, noiseType: 'white' as const, filter: 1.0, jitter: 0, jitterMode: 'random' as const, probability: 1.0 },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5, curve: 'exp' as TapeStopCurve, wobble: 0, probability: 1.0 },
     granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.3, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, detune: 0.5, scatter: 0.2, reverse: false, probability: 1.0 },
     reverse: { duration: 0.5, mix: 0.7, position: 0, crossfade: 0.3, speed: 0.5, feedback: 0, loop: 0, probability: 1.0 },

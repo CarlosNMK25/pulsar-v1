@@ -33,6 +33,14 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
     mix: 50,
     bits: 8,
     sampleRate: 50,
+    drive: 0,
+    curve: 'soft',
+    noise: 0,
+    noiseType: 'white',
+    filter: 100,
+    jitter: 0,
+    jitterMode: 'random',
+    probability: 100,
   });
   
   const [chaosParams, setChaosParams] = useState({
