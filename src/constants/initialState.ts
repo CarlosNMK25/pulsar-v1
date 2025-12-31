@@ -86,6 +86,8 @@ export const defaultDelayParams = {
 export const defaultMasterFilterParams = {
   lowpass: 1.0,
   highpass: 0.0,
+  resonance: 0.1,
+  width: 0.5,
 };
 
 // Default step patterns

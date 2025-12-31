@@ -28,6 +28,8 @@ export interface DelayParams {
 export interface MasterFilterParams {
   lowpass: number;
   highpass: number;
+  resonance: number;
+  width: number;
 }
 
 export type TrackName = 'drums' | 'synth' | 'texture' | 'sample';

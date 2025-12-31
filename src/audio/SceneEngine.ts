@@ -66,6 +66,8 @@ export interface DelayParams {
 export interface MasterFilterParams {
   lowpass: number;
   highpass: number;
+  resonance: number;
+  width: number;
 }
 
 export interface SceneData {
@@ -243,6 +245,8 @@ class SceneEngine {
       masterFilterParams: {
         lowpass: this.lerp(from.masterFilterParams?.lowpass ?? 1, to.masterFilterParams?.lowpass ?? 1, t),
         highpass: this.lerp(from.masterFilterParams?.highpass ?? 0, to.masterFilterParams?.highpass ?? 0, t),
+        resonance: this.lerp(from.masterFilterParams?.resonance ?? 0.1, to.masterFilterParams?.resonance ?? 0.1, t),
+        width: this.lerp(from.masterFilterParams?.width ?? 0.5, to.masterFilterParams?.width ?? 0.5, t),
       },
       bpm: Math.round(this.lerp(from.bpm, to.bpm, t)),
       swing: this.lerp(from.swing, to.swing, t),

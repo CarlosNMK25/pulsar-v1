@@ -7,22 +7,27 @@ interface FXVisualizerProps {
   peakRight: number;
   spectrum: number[];
   isPlaying: boolean;
+  compact?: boolean;
   className?: string;
 }
 
 const VU_SEGMENTS = 20;
+const VU_SEGMENTS_COMPACT = 12;
 const SPECTRUM_LABELS = ['Sub', 'Bass', 'Lo', 'Mid', 'Hi', 'Prs', 'Bri', 'Air'];
+const SPECTRUM_LABELS_COMPACT = ['Lo', 'M', 'Hi', 'Air'];
 
-function VUBar({ level, peak, label }: { level: number; peak: number; label: string }) {
+function VUBar({ level, peak, label, compact }: { level: number; peak: number; label: string; compact?: boolean }) {
+  const segments = compact ? VU_SEGMENTS_COMPACT : VU_SEGMENTS;
+  
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[8px] text-muted-foreground w-3">{label}</span>
-      <div className="flex-1 flex items-center gap-[2px] h-3 relative">
-        {Array.from({ length: VU_SEGMENTS }).map((_, i) => {
-          const threshold = i / VU_SEGMENTS;
+    <div className="flex items-center gap-1">
+      <span className={cn("text-muted-foreground", compact ? "text-[7px] w-2" : "text-[8px] w-3")}>{label}</span>
+      <div className={cn("flex-1 flex items-center gap-[1px] relative", compact ? "h-2" : "h-3")}>
+        {Array.from({ length: segments }).map((_, i) => {
+          const threshold = i / segments;
           const isActive = level > threshold;
-          const isHot = i >= VU_SEGMENTS - 2;
-          const isWarm = i >= VU_SEGMENTS - 5 && i < VU_SEGMENTS - 2;
+          const isHot = i >= segments - 2;
+          const isWarm = i >= segments - 4 && i < segments - 2;
           
           return (
             <div
@@ -43,7 +48,10 @@ function VUBar({ level, peak, label }: { level: number; peak: number; label: str
         {/* Peak indicator */}
         {peak > 0.02 && (
           <div 
-            className="absolute top-0 h-full w-[3px] bg-foreground/80 rounded-sm transition-all duration-75"
+            className={cn(
+              "absolute top-0 h-full w-[2px] bg-foreground/80 rounded-sm transition-all duration-75",
+              compact && "w-[1px]"
+            )}
             style={{ left: `${Math.min(peak, 1) * 100}%` }}
           />
         )}
@@ -52,17 +60,18 @@ function VUBar({ level, peak, label }: { level: number; peak: number; label: str
   );
 }
 
-function SpectrumBar({ level, label }: { level: number; label: string }) {
+function SpectrumBar({ level, label, compact }: { level: number; label: string; compact?: boolean }) {
   const height = Math.max(level * 100, 2);
   const isHigh = level > 0.6;
   const isMid = level > 0.35;
   
   return (
     <div className="flex flex-col items-center gap-0.5 flex-1">
-      <div className="h-6 w-full flex items-end justify-center">
+      <div className={cn("w-full flex items-end justify-center", compact ? "h-4" : "h-6")}>
         <div 
           className={cn(
-            "w-full max-w-[8px] rounded-t-sm transition-all duration-75",
+            "w-full rounded-t-sm transition-all duration-75",
+            compact ? "max-w-[5px]" : "max-w-[8px]",
             isHigh 
               ? "bg-accent shadow-[0_0_6px_hsl(var(--accent)/0.5)]"
               : isMid
@@ -72,7 +81,7 @@ function SpectrumBar({ level, label }: { level: number; label: string }) {
           style={{ height: `${height}%` }}
         />
       </div>
-      <span className="text-[6px] text-muted-foreground/60">{label}</span>
+      {!compact && <span className="text-[6px] text-muted-foreground/60">{label}</span>}
     </div>
   );
 }
@@ -84,8 +93,43 @@ export function FXVisualizer({
   peakRight, 
   spectrum,
   isPlaying,
+  compact,
   className 
 }: FXVisualizerProps) {
+  // In compact mode, show reduced spectrum bands
+  const displaySpectrum = compact 
+    ? [spectrum[0], spectrum[3], spectrum[5], spectrum[7]] 
+    : spectrum;
+  const displayLabels = compact ? SPECTRUM_LABELS_COMPACT : SPECTRUM_LABELS;
+  
+  if (compact) {
+    return (
+      <div className={cn("flex flex-col gap-1", className)}>
+        {/* Wet Signal - Compact VU */}
+        <div className="space-y-0.5">
+          <div className="text-[7px] text-muted-foreground/50 uppercase tracking-wider">Wet</div>
+          <VUBar level={isPlaying ? leftLevel : 0} peak={isPlaying ? peakLeft : 0} label="L" compact />
+          <VUBar level={isPlaying ? rightLevel : 0} peak={isPlaying ? peakRight : 0} label="R" compact />
+        </div>
+        
+        {/* Spectrum - Compact */}
+        <div>
+          <div className="text-[7px] text-muted-foreground/50 uppercase tracking-wider mb-0.5">Spec</div>
+          <div className="flex gap-[1px]">
+            {displaySpectrum.map((level, i) => (
+              <SpectrumBar 
+                key={i} 
+                level={isPlaying ? level : 0} 
+                label={displayLabels[i]} 
+                compact
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className={cn("flex gap-3", className)}>
       {/* VU Meters - Stereo L/R */}
