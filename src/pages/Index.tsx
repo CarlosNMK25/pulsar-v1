@@ -351,7 +351,7 @@ const Index = () => {
                 />
               </div>
               <div className="min-h-[200px]">
-                <ModulationModule
+              <ModulationModule
                   chorus={modulationState.chorus}
                   flanger={modulationState.flanger}
                   phaser={modulationState.phaser}
@@ -361,6 +361,7 @@ const Index = () => {
                   bypassed={modulationState.bypassed}
                   routingMode={modulationState.routingMode}
                   targets={modulationState.targets}
+                  modOffsetsPerTrack={modulationState.modOffsetsPerTrack}
                   onChorusChange={modulationState.updateChorusParams}
                   onFlangerChange={modulationState.updateFlangerParams}
                   onPhaserChange={modulationState.updatePhaserParams}
@@ -370,6 +371,8 @@ const Index = () => {
                   onBypassToggle={modulationState.toggleBypass}
                   onRoutingModeChange={modulationState.setRoutingMode}
                   onTargetToggle={modulationState.toggleTarget}
+                  onModOffsetChange={modulationState.updateModOffset}
+                  onResetTrackModOffsets={modulationState.resetTrackModOffsets}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">

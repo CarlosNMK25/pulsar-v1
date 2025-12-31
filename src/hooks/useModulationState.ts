@@ -13,6 +13,73 @@ import {
 export type ModRoutingMode = 'master' | 'individual';
 export type ModTarget = 'drums' | 'synth' | 'texture' | 'sample';
 
+// Offset types for each effect (relative -0.5 to +0.5, 0 = neutral)
+export interface ChorusOffsets {
+  rate: number;
+  depth: number;
+  mix: number;
+}
+
+export interface FlangerOffsets {
+  rate: number;
+  depth: number;
+  feedback: number;
+  mix: number;
+}
+
+export interface PhaserOffsets {
+  rate: number;
+  depth: number;
+  mix: number;
+}
+
+export interface TremoloOffsets {
+  rate: number;
+  depth: number;
+}
+
+export interface RingModOffsets {
+  frequency: number;
+  mix: number;
+}
+
+export interface AutoPanOffsets {
+  rate: number;
+  depth: number;
+}
+
+export interface TrackModOffsets {
+  chorus: ChorusOffsets;
+  flanger: FlangerOffsets;
+  phaser: PhaserOffsets;
+  tremolo: TremoloOffsets;
+  ringMod: RingModOffsets;
+  autoPan: AutoPanOffsets;
+}
+
+export interface ModOffsetsPerTrack {
+  drums: TrackModOffsets;
+  synth: TrackModOffsets;
+  texture: TrackModOffsets;
+  sample: TrackModOffsets;
+}
+
+const defaultTrackModOffsets: TrackModOffsets = {
+  chorus: { rate: 0, depth: 0, mix: 0 },
+  flanger: { rate: 0, depth: 0, feedback: 0, mix: 0 },
+  phaser: { rate: 0, depth: 0, mix: 0 },
+  tremolo: { rate: 0, depth: 0 },
+  ringMod: { frequency: 0, mix: 0 },
+  autoPan: { rate: 0, depth: 0 },
+};
+
+const defaultModOffsetsPerTrack: ModOffsetsPerTrack = {
+  drums: { ...defaultTrackModOffsets },
+  synth: { ...defaultTrackModOffsets },
+  texture: { ...defaultTrackModOffsets },
+  sample: { ...defaultTrackModOffsets },
+};
+
 export interface ModulationState {
   chorus: ChorusParams;
   flanger: FlangerParams;
@@ -23,6 +90,7 @@ export interface ModulationState {
   bypassed: Record<ModEffect, boolean>;
   routingMode: ModRoutingMode;
   targets: ModTarget[];
+  modOffsetsPerTrack: ModOffsetsPerTrack;
 }
 
 const defaultBypassed: Record<ModEffect, boolean> = {
@@ -44,6 +112,9 @@ export const useModulationState = () => {
   const [bypassed, setBypassed] = useState<Record<ModEffect, boolean>>(defaultBypassed);
   const [routingMode, setRoutingMode] = useState<ModRoutingMode>('master');
   const [targets, setTargets] = useState<ModTarget[]>([]);
+  const [modOffsetsPerTrack, setModOffsetsPerTrack] = useState<ModOffsetsPerTrack>(
+    JSON.parse(JSON.stringify(defaultModOffsetsPerTrack))
+  );
 
   const updateChorusParams = useCallback((params: Partial<ChorusParams>) => {
     setChorus(prev => ({ ...prev, ...params }));
@@ -86,6 +157,33 @@ export const useModulationState = () => {
     });
   }, []);
 
+  // Update a specific offset for a track/effect/param
+  const updateModOffset = useCallback((
+    track: ModTarget,
+    effect: ModEffect,
+    param: string,
+    value: number
+  ) => {
+    setModOffsetsPerTrack(prev => ({
+      ...prev,
+      [track]: {
+        ...prev[track],
+        [effect]: {
+          ...prev[track][effect],
+          [param]: value,
+        },
+      },
+    }));
+  }, []);
+
+  // Reset all offsets for a specific track
+  const resetTrackModOffsets = useCallback((track: ModTarget) => {
+    setModOffsetsPerTrack(prev => ({
+      ...prev,
+      [track]: JSON.parse(JSON.stringify(defaultTrackModOffsets)),
+    }));
+  }, []);
+
   // Batch setter for scene loading
   const setAllModulationState = useCallback((state: Partial<ModulationState>) => {
     if (state.chorus !== undefined) setChorus(state.chorus);
@@ -97,6 +195,7 @@ export const useModulationState = () => {
     if (state.bypassed !== undefined) setBypassed(state.bypassed);
     if (state.routingMode !== undefined) setRoutingMode(state.routingMode);
     if (state.targets !== undefined) setTargets(state.targets);
+    if (state.modOffsetsPerTrack !== undefined) setModOffsetsPerTrack(state.modOffsetsPerTrack);
   }, []);
 
   return {
@@ -110,6 +209,7 @@ export const useModulationState = () => {
     bypassed,
     routingMode,
     targets,
+    modOffsetsPerTrack,
     // Setters
     setChorus,
     setFlanger,
@@ -120,6 +220,7 @@ export const useModulationState = () => {
     setBypassed,
     setRoutingMode,
     setTargets,
+    setModOffsetsPerTrack,
     // Updaters
     updateChorusParams,
     updateFlangerParams,
@@ -130,6 +231,8 @@ export const useModulationState = () => {
     toggleBypass,
     setEffectBypassed,
     toggleTarget,
+    updateModOffset,
+    resetTrackModOffsets,
     setAllModulationState,
   };
 };

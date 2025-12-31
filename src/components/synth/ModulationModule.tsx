@@ -11,10 +11,11 @@ import {
   ModEffect,
   modulationEngine,
 } from '@/audio/ModulationEngine';
-import { ModRoutingMode, ModTarget } from '@/hooks/useModulationState';
+import { ModRoutingMode, ModTarget, ModOffsetsPerTrack } from '@/hooks/useModulationState';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { RotateCcw } from 'lucide-react';
 
 interface ModulationModuleProps {
   chorus: ChorusParams;
@@ -26,6 +27,7 @@ interface ModulationModuleProps {
   bypassed: Record<ModEffect, boolean>;
   routingMode: ModRoutingMode;
   targets: ModTarget[];
+  modOffsetsPerTrack: ModOffsetsPerTrack;
   onChorusChange: (params: Partial<ChorusParams>) => void;
   onFlangerChange: (params: Partial<FlangerParams>) => void;
   onPhaserChange: (params: Partial<PhaserParams>) => void;
@@ -35,6 +37,8 @@ interface ModulationModuleProps {
   onBypassToggle: (effect: ModEffect) => void;
   onRoutingModeChange: (mode: ModRoutingMode) => void;
   onTargetToggle: (target: ModTarget) => void;
+  onModOffsetChange: (track: ModTarget, effect: ModEffect, param: string, value: number) => void;
+  onResetTrackModOffsets: (track: ModTarget) => void;
 }
 
 const targetButtons: { id: ModTarget; label: string }[] = [
@@ -49,6 +53,10 @@ const stageOptions: (2 | 4 | 6 | 8)[] = [2, 4, 6, 8];
 const shapeOptions: ('sine' | 'square' | 'triangle')[] = ['sine', 'square', 'triangle'];
 const panShapeOptions: ('sine' | 'triangle')[] = ['sine', 'triangle'];
 
+// Offset <-> Knob conversions (offset -0.5 to +0.5, knob 0 to 100)
+const offsetToKnob = (offset: number) => 50 + offset * 100;
+const knobToOffset = (knob: number) => (knob - 50) / 100;
+
 export function ModulationModule({
   chorus,
   flanger,
@@ -59,6 +67,7 @@ export function ModulationModule({
   bypassed,
   routingMode,
   targets,
+  modOffsetsPerTrack,
   onChorusChange,
   onFlangerChange,
   onPhaserChange,
@@ -68,9 +77,12 @@ export function ModulationModule({
   onBypassToggle,
   onRoutingModeChange,
   onTargetToggle,
+  onModOffsetChange,
+  onResetTrackModOffsets,
 }: ModulationModuleProps) {
   const [muted, setMuted] = useState(false);
   const [activeTab, setActiveTab] = useState<ModEffect>('chorus');
+  const [selectedEditTrack, setSelectedEditTrack] = useState<ModTarget>('drums');
 
   const isActive = routingMode === 'master' || targets.length > 0;
   const showNoTargetWarning = routingMode === 'individual' && targets.length === 0;
@@ -81,6 +93,174 @@ export function ModulationModule({
   const handleBypassClick = (effect: ModEffect) => {
     onBypassToggle(effect);
     modulationEngine.setBypass(effect, !bypassed[effect]);
+  };
+
+  // Get current track's offsets for the active effect
+  const currentTrackOffsets = modOffsetsPerTrack[selectedEditTrack][activeTab];
+
+  // Render offset knobs based on active effect
+  const renderTrackOffsets = () => {
+    const track = selectedEditTrack;
+    const effect = activeTab;
+
+    switch (effect) {
+      case 'chorus': {
+        const offsets = modOffsetsPerTrack[track].chorus;
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.rate)}
+              onChange={(v) => onModOffsetChange(track, effect, 'rate', knobToOffset(v))}
+              label="Rate±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.depth)}
+              onChange={(v) => onModOffsetChange(track, effect, 'depth', knobToOffset(v))}
+              label="Depth±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.mix)}
+              onChange={(v) => onModOffsetChange(track, effect, 'mix', knobToOffset(v))}
+              label="Mix±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      case 'flanger': {
+        const offsets = modOffsetsPerTrack[track].flanger;
+        return (
+          <div className="grid grid-cols-4 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.rate)}
+              onChange={(v) => onModOffsetChange(track, effect, 'rate', knobToOffset(v))}
+              label="Rate±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.depth)}
+              onChange={(v) => onModOffsetChange(track, effect, 'depth', knobToOffset(v))}
+              label="Depth±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.feedback)}
+              onChange={(v) => onModOffsetChange(track, effect, 'feedback', knobToOffset(v))}
+              label="Fdbk±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.mix)}
+              onChange={(v) => onModOffsetChange(track, effect, 'mix', knobToOffset(v))}
+              label="Mix±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      case 'phaser': {
+        const offsets = modOffsetsPerTrack[track].phaser;
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.rate)}
+              onChange={(v) => onModOffsetChange(track, effect, 'rate', knobToOffset(v))}
+              label="Rate±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.depth)}
+              onChange={(v) => onModOffsetChange(track, effect, 'depth', knobToOffset(v))}
+              label="Depth±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.mix)}
+              onChange={(v) => onModOffsetChange(track, effect, 'mix', knobToOffset(v))}
+              label="Mix±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      case 'tremolo': {
+        const offsets = modOffsetsPerTrack[track].tremolo;
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.rate)}
+              onChange={(v) => onModOffsetChange(track, effect, 'rate', knobToOffset(v))}
+              label="Rate±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.depth)}
+              onChange={(v) => onModOffsetChange(track, effect, 'depth', knobToOffset(v))}
+              label="Depth±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      case 'ringMod': {
+        const offsets = modOffsetsPerTrack[track].ringMod;
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.frequency)}
+              onChange={(v) => onModOffsetChange(track, effect, 'frequency', knobToOffset(v))}
+              label="Freq±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.mix)}
+              onChange={(v) => onModOffsetChange(track, effect, 'mix', knobToOffset(v))}
+              label="Mix±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      case 'autoPan': {
+        const offsets = modOffsetsPerTrack[track].autoPan;
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={offsetToKnob(offsets.rate)}
+              onChange={(v) => onModOffsetChange(track, effect, 'rate', knobToOffset(v))}
+              label="Rate±"
+              size="sm"
+              variant="secondary"
+            />
+            <Knob
+              value={offsetToKnob(offsets.depth)}
+              onChange={(v) => onModOffsetChange(track, effect, 'depth', knobToOffset(v))}
+              label="Depth±"
+              size="sm"
+              variant="secondary"
+            />
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
   };
 
   return (
@@ -544,6 +724,43 @@ export function ModulationModule({
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Track Offsets Section - Only shown in TRACKS mode */}
+        {routingMode === 'individual' && targets.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">Track Offsets</span>
+                <div className="flex gap-0.5">
+                  {targets.map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setSelectedEditTrack(t)}
+                      className={cn(
+                        'px-1.5 h-5 text-[9px] font-mono rounded transition-all',
+                        selectedEditTrack === t
+                          ? 'bg-accent text-accent-foreground ring-1 ring-accent'
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {t.charAt(0).toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onResetTrackModOffsets(selectedEditTrack)}
+                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
+                title={`Reset ${selectedEditTrack} offsets`}
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </div>
+            {renderTrackOffsets()}
+          </div>
+        )}
       </div>
     </ModuleCard>
   );
