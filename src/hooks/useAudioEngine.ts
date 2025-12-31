@@ -956,8 +956,8 @@ export const useAudioEngine = ({
     }
   }, []);
 
-  // TapeStop params - FIX: ahora los knobs Speed/Mix tienen efecto
-  const setGlitchTapeStopParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { speed?: number; duration?: number; mix?: number }) => {
+  // TapeStop params - includes curve, wobble, probability
+  const setGlitchTapeStopParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { speed?: number; duration?: number; mix?: number; curve?: 'linear' | 'exp' | 'log' | 'scurve'; wobble?: number; probability?: number }) => {
     switch (track) {
       case 'master':
         glitchEngine.setTapeStopParams(params);

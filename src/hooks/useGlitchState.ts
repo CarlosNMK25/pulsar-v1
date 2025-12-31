@@ -16,10 +16,13 @@ export interface TrackGlitchParams {
     sampleRate: number; // 0-100
     mix: number;        // 0-100 (NEW)
   };
-  tapeStop: {           // NEW
+  tapeStop: {
     speed: number;      // 0-100
     duration: number;   // 0-100
     mix: number;        // 0-100
+    curve: 'linear' | 'exp' | 'log' | 'scurve';
+    wobble: number;     // 0-100
+    probability: number; // 0-100
   };
   freeze: {             // NEW
     grainSize: number;  // 0-100
@@ -46,7 +49,7 @@ export type GlitchParamsPerTrack = Record<GlitchTrackId, TrackGlitchParams>;
 const createDefaultTrackParams = (): TrackGlitchParams => ({
   stutter: { division: '1/16', decay: 50, mix: 50, repeatCount: 4, probability: 100 },
   bitcrush: { bits: 8, sampleRate: 50, mix: 50 },
-  tapeStop: { speed: 50, duration: 50, mix: 70 },
+  tapeStop: { speed: 50, duration: 50, mix: 70, curve: 'exp', wobble: 0, probability: 100 },
   freeze: { grainSize: 50, pitch: 50, spread: 50, mix: 50 },
   reverse: { duration: 50, mix: 70 },
   chaos: { density: 30, intensity: 50 },

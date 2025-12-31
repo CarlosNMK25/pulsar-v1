@@ -20,9 +20,14 @@ export interface BitcrushParams extends GlitchEffectParams {
   sampleRate: number;
 }
 
+export type TapeStopCurve = 'linear' | 'exp' | 'log' | 'scurve';
+
 export interface TapeStopParams extends GlitchEffectParams {
   speed: number;
   duration: number;
+  curve: TapeStopCurve;
+  wobble: number;      // 0-1: wow & flutter intensity
+  probability: number; // 0-1: chance of triggering
 }
 
 export interface GranularFreezeParams extends GlitchEffectParams {
@@ -108,6 +113,9 @@ export class GlitchEngine {
       mix: 0.5,
       speed: 0.5,
       duration: 0.5,
+      curve: 'exp' as TapeStopCurve,
+      wobble: 0,
+      probability: 1.0,
     },
     granularFreeze: {
       active: false,
@@ -319,6 +327,9 @@ export class GlitchEngine {
     if (params.speed !== undefined) this.params.tapeStop.speed = params.speed;
     if (params.duration !== undefined) this.params.tapeStop.duration = params.duration;
     if (params.mix !== undefined) this.params.tapeStop.mix = params.mix;
+    if (params.curve !== undefined) this.params.tapeStop.curve = params.curve;
+    if (params.wobble !== undefined) this.params.tapeStop.wobble = params.wobble;
+    if (params.probability !== undefined) this.params.tapeStop.probability = params.probability;
   }
 
   setGranularFreezeParams(params: Partial<GranularFreezeParams>): void {
@@ -395,49 +406,92 @@ export class GlitchEngine {
   triggerTapeStop(): void {
     if (this.bypass || !this.outputNode || !this.inputNode || !this.wetNode || !this.dryNode) return;
     
+    // Probability check
+    if (Math.random() > this.params.tapeStop.probability) {
+      console.log('[GlitchEngine] TapeStop skipped (probability:', this.params.tapeStop.probability.toFixed(2), ')');
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
-    // USAR speed para controlar la velocidad de la curva de decaimiento
-    // speed 0 = muy lento (2s), speed 1 = muy rápido (0.3s)
+    // Calculate duration based on speed and duration params
     const speedFactor = 0.3 + this.params.tapeStop.speed * 1.7; // 0.3 - 2.0
     const baseDuration = 0.3 + (this.params.tapeStop.duration * 1.2);
     const duration = baseDuration / speedFactor;
     
-    // USAR mix para blend wet/dry durante el efecto
+    // Activate wet signal for the effect
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);
     this.wetNode.gain.setValueAtTime(this.params.tapeStop.mix, now);
     this.dryNode.gain.setValueAtTime(1 - this.params.tapeStop.mix * 0.5, now);
     
-    // Create a more realistic tape stop using playbackRate simulation
-    // We'll use gain automation combined with pitch-shifting feel
     this.outputNode.gain.cancelScheduledValues(now);
     this.outputNode.gain.setValueAtTime(1, now);
     
-    // Create a series of gain steps to simulate decreasing playback rate
-    // This creates a "slowing down" effect by gradually muting
-    const steps = 20;
+    // Generate curve based on type
+    const steps = 64;
+    const curveValues = new Float32Array(steps);
+    
     for (let i = 0; i < steps; i++) {
-      const t = now + (i / steps) * duration;
-      const progress = i / steps;
-      // Exponential decay for more natural sound
-      const gainValue = Math.pow(1 - progress, 2);
-      this.outputNode.gain.setValueAtTime(gainValue, t);
+      const progress = i / (steps - 1);
+      let value: number;
+      
+      switch (this.params.tapeStop.curve) {
+        case 'linear':
+          value = 1 - progress;
+          break;
+        case 'exp':
+          // Exponential: fast start, slow end
+          value = Math.pow(1 - progress, 2);
+          break;
+        case 'log':
+          // Logarithmic: slow start, fast end
+          value = 1 - Math.pow(progress, 0.5);
+          break;
+        case 'scurve':
+          // S-curve: smooth in/out
+          value = 1 - (3 * progress * progress - 2 * progress * progress * progress);
+          break;
+        default:
+          value = Math.pow(1 - progress, 2);
+      }
+      
+      curveValues[i] = Math.max(0.001, value); // Avoid 0 for exponential ramps
     }
     
-    // Final silence
-    this.outputNode.gain.setValueAtTime(0, now + duration);
+    // Apply the curve
+    this.outputNode.gain.setValueCurveAtTime(curveValues, now, duration);
+    
+    // Add wobble (wow & flutter) if enabled
+    if (this.params.tapeStop.wobble > 0) {
+      const wobbleLfo = ctx.createOscillator();
+      const wobbleGain = ctx.createGain();
+      
+      // Random frequency between 4-8 Hz for vintage feel
+      wobbleLfo.frequency.value = 4 + Math.random() * 4;
+      wobbleLfo.type = 'sine';
+      
+      // Wobble intensity scales with parameter (max 20% variation)
+      wobbleGain.gain.value = this.params.tapeStop.wobble * 0.2;
+      
+      wobbleLfo.connect(wobbleGain);
+      wobbleGain.connect(this.outputNode.gain);
+      
+      wobbleLfo.start(now);
+      wobbleLfo.stop(now + duration);
+    }
     
     // Restore after effect
+    this.outputNode.gain.setValueAtTime(0.001, now + duration);
     this.outputNode.gain.linearRampToValueAtTime(1, now + duration + 0.15);
     
-    // Restaurar wet/dry después del efecto
+    // Restore wet/dry
     const endTime = now + duration + 0.1;
     this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
     
-    console.log('[GlitchEngine] Tape stop triggered, speed:', this.params.tapeStop.speed.toFixed(2), 'mix:', this.params.tapeStop.mix.toFixed(2), 'duration:', duration.toFixed(2), 's');
+    console.log('[GlitchEngine] TapeStop triggered, curve:', this.params.tapeStop.curve, 'wobble:', this.params.tapeStop.wobble.toFixed(2), 'prob:', this.params.tapeStop.probability.toFixed(2));
   }
   
   triggerBitcrush(duration?: number): void {
