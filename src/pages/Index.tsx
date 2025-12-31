@@ -345,6 +345,8 @@ const Index = () => {
                   glitchTargets={glitchTargets}
                   muted={glitchMuted}
                   paramsPerTrack={glitchState.paramsPerTrack}
+                  isPlaying={isPlaying}
+                  analyserData={analyserData}
                   onMuteToggle={() => setGlitchMuted(prev => !prev)}
                   onGlitchTargetsChange={setGlitchTargets}
                   onTriggerGlitch={(effect) => !glitchMuted && triggerGlitch(effect)}
