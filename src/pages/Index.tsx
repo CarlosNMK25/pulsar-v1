@@ -386,12 +386,17 @@ const Index = () => {
                   }}
                   onFreezeParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateFreezeParams(track, params);
-                    // FIX: Ahora aplicamos los params al engine en tiempo real
                     setGlitchFreezeParams(track, {
                       grainSize: params.grainSize !== undefined ? params.grainSize / 100 : undefined,
                       pitch: params.pitch !== undefined ? params.pitch / 100 : undefined,
                       spread: params.spread !== undefined ? params.spread / 100 : undefined,
                       mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                      position: params.position !== undefined ? params.position / 100 : undefined,
+                      overlap: params.overlap !== undefined ? params.overlap / 100 : undefined,
+                      density: params.density !== undefined ? params.density / 100 : undefined,
+                      jitter: params.jitter !== undefined ? params.jitter / 100 : undefined,
+                      attack: params.attack !== undefined ? params.attack / 100 : undefined,
+                      probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
                   onReverseParamsChange={(track: GlitchTrackId, params) => {

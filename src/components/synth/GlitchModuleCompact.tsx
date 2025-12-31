@@ -473,7 +473,32 @@ export const GlitchModuleCompact = ({
             <Disc className="w-3 h-3 mr-1" />
             TRIGGER
           </Button>
-          <div className="grid grid-cols-4 gap-1">
+          {/* Row 1: Timing controls */}
+          <div className="grid grid-cols-3 gap-1">
+            <Knob
+              value={currentParams.freeze.position}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { position: v })}
+              label="Pos"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.overlap}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { overlap: v })}
+              label="Ovlp"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.density}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { density: v })}
+              label="Dens"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          {/* Row 2: Grain shape */}
+          <div className="grid grid-cols-3 gap-1">
             <Knob
               value={currentParams.freeze.grainSize}
               onChange={(v) => onFreezeParamsChange(editingTrack, { grainSize: v })}
@@ -481,6 +506,23 @@ export const GlitchModuleCompact = ({
               size="sm"
               variant={!isActive ? 'secondary' : 'primary'}
             />
+            <Knob
+              value={currentParams.freeze.jitter}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { jitter: v })}
+              label="Jit"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.attack}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { attack: v })}
+              label="Atk"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          {/* Row 3: Output */}
+          <div className="grid grid-cols-4 gap-1">
             <Knob
               value={currentParams.freeze.pitch}
               onChange={(v) => onFreezeParamsChange(editingTrack, { pitch: v })}
@@ -491,7 +533,7 @@ export const GlitchModuleCompact = ({
             <Knob
               value={currentParams.freeze.spread}
               onChange={(v) => onFreezeParamsChange(editingTrack, { spread: v })}
-              label="Spread"
+              label="Sprd"
               size="sm"
               variant={!isActive ? 'secondary' : 'primary'}
             />
@@ -501,6 +543,13 @@ export const GlitchModuleCompact = ({
               label="Mix"
               size="sm"
               variant={!isActive ? 'secondary' : 'accent'}
+            />
+            <Knob
+              value={currentParams.freeze.probability}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { probability: v })}
+              label="Prob"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
             />
           </div>
         </TabsContent>

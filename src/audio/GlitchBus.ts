@@ -40,7 +40,7 @@ export class GlitchBus {
     stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5, repeatCount: 8, probability: 1.0 },
     bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5, curve: 'exp' as TapeStopCurve, wobble: 0, probability: 1.0 },
-    granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.5, mix: 0.5 },
+    granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.5, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, probability: 1.0 },
     reverse: { duration: 0.5, mix: 0.7 },
   };
 
@@ -143,11 +143,17 @@ export class GlitchBus {
     if (params.probability !== undefined) this.params.tapeStop.probability = params.probability;
   }
 
-  setGranularFreezeParams(params: Partial<{ grainSize: number; pitch: number; spread: number; mix: number }>): void {
+  setGranularFreezeParams(params: Partial<{ grainSize: number; pitch: number; spread: number; mix: number; position: number; overlap: number; density: number; jitter: number; attack: number; probability: number }>): void {
     if (params.grainSize !== undefined) this.params.granularFreeze.grainSize = params.grainSize;
     if (params.pitch !== undefined) this.params.granularFreeze.pitch = params.pitch;
     if (params.spread !== undefined) this.params.granularFreeze.spread = params.spread;
     if (params.mix !== undefined) this.params.granularFreeze.mix = params.mix;
+    if (params.position !== undefined) this.params.granularFreeze.position = params.position;
+    if (params.overlap !== undefined) this.params.granularFreeze.overlap = params.overlap;
+    if (params.density !== undefined) this.params.granularFreeze.density = params.density;
+    if (params.jitter !== undefined) this.params.granularFreeze.jitter = params.jitter;
+    if (params.attack !== undefined) this.params.granularFreeze.attack = params.attack;
+    if (params.probability !== undefined) this.params.granularFreeze.probability = params.probability;
   }
 
   setReverseParams(params: Partial<{ duration: number; mix: number }>): void {
@@ -325,34 +331,58 @@ export class GlitchBus {
   triggerGranularFreeze(): void {
     if (this.bypass || !this.wetNode || !this.dryNode || !this.stutterGain) return;
     
+    // Probability check
+    if (Math.random() > this.params.granularFreeze.probability) {
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     const freezeDuration = 0.5 + (this.params.granularFreeze.grainSize * 1.5);
     
-    // USAR pitch para modular el timing de los grains
-    const pitchFactor = 0.5 + this.params.granularFreeze.pitch;
-    const baseGrainTime = 0.02 + (this.params.granularFreeze.grainSize * 0.08);
-    const grainTime = baseGrainTime / pitchFactor;
-    const numGrains = Math.floor(freezeDuration / grainTime);
+    // Density affects grains per second (10-50 grains/sec)
+    const baseDensity = 10 + this.params.granularFreeze.density * 40;
+    const baseGrainInterval = 1 / baseDensity;
     
-    // USAR mix para wet/dry
+    // Overlap affects how much grains stack (1x to 3x overlap)
+    const overlapFactor = 1 + this.params.granularFreeze.overlap * 2;
+    const grainTime = baseGrainInterval / overlapFactor;
+    
+    // Pitch modulates timing
+    const pitchFactor = 0.5 + this.params.granularFreeze.pitch;
+    const adjustedGrainTime = grainTime / pitchFactor;
+    
+    const numGrains = Math.floor(freezeDuration / adjustedGrainTime);
+    
+    // Activate wet with mix
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);
     this.wetNode.gain.setValueAtTime(this.params.granularFreeze.mix, now);
     this.dryNode.gain.setValueAtTime(1 - this.params.granularFreeze.mix * 0.7, now);
     
-    // USAR pitch para variar el envelope
-    const attackRatio = 0.1 + (1 - this.params.granularFreeze.pitch) * 0.2;
+    // Attack controls grain envelope rise time (1-51ms)
+    const attackTime = 0.001 + this.params.granularFreeze.attack * 0.05;
     const releaseRatio = 0.6 + this.params.granularFreeze.pitch * 0.3;
+    
+    // Position affects starting offset
+    const positionOffset = this.params.granularFreeze.position * adjustedGrainTime;
+    
+    // Jitter adds temporal randomness
+    const jitterAmount = this.params.granularFreeze.jitter;
     
     this.stutterGain.gain.cancelScheduledValues(now);
     for (let i = 0; i < numGrains; i++) {
-      const time = now + (i * grainTime);
+      const jitteredOffset = (Math.random() - 0.5) * jitterAmount * adjustedGrainTime;
+      const time = now + positionOffset + (i * adjustedGrainTime) + jitteredOffset;
+      
+      if (time < now) continue;
+      
       const spreadRandom = 1 - (Math.random() * this.params.granularFreeze.spread * 0.5);
       
-      this.stutterGain.gain.setValueAtTime(spreadRandom, time);
-      this.stutterGain.gain.setValueAtTime(0, time + grainTime * attackRatio);
-      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + grainTime * releaseRatio);
+      this.stutterGain.gain.setValueAtTime(0, time);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom, time + attackTime);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + adjustedGrainTime * releaseRatio);
+      this.stutterGain.gain.linearRampToValueAtTime(0, time + adjustedGrainTime * 0.95);
     }
     
     const endTime = now + freezeDuration + 0.05;

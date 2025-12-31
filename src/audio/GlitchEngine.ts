@@ -34,6 +34,12 @@ export interface GranularFreezeParams extends GlitchEffectParams {
   grainSize: number;
   pitch: number;
   spread: number;
+  position: number;     // 0-1: capture point in grain cycle
+  overlap: number;      // 0-1: grain superposition
+  density: number;      // 0-1: grains per second multiplier
+  jitter: number;       // 0-1: temporal variation in timing
+  attack: number;       // 0-1: grain envelope attack time
+  probability: number;  // 0-1: chance of triggering
 }
 
 export interface ChaosParams {
@@ -123,6 +129,12 @@ export class GlitchEngine {
       grainSize: 0.5,
       pitch: 0.5,
       spread: 0.5,
+      position: 0.5,
+      overlap: 0.5,
+      density: 0.5,
+      jitter: 0.2,
+      attack: 0.1,
+      probability: 1.0,
     },
     reverse: {
       active: false,
@@ -338,6 +350,12 @@ export class GlitchEngine {
     if (params.pitch !== undefined) this.params.granularFreeze.pitch = params.pitch;
     if (params.spread !== undefined) this.params.granularFreeze.spread = params.spread;
     if (params.mix !== undefined) this.params.granularFreeze.mix = params.mix;
+    if (params.position !== undefined) this.params.granularFreeze.position = params.position;
+    if (params.overlap !== undefined) this.params.granularFreeze.overlap = params.overlap;
+    if (params.density !== undefined) this.params.granularFreeze.density = params.density;
+    if (params.jitter !== undefined) this.params.granularFreeze.jitter = params.jitter;
+    if (params.attack !== undefined) this.params.granularFreeze.attack = params.attack;
+    if (params.probability !== undefined) this.params.granularFreeze.probability = params.probability;
   }
 
   setReverseParams(params: Partial<ReverseParams>): void {
@@ -544,18 +562,29 @@ export class GlitchEngine {
   triggerGranularFreeze(): void {
     if (this.bypass || !this.wetNode || !this.dryNode || !this.stutterGain) return;
     
+    // Probability check
+    if (Math.random() > this.params.granularFreeze.probability) {
+      console.log('[GlitchEngine] Freeze skipped (probability:', this.params.granularFreeze.probability.toFixed(2), ')');
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     const freezeDuration = 0.5 + (this.params.granularFreeze.grainSize * 1.5);
     
-    // USAR pitch para modular el timing de los grains
-    // pitch < 0.5 = grains más lentos/espaciados, pitch > 0.5 = grains más rápidos/densos
-    const pitchFactor = 0.5 + this.params.granularFreeze.pitch; // 0.5 - 1.5
+    // Density affects grains per second (10-50 grains/sec based on density 0-1)
+    const baseDensity = 10 + this.params.granularFreeze.density * 40;
+    const baseGrainInterval = 1 / baseDensity;
     
-    // Simulate freeze with rapid micro-stutters (granular-like)
-    const baseGrainTime = 0.02 + (this.params.granularFreeze.grainSize * 0.08);
-    const grainTime = baseGrainTime / pitchFactor; // Pitch afecta el timing
-    const numGrains = Math.floor(freezeDuration / grainTime);
+    // Overlap affects how much grains stack (1x to 3x overlap)
+    const overlapFactor = 1 + this.params.granularFreeze.overlap * 2;
+    const grainTime = baseGrainInterval / overlapFactor;
+    
+    // Pitch still modulates timing subtly
+    const pitchFactor = 0.5 + this.params.granularFreeze.pitch;
+    const adjustedGrainTime = grainTime / pitchFactor;
+    
+    const numGrains = Math.floor(freezeDuration / adjustedGrainTime);
     
     // Activate wet with mix control
     this.wetNode.gain.cancelScheduledValues(now);
@@ -563,22 +592,34 @@ export class GlitchEngine {
     this.wetNode.gain.setValueAtTime(this.params.granularFreeze.mix, now);
     this.dryNode.gain.setValueAtTime(1 - this.params.granularFreeze.mix * 0.7, now);
     
-    // USAR pitch para variar el envelope de cada grain
-    // pitch alto = attack más corto, decay más largo (sonido más brillante)
-    // pitch bajo = attack más largo, decay más corto (sonido más suave)
-    const attackRatio = 0.1 + (1 - this.params.granularFreeze.pitch) * 0.2; // 0.1-0.3
-    const releaseRatio = 0.6 + this.params.granularFreeze.pitch * 0.3; // 0.6-0.9
+    // Attack controls grain envelope rise time (1-51ms based on attack 0-1)
+    const attackTime = 0.001 + this.params.granularFreeze.attack * 0.05;
+    const attackRatio = attackTime / adjustedGrainTime;
+    const releaseRatio = 0.6 + this.params.granularFreeze.pitch * 0.3;
+    
+    // Position affects the starting offset within grain cycle
+    const positionOffset = this.params.granularFreeze.position * adjustedGrainTime;
+    
+    // Jitter adds temporal randomness
+    const jitterAmount = this.params.granularFreeze.jitter;
     
     // Rapid grain-like gates
     this.stutterGain.gain.cancelScheduledValues(now);
     for (let i = 0; i < numGrains; i++) {
-      const time = now + (i * grainTime);
+      // Apply jitter to timing
+      const jitteredOffset = (Math.random() - 0.5) * jitterAmount * adjustedGrainTime;
+      const time = now + positionOffset + (i * adjustedGrainTime) + jitteredOffset;
+      
+      // Ensure time is not in the past
+      if (time < now) continue;
+      
       const spreadRandom = 1 - (Math.random() * this.params.granularFreeze.spread * 0.5);
       
-      // Pitch afecta la forma del envelope del grain
-      this.stutterGain.gain.setValueAtTime(spreadRandom, time);
-      this.stutterGain.gain.setValueAtTime(0, time + grainTime * attackRatio);
-      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + grainTime * releaseRatio);
+      // Apply grain envelope with controlled attack
+      this.stutterGain.gain.setValueAtTime(0, time);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom, time + attackTime);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + adjustedGrainTime * releaseRatio);
+      this.stutterGain.gain.linearRampToValueAtTime(0, time + adjustedGrainTime * 0.95);
     }
     
     // Return to normal
@@ -587,7 +628,9 @@ export class GlitchEngine {
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
     this.stutterGain.gain.setValueAtTime(1, endTime);
     
-    console.log('[GlitchEngine] Freeze triggered, pitch:', this.params.granularFreeze.pitch.toFixed(2), 'grains:', numGrains, 'duration:', freezeDuration.toFixed(2), 's');
+    console.log('[GlitchEngine] Freeze triggered, density:', this.params.granularFreeze.density.toFixed(2), 
+      'overlap:', this.params.granularFreeze.overlap.toFixed(2), 
+      'grains:', numGrains, 'prob:', this.params.granularFreeze.probability.toFixed(2));
   }
 
   triggerReverse(duration?: number): void {
