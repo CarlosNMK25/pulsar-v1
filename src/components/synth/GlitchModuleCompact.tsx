@@ -612,11 +612,50 @@ export const GlitchModuleCompact = ({
             <Rewind className="w-3 h-3 mr-1" />
             TRIGGER
           </Button>
-          <div className="grid grid-cols-2 gap-2">
+          {/* Row 1: Position, Crossfade, Speed */}
+          <div className="grid grid-cols-3 gap-1">
+            <Knob
+              value={currentParams.reverse.position}
+              onChange={(v) => onReverseParamsChange(editingTrack, { position: v })}
+              label="Pos"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.reverse.crossfade}
+              onChange={(v) => onReverseParamsChange(editingTrack, { crossfade: v })}
+              label="XFade"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.reverse.speed}
+              onChange={(v) => onReverseParamsChange(editingTrack, { speed: v })}
+              label="Speed"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          {/* Row 2: Duration, Feedback, Loop, Mix, Prob */}
+          <div className="grid grid-cols-5 gap-1">
             <Knob
               value={currentParams.reverse.duration}
               onChange={(v) => onReverseParamsChange(editingTrack, { duration: v })}
-              label="Duration"
+              label="Dur"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.reverse.feedback}
+              onChange={(v) => onReverseParamsChange(editingTrack, { feedback: v })}
+              label="Fdbk"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.reverse.loop}
+              onChange={(v) => onReverseParamsChange(editingTrack, { loop: v })}
+              label="Loop"
               size="sm"
               variant={!isActive ? 'secondary' : 'primary'}
             />
@@ -626,6 +665,13 @@ export const GlitchModuleCompact = ({
               label="Mix"
               size="sm"
               variant={!isActive ? 'secondary' : 'accent'}
+            />
+            <Knob
+              value={currentParams.reverse.probability}
+              onChange={(v) => onReverseParamsChange(editingTrack, { probability: v })}
+              label="Prob"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
             />
           </div>
         </TabsContent>

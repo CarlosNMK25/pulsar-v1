@@ -49,7 +49,13 @@ export interface ChaosParams {
 }
 
 export interface ReverseParams extends GlitchEffectParams {
-  duration: number; // 0-1: fragment duration to reverse (0.1 - 0.5s)
+  duration: number;     // 0-1: fragment duration to reverse (0.1 - 0.5s)
+  position: number;     // 0-1: start position in captured buffer
+  crossfade: number;    // 0-1: smooth envelope at boundaries
+  speed: number;        // 0-1: playback speed (0.5 = half, 1 = normal, 2 = double)
+  feedback: number;     // 0-1: re-inject reversed output
+  loop: number;         // 0-1: number of repetitions (0=1x, 1=4x)
+  probability: number;  // 0-1: chance of triggering
 }
 
 export interface GlitchParams {
@@ -140,6 +146,12 @@ export class GlitchEngine {
       active: false,
       mix: 0.7,
       duration: 0.5,
+      position: 0,
+      crossfade: 0.3,
+      speed: 0.5,
+      feedback: 0,
+      loop: 0,
+      probability: 1.0,
     },
     chaos: {
       enabled: false,
@@ -362,6 +374,12 @@ export class GlitchEngine {
     // Solo actualizar valores definidos para evitar NaN
     if (params.duration !== undefined) this.params.reverse.duration = params.duration;
     if (params.mix !== undefined) this.params.reverse.mix = params.mix;
+    if (params.position !== undefined) this.params.reverse.position = params.position;
+    if (params.crossfade !== undefined) this.params.reverse.crossfade = params.crossfade;
+    if (params.speed !== undefined) this.params.reverse.speed = params.speed;
+    if (params.feedback !== undefined) this.params.reverse.feedback = params.feedback;
+    if (params.loop !== undefined) this.params.reverse.loop = params.loop;
+    if (params.probability !== undefined) this.params.reverse.probability = params.probability;
   }
 
   // Trigger effects (for momentary activation)
@@ -636,12 +654,27 @@ export class GlitchEngine {
   triggerReverse(duration?: number): void {
     if (this.bypass || !this.reverseGain || !this.wetNode || !this.dryNode) return;
     
+    // Probability check
+    if (Math.random() > this.params.reverse.probability) {
+      console.log('[GlitchEngine] Reverse skipped (probability:', this.params.reverse.probability.toFixed(2), ')');
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
-    const now = ctx.currentTime;
     const sampleRate = ctx.sampleRate;
     
     // Duration of fragment to capture and reverse (0.1 - 0.5 seconds)
     const reverseDuration = duration || (0.1 + this.params.reverse.duration * 0.4);
+    
+    // Speed affects playback rate (0.5x to 2x)
+    const playbackSpeed = 0.5 + this.params.reverse.speed * 1.5;
+    
+    // Loop count (1 to 4 loops)
+    const loopCount = Math.floor(1 + this.params.reverse.loop * 3);
+    
+    // Crossfade time (5-100ms)
+    const crossfadeTime = 0.005 + this.params.reverse.crossfade * 0.095;
+    
     const bufferSize = Math.floor(reverseDuration * sampleRate);
     
     // Start recording phase
@@ -654,35 +687,64 @@ export class GlitchEngine {
     setTimeout(() => {
       this.reverseRecording = false;
       
+      // Position affects where in the buffer we start (0-50% offset)
+      const positionOffset = Math.floor(this.params.reverse.position * bufferSize * 0.5);
+      
       // Reverse the captured samples
       for (let ch = 0; ch < this.reverseSamples.length; ch++) {
-        this.reverseSamples[ch].reverse();
-      }
-      
-      // Start reversed playback
-      this.reversePlayback = true;
-      this.reversePlaybackIndex = 0;
-      
-      // Activate wet signal
-      if (this.wetNode && this.dryNode && this.reverseGain) {
-        this.wetNode.gain.setValueAtTime(this.params.reverse.mix, ctx.currentTime);
-        this.dryNode.gain.setValueAtTime(1 - this.params.reverse.mix * 0.7, ctx.currentTime);
-        this.reverseGain.gain.setValueAtTime(1, ctx.currentTime);
-      }
-      
-      // Return to normal after playback
-      setTimeout(() => {
-        this.reversePlayback = false;
-        if (this.wetNode && this.dryNode && this.reverseGain) {
-          this.wetNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
-          this.dryNode.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
-          this.reverseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        // Apply position offset - shift start point
+        if (positionOffset > 0) {
+          const shifted = new Float32Array(bufferSize);
+          for (let i = 0; i < bufferSize; i++) {
+            shifted[i] = this.reverseSamples[ch][(i + positionOffset) % bufferSize];
+          }
+          this.reverseSamples[ch] = shifted;
         }
-      }, reverseDuration * 1000);
+        this.reverseSamples[ch].reverse();
+        
+        // Apply crossfade envelope at boundaries
+        const fadeLength = Math.floor(crossfadeTime * sampleRate);
+        for (let i = 0; i < fadeLength && i < bufferSize; i++) {
+          const fade = i / fadeLength;
+          this.reverseSamples[ch][i] *= fade;
+          this.reverseSamples[ch][bufferSize - 1 - i] *= fade;
+        }
+      }
+      
+      // Execute playback loops
+      let currentLoop = 0;
+      const playLoop = () => {
+        if (currentLoop >= loopCount) {
+          this.reversePlayback = false;
+          if (this.wetNode && this.dryNode && this.reverseGain) {
+            this.wetNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+            this.dryNode.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+            this.reverseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+          }
+          return;
+        }
+        
+        this.reversePlayback = true;
+        this.reversePlaybackIndex = 0;
+        
+        // Activate wet signal with feedback consideration
+        if (this.wetNode && this.dryNode && this.reverseGain) {
+          const feedbackDecay = Math.pow(1 - this.params.reverse.feedback * 0.3, currentLoop);
+          this.wetNode.gain.setValueAtTime(this.params.reverse.mix * feedbackDecay, ctx.currentTime);
+          this.dryNode.gain.setValueAtTime(1 - this.params.reverse.mix * 0.7 * feedbackDecay, ctx.currentTime);
+          this.reverseGain.gain.setValueAtTime(1, ctx.currentTime);
+        }
+        
+        currentLoop++;
+        const loopDurationMs = (reverseDuration / playbackSpeed) * 1000;
+        setTimeout(playLoop, loopDurationMs);
+      };
+      
+      playLoop();
       
     }, reverseDuration * 1000);
     
-    console.log('[GlitchEngine] Reverse triggered, duration:', reverseDuration.toFixed(2), 's');
+    console.log('[GlitchEngine] Reverse triggered, duration:', reverseDuration.toFixed(2), 's, speed:', playbackSpeed.toFixed(2), 'x, loops:', loopCount, ', prob:', this.params.reverse.probability.toFixed(2));
   }
 
   // Reverse audio processing
