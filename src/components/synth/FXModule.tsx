@@ -37,6 +37,8 @@ interface FXModuleProps {
   masterFilterParams: {
     lowpass: number;
     highpass: number;
+    resonance: number;
+    width: number;
   };
   sendLevels: TrackSendLevels;
   bpm: number;
@@ -482,57 +484,79 @@ export function FXModule({
           </div>
         )}
 
-        {/* Wet Signal Visualizer */}
-        <div className="py-2">
-          <FXVisualizer 
-            leftLevel={levels.masterLeft}
-            rightLevel={levels.masterRight}
-            peakLeft={levels.peakLeft}
-            peakRight={levels.peakRight}
-            spectrum={levels.spectrum}
-            isPlaying={isPlaying && !muted}
-          />
-        </div>
-
-        {/* Send Matrix */}
-        <div className="py-2 border-t border-border/30">
-          <SendMatrix sendLevels={sendLevels} onSendChange={onSendChange} />
+        {/* Combined Row: Send Matrix + Visualizers */}
+        <div className="py-2 flex gap-3 items-stretch">
+          {/* Send Matrix - Left */}
+          <div className="flex-1">
+            <SendMatrix sendLevels={sendLevels} onSendChange={onSendChange} />
+          </div>
+          
+          {/* Visualizers - Right (stacked vertically) */}
+          <div className="flex flex-col gap-1.5 w-28">
+            <FXVisualizer 
+              leftLevel={levels.masterLeft}
+              rightLevel={levels.masterRight}
+              peakLeft={levels.peakLeft}
+              peakRight={levels.peakRight}
+              spectrum={levels.spectrum}
+              isPlaying={isPlaying && !muted}
+              compact
+            />
+          </div>
         </div>
 
         {/* Master Filter Section */}
         <div className="pt-2 border-t border-border/30">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Knob 
-                value={masterFilterParams.highpass * 100}
-                onChange={(v) => {
-                  const val = v / 100;
-                  onMasterFilterChange({ highpass: val });
-                  fxEngine.setMasterFilterParams({ highpass: val });
-                }}
-                label="HiPass" 
-                size="sm" 
-                variant="secondary" 
-              />
+          <div className="flex items-center justify-between gap-2">
+            <Knob 
+              value={masterFilterParams.highpass * 100}
+              onChange={(v) => {
+                const val = v / 100;
+                onMasterFilterChange({ highpass: val });
+                fxEngine.setMasterFilterParams({ highpass: val });
+              }}
+              label="HiPass" 
+              size="sm" 
+              variant="secondary" 
+            />
+            <Knob 
+              value={masterFilterParams.resonance * 100}
+              onChange={(v) => {
+                const val = v / 100;
+                onMasterFilterChange({ resonance: val });
+                fxEngine.setMasterFilterParams({ resonance: val });
+              }}
+              label="Reso" 
+              size="sm" 
+              variant="accent" 
+            />
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-px bg-border/50" />
+              <span className="text-[8px] text-muted-foreground/50">Master</span>
+              <div className="w-4 h-px bg-border/50" />
             </div>
-            <div className="flex-1 flex items-center gap-2">
-              <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
-              <span className="text-[9px] text-muted-foreground/60">Master</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Knob 
-                value={masterFilterParams.lowpass * 100}
-                onChange={(v) => {
-                  const val = v / 100;
-                  onMasterFilterChange({ lowpass: val });
-                  fxEngine.setMasterFilterParams({ lowpass: val });
-                }}
-                label="LoPass" 
-                size="sm" 
-                variant="secondary" 
-              />
-            </div>
+            <Knob 
+              value={masterFilterParams.width * 100}
+              onChange={(v) => {
+                const val = v / 100;
+                onMasterFilterChange({ width: val });
+                fxEngine.setMasterFilterParams({ width: val });
+              }}
+              label="Width" 
+              size="sm" 
+              variant="accent" 
+            />
+            <Knob 
+              value={masterFilterParams.lowpass * 100}
+              onChange={(v) => {
+                const val = v / 100;
+                onMasterFilterChange({ lowpass: val });
+                fxEngine.setMasterFilterParams({ lowpass: val });
+              }}
+              label="LoPass" 
+              size="sm" 
+              variant="secondary" 
+            />
           </div>
         </div>
       </div>

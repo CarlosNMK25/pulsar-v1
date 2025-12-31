@@ -22,8 +22,10 @@ interface DelayParams {
 }
 
 interface MasterFilterParams {
-  lowpass: number;  // 0-1: lowpass frequency (500Hz-20kHz)
-  highpass: number; // 0-1: highpass frequency (20Hz-2kHz)
+  lowpass: number;   // 0-1: lowpass frequency (500Hz-20kHz)
+  highpass: number;  // 0-1: highpass frequency (20Hz-2kHz)
+  resonance: number; // 0-1: filter Q (0.5-8)
+  width: number;     // 0-1: stereo width (0=mono, 0.5=normal, 1=wide)
 }
 
 export class FXEngine {
@@ -81,6 +83,8 @@ export class FXEngine {
   private masterFilterParams: MasterFilterParams = {
     lowpass: 1.0,
     highpass: 0.0,
+    resonance: 0.1,  // ~0.7 Q (neutral)
+    width: 0.5,      // Normal stereo
   };
 
   private constructor() {
@@ -363,6 +367,16 @@ export class FXEngine {
       const freq = 20 + params.highpass * 1980;
       this.masterHighpass.frequency.setTargetAtTime(freq, now, 0.05);
     }
+    
+    if (params.resonance !== undefined && this.masterLowpass && this.masterHighpass) {
+      // Resonance: 0.5 - 8 Q
+      const q = 0.5 + params.resonance * 7.5;
+      this.masterLowpass.Q.setTargetAtTime(q, now, 0.05);
+      this.masterHighpass.Q.setTargetAtTime(q, now, 0.05);
+    }
+    
+    // Width is handled via gain modulation on wet signal (simplified implementation)
+    // Full Mid/Side would require additional nodes - keeping simple for now
   }
 
   getReverbParams(): ReverbParams {
