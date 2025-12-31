@@ -11,6 +11,8 @@ export interface GlitchEffectParams {
 export interface StutterParams extends GlitchEffectParams {
   division: '1/4' | '1/8' | '1/16' | '1/32' | '1/64';
   decay: number;
+  repeatCount: number;  // 1-16: how many times to repeat
+  probability: number;  // 0-1: chance of triggering
 }
 
 export interface BitcrushParams extends GlitchEffectParams {
@@ -92,6 +94,8 @@ export class GlitchEngine {
       mix: 0.5,
       division: '1/16',
       decay: 0.5,
+      repeatCount: 8,
+      probability: 1.0,
     },
     bitcrush: {
       active: false,
@@ -296,7 +300,12 @@ export class GlitchEngine {
 
   // Individual effect controls
   setStutterParams(params: Partial<StutterParams>): void {
-    this.params.stutter = { ...this.params.stutter, ...params };
+    // Solo actualizar valores definidos para evitar NaN
+    if (params.division !== undefined) this.params.stutter.division = params.division;
+    if (params.decay !== undefined) this.params.stutter.decay = params.decay;
+    if (params.mix !== undefined) this.params.stutter.mix = params.mix;
+    if (params.repeatCount !== undefined) this.params.stutter.repeatCount = params.repeatCount;
+    if (params.probability !== undefined) this.params.stutter.probability = params.probability;
     this.updateStutter();
   }
 
@@ -330,6 +339,12 @@ export class GlitchEngine {
   triggerStutter(duration?: number): void {
     if (this.bypass || !this.stutterGain || !this.wetNode || !this.dryNode) return;
     
+    // Probability check - skip effect if random > probability
+    if (Math.random() > this.params.stutter.probability) {
+      console.log('[GlitchEngine] Stutter skipped (probability:', this.params.stutter.probability.toFixed(2), ')');
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
@@ -344,9 +359,9 @@ export class GlitchEngine {
     };
     const stutterTime = divisionMap[this.params.stutter.division];
     
-    // Create stutter effect
-    const stutterDuration = duration || stutterTime * 8;
-    const numStutters = Math.floor(stutterDuration / stutterTime);
+    // Use repeatCount to determine number of stutters (1-16)
+    const numStutters = Math.max(1, Math.min(16, this.params.stutter.repeatCount));
+    const stutterDuration = duration || stutterTime * numStutters;
     
     // Activate wet signal for the effect
     this.wetNode.gain.cancelScheduledValues(now);
@@ -374,7 +389,7 @@ export class GlitchEngine {
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
     this.stutterGain.gain.setValueAtTime(1, endTime);
     
-    console.log('[GlitchEngine] Stutter triggered:', numStutters, 'stutters over', stutterDuration.toFixed(2), 's');
+    console.log('[GlitchEngine] Stutter triggered:', numStutters, 'reps, prob:', this.params.stutter.probability.toFixed(2));
   }
 
   triggerTapeStop(): void {

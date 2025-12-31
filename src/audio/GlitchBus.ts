@@ -37,7 +37,7 @@ export class GlitchBus {
   private chaosParams = { density: 0.3, intensity: 0.5 };
 
   private params = {
-    stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5 },
+    stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5, repeatCount: 8, probability: 1.0 },
     bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5 },
     granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.5, mix: 0.5 },
@@ -120,10 +120,12 @@ export class GlitchBus {
     return this.bypass;
   }
 
-  setStutterParams(params: Partial<{ division: StutterParams['division']; decay: number; mix: number }>): void {
+  setStutterParams(params: Partial<{ division: StutterParams['division']; decay: number; mix: number; repeatCount: number; probability: number }>): void {
     if (params.division) this.params.stutter.division = params.division;
     if (params.decay !== undefined) this.params.stutter.decay = params.decay;
     if (params.mix !== undefined) this.params.stutter.mix = params.mix;
+    if (params.repeatCount !== undefined) this.params.stutter.repeatCount = params.repeatCount;
+    if (params.probability !== undefined) this.params.stutter.probability = params.probability;
   }
 
   setBitcrushParams(params: Partial<{ bits: number; sampleRate: number; mix: number }>): void {
@@ -153,6 +155,11 @@ export class GlitchBus {
   triggerStutter(duration?: number): void {
     if (this.bypass || !this.stutterGain || !this.wetNode || !this.dryNode) return;
     
+    // Probability check
+    if (Math.random() > this.params.stutter.probability) {
+      return;
+    }
+    
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
     
@@ -166,8 +173,9 @@ export class GlitchBus {
     };
     const stutterTime = divisionMap[this.params.stutter.division];
     
-    const stutterDuration = duration || stutterTime * 8;
-    const numStutters = Math.floor(stutterDuration / stutterTime);
+    // Use repeatCount for number of stutters
+    const numStutters = Math.max(1, Math.min(16, this.params.stutter.repeatCount));
+    const stutterDuration = duration || stutterTime * numStutters;
     
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);

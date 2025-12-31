@@ -343,7 +343,7 @@ export const GlitchModuleCompact = ({
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-4 gap-1">
             <Knob
               value={currentParams.stutter.decay}
               onChange={(v) => onStutterParamsChange(editingTrack, { decay: v })}
@@ -357,6 +357,23 @@ export const GlitchModuleCompact = ({
               label="Mix"
               size="sm"
               variant={!isActive ? 'secondary' : 'accent'}
+            />
+            <Knob
+              value={(currentParams.stutter.repeatCount / 16) * 100}
+              onChange={(v) => {
+                const reps = Math.max(1, Math.round((v / 100) * 16));
+                onStutterParamsChange(editingTrack, { repeatCount: reps });
+              }}
+              label={`${currentParams.stutter.repeatCount}x`}
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.stutter.probability}
+              onChange={(v) => onStutterParamsChange(editingTrack, { probability: v })}
+              label="Prob"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
             />
           </div>
         </TabsContent>

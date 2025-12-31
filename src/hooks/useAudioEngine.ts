@@ -846,7 +846,7 @@ export const useAudioEngine = ({
   }, [glitchTargets]);
 
   // Update glitch params on specific track
-  const setGlitchStutterParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { division?: '1/4' | '1/8' | '1/16' | '1/32' | '1/64'; decay?: number; mix?: number }) => {
+  const setGlitchStutterParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { division?: '1/4' | '1/8' | '1/16' | '1/32' | '1/64'; decay?: number; mix?: number; repeatCount?: number; probability?: number }) => {
     switch (track) {
       case 'master':
         glitchEngine.setStutterParams(params);

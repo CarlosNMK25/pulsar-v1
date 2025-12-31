@@ -24,6 +24,8 @@ export const GlitchModule = ({ className }: GlitchModuleProps) => {
     mix: 50,
     division: '1/16',
     decay: 50,
+    repeatCount: 8,
+    probability: 1.0,
   });
   
   const [bitcrushParams, setBitcrushParams] = useState<BitcrushParams>({
