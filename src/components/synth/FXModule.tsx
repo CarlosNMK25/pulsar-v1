@@ -93,42 +93,66 @@ export function FXModule({
             <div className="grid grid-cols-3 gap-1.5">
               <Knob
                 value={reverbParams.size * 100}
-                onChange={(v) => onReverbChange({ size: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ size: val });
+                  fxEngine.setReverbParams({ size: val });
+                }}
                 label="Size"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={reverbParams.decay * 100}
-                onChange={(v) => onReverbChange({ decay: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ decay: val });
+                  fxEngine.setReverbParams({ decay: val });
+                }}
                 label="Decay"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={reverbParams.damping * 100}
-                onChange={(v) => onReverbChange({ damping: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ damping: val });
+                  fxEngine.setReverbParams({ damping: val });
+                }}
                 label="Damp"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={reverbParams.preDelay * 100}
-                onChange={(v) => onReverbChange({ preDelay: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ preDelay: val });
+                  fxEngine.setReverbParams({ preDelay: val });
+                }}
                 label="PreDly"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={reverbParams.lofi * 100}
-                onChange={(v) => onReverbChange({ lofi: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ lofi: val });
+                  fxEngine.setReverbParams({ lofi: val });
+                }}
                 label="LoFi"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={reverbParams.mix * 100}
-                onChange={(v) => onReverbChange({ mix: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onReverbChange({ mix: val });
+                  fxEngine.setReverbParams({ mix: val });
+                }}
                 label="Mix"
                 size="sm"
                 variant={muted ? 'secondary' : 'accent'}
@@ -170,35 +194,55 @@ export function FXModule({
             <div className="grid grid-cols-3 gap-1.5">
               <Knob
                 value={delayParams.time * 100}
-                onChange={(v) => onDelayChange({ time: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onDelayChange({ time: val });
+                  fxEngine.setDelayParams({ time: val });
+                }}
                 label="Time"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={delayParams.feedback * 100}
-                onChange={(v) => onDelayChange({ feedback: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onDelayChange({ feedback: val });
+                  fxEngine.setDelayParams({ feedback: val });
+                }}
                 label="Fdbk"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={delayParams.filter * 100}
-                onChange={(v) => onDelayChange({ filter: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onDelayChange({ filter: val });
+                  fxEngine.setDelayParams({ filter: val });
+                }}
                 label="Filter"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={delayParams.spread * 100}
-                onChange={(v) => onDelayChange({ spread: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onDelayChange({ spread: val });
+                  fxEngine.setDelayParams({ spread: val });
+                }}
                 label="Spread"
                 size="sm"
                 variant={muted ? 'secondary' : 'primary'}
               />
               <Knob
                 value={delayParams.mix * 100}
-                onChange={(v) => onDelayChange({ mix: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onDelayChange({ mix: val });
+                  fxEngine.setDelayParams({ mix: val });
+                }}
                 label="Mix"
                 size="sm"
                 variant={muted ? 'secondary' : 'accent'}
@@ -230,7 +274,11 @@ export function FXModule({
             <div className="flex items-center gap-2">
               <Knob 
                 value={masterFilterParams.highpass * 100}
-                onChange={(v) => onMasterFilterChange({ highpass: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onMasterFilterChange({ highpass: val });
+                  fxEngine.setMasterFilterParams({ highpass: val });
+                }}
                 label="HiPass" 
                 size="sm" 
                 variant="secondary" 
@@ -244,7 +292,11 @@ export function FXModule({
             <div className="flex items-center gap-2">
               <Knob 
                 value={masterFilterParams.lowpass * 100}
-                onChange={(v) => onMasterFilterChange({ lowpass: v / 100 })}
+                onChange={(v) => {
+                  const val = v / 100;
+                  onMasterFilterChange({ lowpass: val });
+                  fxEngine.setMasterFilterParams({ lowpass: val });
+                }}
                 label="LoPass" 
                 size="sm" 
                 variant="secondary" 
