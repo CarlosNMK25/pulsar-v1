@@ -492,7 +492,7 @@ export function FXModule({
           </div>
           
           {/* Visualizers - Right (stacked vertically) */}
-          <div className="flex flex-col gap-1.5 w-28">
+          <div className="flex flex-col gap-1.5 w-56">
             <FXVisualizer 
               leftLevel={levels.masterLeft}
               rightLevel={levels.masterRight}
