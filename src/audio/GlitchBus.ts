@@ -29,6 +29,14 @@ export class GlitchBus {
   private reverseSamples: Float32Array[] = [];
   private reversePlaybackIndex = 0;
   
+  // Granular Freeze - Circular buffer for real grain synthesis
+  private freezeCaptureNode: ScriptProcessorNode | null = null;
+  private freezeCircularBuffer: Float32Array[] = [];
+  private freezeBufferSize = 0;
+  private freezeWriteIndex = 0;
+  private freezeActiveGrains: AudioBufferSourceNode[] = [];
+  private freezeGainNodes: GainNode[] = [];
+  
   private bypass = true;
   private isConnected = false;
 
@@ -40,7 +48,7 @@ export class GlitchBus {
     stutter: { division: '1/16' as StutterParams['division'], decay: 0.5, mix: 0.5, repeatCount: 8, probability: 1.0 },
     bitcrush: { bits: 8, sampleRate: 0.5, mix: 0.5 },
     tapeStop: { speed: 0.5, duration: 0.5, mix: 0.5, curve: 'exp' as TapeStopCurve, wobble: 0, probability: 1.0 },
-    granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.5, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, probability: 1.0 },
+    granularFreeze: { grainSize: 0.5, pitch: 0.5, spread: 0.3, mix: 0.5, position: 0.5, overlap: 0.5, density: 0.5, jitter: 0.2, attack: 0.1, detune: 0.5, scatter: 0.2, reverse: false, probability: 1.0 },
     reverse: { duration: 0.5, mix: 0.7, position: 0, crossfade: 0.3, speed: 0.5, feedback: 0, loop: 0, probability: 1.0 },
   };
 
@@ -77,6 +85,16 @@ export class GlitchBus {
     this.reverseProcessor = ctx.createScriptProcessor(2048, 2, 2);
     this.reverseProcessor.onaudioprocess = this.processReverse.bind(this);
     
+    // Granular Freeze - Circular buffer (~2 seconds)
+    this.freezeBufferSize = Math.floor(ctx.sampleRate * 2);
+    this.freezeCircularBuffer = [
+      new Float32Array(this.freezeBufferSize),
+      new Float32Array(this.freezeBufferSize)
+    ];
+    this.freezeWriteIndex = 0;
+    this.freezeCaptureNode = ctx.createScriptProcessor(2048, 2, 2);
+    this.freezeCaptureNode.onaudioprocess = this.captureFreeze.bind(this);
+    
     // Connect routing
     this.inputNode.connect(this.dryNode);
     this.dryNode.connect(this.outputNode);
@@ -91,6 +109,13 @@ export class GlitchBus {
     this.inputNode.connect(this.reverseProcessor);
     this.reverseProcessor.connect(this.reverseGain);
     this.reverseGain.connect(this.wetNode);
+    
+    // Freeze capture (silent output to keep processor alive)
+    this.inputNode.connect(this.freezeCaptureNode);
+    const silentGain = ctx.createGain();
+    silentGain.gain.value = 0;
+    this.freezeCaptureNode.connect(silentGain);
+    silentGain.connect(ctx.destination);
     
     this.wetNode.connect(this.outputNode);
     
@@ -143,7 +168,7 @@ export class GlitchBus {
     if (params.probability !== undefined) this.params.tapeStop.probability = params.probability;
   }
 
-  setGranularFreezeParams(params: Partial<{ grainSize: number; pitch: number; spread: number; mix: number; position: number; overlap: number; density: number; jitter: number; attack: number; probability: number }>): void {
+  setGranularFreezeParams(params: Partial<{ grainSize: number; pitch: number; spread: number; mix: number; position: number; overlap: number; density: number; jitter: number; attack: number; detune: number; scatter: number; reverse: boolean; probability: number }>): void {
     if (params.grainSize !== undefined) this.params.granularFreeze.grainSize = params.grainSize;
     if (params.pitch !== undefined) this.params.granularFreeze.pitch = params.pitch;
     if (params.spread !== undefined) this.params.granularFreeze.spread = params.spread;
@@ -153,6 +178,9 @@ export class GlitchBus {
     if (params.density !== undefined) this.params.granularFreeze.density = params.density;
     if (params.jitter !== undefined) this.params.granularFreeze.jitter = params.jitter;
     if (params.attack !== undefined) this.params.granularFreeze.attack = params.attack;
+    if (params.detune !== undefined) this.params.granularFreeze.detune = params.detune;
+    if (params.scatter !== undefined) this.params.granularFreeze.scatter = params.scatter;
+    if (params.reverse !== undefined) this.params.granularFreeze.reverse = params.reverse;
     if (params.probability !== undefined) this.params.granularFreeze.probability = params.probability;
   }
 
@@ -334,8 +362,80 @@ export class GlitchBus {
     }
   }
 
+  // Capture audio continuously for granular freeze
+  private captureFreeze(event: AudioProcessingEvent): void {
+    const inputL = event.inputBuffer.getChannelData(0);
+    const inputR = event.inputBuffer.numberOfChannels > 1 
+      ? event.inputBuffer.getChannelData(1) 
+      : inputL;
+    
+    for (let i = 0; i < inputL.length; i++) {
+      this.freezeCircularBuffer[0][this.freezeWriteIndex] = inputL[i];
+      this.freezeCircularBuffer[1][this.freezeWriteIndex] = inputR[i];
+      this.freezeWriteIndex = (this.freezeWriteIndex + 1) % this.freezeBufferSize;
+    }
+    
+    // Pass through silently
+    const outputL = event.outputBuffer.getChannelData(0);
+    const outputR = event.outputBuffer.getChannelData(1);
+    for (let i = 0; i < outputL.length; i++) {
+      outputL[i] = 0;
+      outputR[i] = 0;
+    }
+  }
+
+  // Spawn a single grain with real AudioBufferSourceNode
+  private spawnGrain(
+    buffer: AudioBuffer,
+    grainStart: number,
+    readPosition: number,
+    grainDuration: number,
+    playbackRate: number,
+    detuneValue: number,
+    attack: number,
+    release: number,
+    amplitude: number
+  ): void {
+    const ctx = audioEngine.getContext();
+    
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
+    source.detune.value = detuneValue;
+    
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0, grainStart);
+    envelope.gain.linearRampToValueAtTime(amplitude, grainStart + attack);
+    envelope.gain.setValueAtTime(amplitude, grainStart + grainDuration - release);
+    envelope.gain.linearRampToValueAtTime(0, grainStart + grainDuration);
+    
+    source.connect(envelope);
+    envelope.connect(this.wetNode!);
+    
+    const actualDuration = grainDuration / playbackRate;
+    const maxPosition = Math.max(0, buffer.duration - actualDuration);
+    const clampedPosition = Math.min(Math.max(0, readPosition), maxPosition);
+    
+    source.start(grainStart, clampedPosition, actualDuration);
+    
+    this.freezeActiveGrains.push(source);
+    this.freezeGainNodes.push(envelope);
+    
+    source.onended = () => {
+      const idx = this.freezeActiveGrains.indexOf(source);
+      if (idx > -1) {
+        this.freezeActiveGrains.splice(idx, 1);
+        this.freezeGainNodes.splice(idx, 1);
+      }
+      try {
+        source.disconnect();
+        envelope.disconnect();
+      } catch {}
+    };
+  }
+
   triggerGranularFreeze(): void {
-    if (this.bypass || !this.wetNode || !this.dryNode || !this.stutterGain) return;
+    if (this.bypass || !this.wetNode || !this.dryNode) return;
     
     // Probability check
     if (Math.random() > this.params.granularFreeze.probability) {
@@ -344,57 +444,76 @@ export class GlitchBus {
     
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
-    const freezeDuration = 0.5 + (this.params.granularFreeze.grainSize * 1.5);
+    const sampleRate = ctx.sampleRate;
     
-    // Density affects grains per second (10-50 grains/sec)
-    const baseDensity = 10 + this.params.granularFreeze.density * 40;
-    const baseGrainInterval = 1 / baseDensity;
+    // Create buffer from circular capture
+    const capturedSamples = Math.min(this.freezeWriteIndex + sampleRate, this.freezeBufferSize);
+    const grainBuffer = ctx.createBuffer(2, capturedSamples, sampleRate);
     
-    // Overlap affects how much grains stack (1x to 3x overlap)
-    const overlapFactor = 1 + this.params.granularFreeze.overlap * 2;
-    const grainTime = baseGrainInterval / overlapFactor;
+    for (let ch = 0; ch < 2; ch++) {
+      const channelData = grainBuffer.getChannelData(ch);
+      for (let i = 0; i < capturedSamples; i++) {
+        const readIdx = (this.freezeWriteIndex - capturedSamples + i + this.freezeBufferSize) % this.freezeBufferSize;
+        channelData[i] = this.freezeCircularBuffer[ch][readIdx];
+      }
+      
+      if (this.params.granularFreeze.reverse) {
+        channelData.reverse();
+      }
+    }
     
-    // Pitch modulates timing
-    const pitchFactor = 0.5 + this.params.granularFreeze.pitch;
-    const adjustedGrainTime = grainTime / pitchFactor;
+    // Calculate grain parameters
+    const grainSize = 0.02 + this.params.granularFreeze.grainSize * 0.18;
+    const density = 5 + this.params.granularFreeze.density * 55;
+    const overlap = 1 + this.params.granularFreeze.overlap * 7;
+    const grainInterval = 1 / (density * overlap);
     
-    const numGrains = Math.floor(freezeDuration / adjustedGrainTime);
+    const playbackRate = Math.pow(2, (this.params.granularFreeze.pitch - 0.5) * 4);
+    const detuneBase = (this.params.granularFreeze.detune - 0.5) * 2400;
+    const scatterAmount = this.params.granularFreeze.scatter;
     
-    // Activate wet with mix
+    const attackTime = 0.002 + this.params.granularFreeze.attack * 0.048;
+    const releaseTime = grainSize * 0.4;
+    
+    const freezeDuration = 0.5 + grainSize * 5;
+    const numGrains = Math.floor(freezeDuration / grainInterval);
+    
+    const basePosition = this.params.granularFreeze.position * (grainBuffer.duration - grainSize);
+    const jitterAmount = this.params.granularFreeze.jitter;
+    
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);
     this.wetNode.gain.setValueAtTime(this.params.granularFreeze.mix, now);
-    this.dryNode.gain.setValueAtTime(1 - this.params.granularFreeze.mix * 0.7, now);
+    this.dryNode.gain.setValueAtTime(1 - this.params.granularFreeze.mix * 0.5, now);
     
-    // Attack controls grain envelope rise time (1-51ms)
-    const attackTime = 0.001 + this.params.granularFreeze.attack * 0.05;
-    const releaseRatio = 0.6 + this.params.granularFreeze.pitch * 0.3;
-    
-    // Position affects starting offset
-    const positionOffset = this.params.granularFreeze.position * adjustedGrainTime;
-    
-    // Jitter adds temporal randomness
-    const jitterAmount = this.params.granularFreeze.jitter;
-    
-    this.stutterGain.gain.cancelScheduledValues(now);
     for (let i = 0; i < numGrains; i++) {
-      const jitteredOffset = (Math.random() - 0.5) * jitterAmount * adjustedGrainTime;
-      const time = now + positionOffset + (i * adjustedGrainTime) + jitteredOffset;
+      const jitteredOffset = (Math.random() - 0.5) * jitterAmount * grainInterval;
+      const grainTime = now + (i * grainInterval) + jitteredOffset;
       
-      if (time < now) continue;
+      if (grainTime < now) continue;
       
-      const spreadRandom = 1 - (Math.random() * this.params.granularFreeze.spread * 0.5);
+      const scatterOffset = (Math.random() - 0.5) * scatterAmount * grainBuffer.duration;
+      const readPosition = Math.max(0, Math.min(basePosition + scatterOffset, grainBuffer.duration - grainSize));
       
-      this.stutterGain.gain.setValueAtTime(0, time);
-      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom, time + attackTime);
-      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + adjustedGrainTime * releaseRatio);
-      this.stutterGain.gain.linearRampToValueAtTime(0, time + adjustedGrainTime * 0.95);
+      const amplitude = 1 - (Math.random() * this.params.granularFreeze.spread * 0.6);
+      const detuneVariation = (Math.random() - 0.5) * 200 * this.params.granularFreeze.spread;
+      
+      this.spawnGrain(
+        grainBuffer,
+        grainTime,
+        readPosition,
+        grainSize,
+        playbackRate,
+        detuneBase + detuneVariation,
+        attackTime,
+        releaseTime,
+        amplitude
+      );
     }
     
-    const endTime = now + freezeDuration + 0.05;
+    const endTime = now + freezeDuration + 0.1;
     this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
-    this.stutterGain.gain.setValueAtTime(1, endTime);
   }
 
   triggerReverse(duration?: number): void {

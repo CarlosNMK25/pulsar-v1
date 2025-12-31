@@ -396,6 +396,9 @@ const Index = () => {
                       density: params.density !== undefined ? params.density / 100 : undefined,
                       jitter: params.jitter !== undefined ? params.jitter / 100 : undefined,
                       attack: params.attack !== undefined ? params.attack / 100 : undefined,
+                      detune: params.detune !== undefined ? params.detune / 100 : undefined,
+                      scatter: params.scatter !== undefined ? params.scatter / 100 : undefined,
+                      reverse: params.reverse,
                       probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
