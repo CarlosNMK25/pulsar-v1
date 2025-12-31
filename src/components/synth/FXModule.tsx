@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { FXMeter } from './FXMeter';
+import { SendMatrix } from './SendMatrix';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { useFXAnalyser } from '@/hooks/useFXAnalyser';
+import { TrackName, TrackSendLevels } from '@/hooks/useFXState';
 import { cn } from '@/lib/utils';
 
 interface FXModuleProps {
@@ -27,11 +29,13 @@ interface FXModuleProps {
     lowpass: number;
     highpass: number;
   };
+  sendLevels: TrackSendLevels;
   bpm: number;
   isPlaying: boolean;
   onReverbChange: (params: Partial<FXModuleProps['reverbParams']>) => void;
   onDelayChange: (params: Partial<FXModuleProps['delayParams']>) => void;
   onMasterFilterChange: (params: Partial<FXModuleProps['masterFilterParams']>) => void;
+  onSendChange: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
 }
 
 const syncDivisions: SyncDivision[] = ['1/4', '1/8', '3/16'];
@@ -40,11 +44,13 @@ export function FXModule({
   reverbParams, 
   delayParams, 
   masterFilterParams,
+  sendLevels,
   bpm,
   isPlaying,
   onReverbChange, 
   onDelayChange,
   onMasterFilterChange,
+  onSendChange,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
   const { reverb: reverbLevel, delay: delayLevel, master: masterLevel } = useFXAnalyser(isPlaying && !muted);
@@ -203,6 +209,11 @@ export function FXModule({
         {/* VU Meter - Wet Signal */}
         <div className="py-1.5">
           <FXMeter level={masterLevel} className="mx-0.5" />
+        </div>
+
+        {/* Send Matrix */}
+        <div className="py-2 border-t border-border/30">
+          <SendMatrix sendLevels={sendLevels} onSendChange={onSendChange} />
         </div>
 
         {/* Master Filter Section */}
