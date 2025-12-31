@@ -10,6 +10,7 @@ import { FXModule } from '@/components/synth/FXModule';
 import { GlitchModuleCompact } from '@/components/synth/GlitchModuleCompact';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
+import { PatternChain } from '@/components/synth/PatternChain';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDrumState } from '@/hooks/useDrumState';
@@ -18,6 +19,7 @@ import { useTextureState } from '@/hooks/useTextureState';
 import { useFXState } from '@/hooks/useFXState';
 import { useSampleState } from '@/hooks/useSampleState';
 import { useSceneManager } from '@/hooks/useSceneManager';
+import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { SampleModule } from '@/components/synth/SampleModule';
 
@@ -51,6 +53,14 @@ const Index = () => {
     swing,
     setBpm,
     setSwing,
+  });
+
+  // Pattern chain
+  const patternChain = usePatternChain({
+    onSceneChange: sceneManager.handleSceneSelect,
+    isPlaying,
+    activeScene: sceneManager.activeScene,
+    savedSceneIds: sceneManager.savedSceneIds,
   });
 
   // Audio recorder hook
@@ -301,6 +311,23 @@ const Index = () => {
                   onImportAll={sceneManager.handleImportAll}
                 />
               </div>
+            </div>
+            {/* Pattern Chain */}
+            <div className="module">
+              <PatternChain
+                config={patternChain.config}
+                currentChainIndex={patternChain.currentChainIndex}
+                isChainActive={patternChain.isChainActive}
+                scenes={sceneManager.scenes}
+                savedSceneIds={sceneManager.savedSceneIds}
+                activeScene={sceneManager.activeScene}
+                onAddToChain={patternChain.addToChain}
+                onRemoveFromChain={patternChain.removeFromChain}
+                onBarsPerPatternChange={patternChain.setBarsPerPattern}
+                onLoopChainChange={patternChain.setLoopChain}
+                onToggleEnabled={patternChain.toggleChainEnabled}
+                onClearChain={patternChain.clearChain}
+              />
             </div>
           </section>
 
