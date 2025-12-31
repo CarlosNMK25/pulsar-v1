@@ -14,7 +14,6 @@ interface MixerTabProps {
   onSampleMuteToggle?: () => void;
   volumes?: Record<string, number>;
   onVolumeChange?: (channel: string, value: number) => void;
-  // Track routing for FX/Glitch bypass
   trackRouting?: TrackRoutingState;
   onRoutingChange?: (track: TrackName, routing: { fxBypass?: boolean; glitchBypass?: boolean }) => void;
 }
@@ -49,11 +48,14 @@ const Channel = ({
   showRouting = false,
 }: ChannelProps) => {
   return (
-    <div className="flex flex-col items-center gap-1 px-2">
+    <div className="flex flex-col items-center gap-2 px-4">
+      {/* Label */}
+      <span className="text-sm font-medium text-foreground uppercase tracking-wide">{name}</span>
+      
       {/* Vertical fader container */}
-      <div className="relative h-16 w-6 flex items-center justify-center">
+      <div className="relative h-40 w-8 flex items-center justify-center">
         {/* Level meter background */}
-        <div className="absolute inset-0 w-1.5 left-1/2 -translate-x-1/2 bg-muted rounded-full overflow-hidden">
+        <div className="absolute inset-0 w-3 left-1/2 -translate-x-1/2 bg-muted rounded-full overflow-hidden">
           <div 
             className={cn("absolute bottom-0 w-full rounded-full transition-all", color)}
             style={{ height: muted ? '0%' : `${volume * 100}%` }}
@@ -69,43 +71,45 @@ const Channel = ({
             max={1}
             step={0.01}
             onValueChange={([val]) => onVolumeChange?.(val)}
-            className="h-14"
+            className="h-36"
             disabled={muted}
           />
         </div>
       </div>
       
       {/* Volume value */}
-      <span className="text-[9px] text-muted-foreground tabular-nums">
+      <span className="text-xs font-mono text-muted-foreground tabular-nums">
         {Math.round(volume * 100)}
       </span>
       
       {/* Routing toggles (FX / Glitch) */}
       {showRouting && (
-        <div className="flex gap-0.5">
+        <div className="flex gap-2">
           <button
             onClick={onFxBypassToggle}
             className={cn(
-              "p-0.5 rounded transition-colors",
+              "p-2 rounded-lg flex flex-col items-center gap-0.5 transition-colors",
               fxBypass 
                 ? "bg-muted text-muted-foreground" 
                 : "bg-primary/20 text-primary"
             )}
             title={fxBypass ? "FX bypassed" : "FX active"}
           >
-            <Waves className="w-2.5 h-2.5" />
+            <Waves className="w-5 h-5" />
+            <span className="text-[10px] font-medium">FX</span>
           </button>
           <button
             onClick={onGlitchBypassToggle}
             className={cn(
-              "p-0.5 rounded transition-colors",
+              "p-2 rounded-lg flex flex-col items-center gap-0.5 transition-colors",
               glitchBypass 
                 ? "bg-muted text-muted-foreground" 
                 : "bg-primary/20 text-primary"
             )}
             title={glitchBypass ? "Glitch bypassed" : "Glitch active"}
           >
-            <Sparkles className="w-2.5 h-2.5" />
+            <Sparkles className="w-5 h-5" />
+            <span className="text-[10px] font-medium">GLT</span>
           </button>
         </div>
       )}
@@ -114,15 +118,12 @@ const Channel = ({
       <button
         onClick={onMuteToggle}
         className={cn(
-          "p-1 rounded transition-colors",
+          "p-2 rounded-lg transition-colors",
           muted ? "bg-destructive/20 text-destructive" : "bg-muted hover:bg-muted/80 text-foreground"
         )}
       >
-        {muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+        {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
       </button>
-      
-      {/* Label */}
-      <span className="text-[9px] text-muted-foreground uppercase tracking-wide">{name}</span>
     </div>
   );
 };
@@ -142,7 +143,7 @@ export const MixerTab = ({
   onRoutingChange,
 }: MixerTabProps) => {
   return (
-    <div className="flex items-center justify-center h-full gap-1 px-4">
+    <div className="flex items-center justify-center h-full gap-2 px-6">
       <Channel 
         name="Drum" 
         channelId="drum"
@@ -157,7 +158,7 @@ export const MixerTab = ({
         onGlitchBypassToggle={() => onRoutingChange?.('drums', { glitchBypass: !trackRouting?.drums.glitchBypass })}
         showRouting={!!trackRouting}
       />
-      <div className="w-px h-20 bg-border" />
+      <div className="w-px h-56 bg-border" />
       <Channel 
         name="Synth" 
         channelId="synth"
@@ -172,7 +173,7 @@ export const MixerTab = ({
         onGlitchBypassToggle={() => onRoutingChange?.('synth', { glitchBypass: !trackRouting?.synth.glitchBypass })}
         showRouting={!!trackRouting}
       />
-      <div className="w-px h-20 bg-border" />
+      <div className="w-px h-56 bg-border" />
       <Channel 
         name="Texture" 
         channelId="texture"
@@ -187,7 +188,7 @@ export const MixerTab = ({
         onGlitchBypassToggle={() => onRoutingChange?.('texture', { glitchBypass: !trackRouting?.texture.glitchBypass })}
         showRouting={!!trackRouting}
       />
-      <div className="w-px h-20 bg-border" />
+      <div className="w-px h-56 bg-border" />
       <Channel 
         name="Sample" 
         channelId="sample"
@@ -202,7 +203,7 @@ export const MixerTab = ({
         onGlitchBypassToggle={() => onRoutingChange?.('sample', { glitchBypass: !trackRouting?.sample.glitchBypass })}
         showRouting={!!trackRouting}
       />
-      <div className="w-px h-20 bg-border mx-1" />
+      <div className="w-px h-56 bg-border mx-2" />
       <Channel 
         name="Master" 
         channelId="master"
