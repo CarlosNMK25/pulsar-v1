@@ -5,7 +5,8 @@ import { FXVisualizer } from './FXVisualizer';
 import { SendMatrix } from './SendMatrix';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { useFXAnalyser } from '@/hooks/useFXAnalyser';
-import { TrackName, TrackSendLevels } from '@/hooks/useFXState';
+import { TrackName, TrackSendLevels, FXRoutingMode, FXTarget } from '@/hooks/useFXState';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface FXModuleProps {
@@ -32,13 +33,25 @@ interface FXModuleProps {
   sendLevels: TrackSendLevels;
   bpm: number;
   isPlaying: boolean;
+  fxRoutingMode: FXRoutingMode;
+  fxTargets: FXTarget[];
   onReverbChange: (params: Partial<FXModuleProps['reverbParams']>) => void;
   onDelayChange: (params: Partial<FXModuleProps['delayParams']>) => void;
   onMasterFilterChange: (params: Partial<FXModuleProps['masterFilterParams']>) => void;
   onSendChange: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
+  onRoutingModeChange: (mode: FXRoutingMode) => void;
+  onTargetToggle: (target: FXTarget) => void;
 }
 
 const syncDivisions: SyncDivision[] = ['1/4', '1/8', '3/16'];
+
+const individualButtons: { id: FXTarget; label: string }[] = [
+  { id: 'drums', label: 'D' },
+  { id: 'synth', label: 'S' },
+  { id: 'texture', label: 'T' },
+  { id: 'sample', label: 'Smp' },
+  { id: 'glitch', label: 'G' },
+];
 
 export function FXModule({ 
   reverbParams, 
@@ -47,14 +60,21 @@ export function FXModule({
   sendLevels,
   bpm,
   isPlaying,
+  fxRoutingMode,
+  fxTargets,
   onReverbChange, 
   onDelayChange,
   onMasterFilterChange,
   onSendChange,
+  onRoutingModeChange,
+  onTargetToggle,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
   const levels = useFXAnalyser(isPlaying && !muted);
   const { reverb: reverbLevel, delay: delayLevel } = levels;
+  
+  const isActive = fxRoutingMode === 'master' || fxTargets.length > 0;
+  const showNoTargetWarning = fxRoutingMode === 'individual' && fxTargets.length === 0;
 
   // Apply bypass to FX engine when mute changes
   useEffect(() => {
@@ -75,6 +95,63 @@ export function FXModule({
       onMuteToggle={() => setMuted(!muted)}
     >
       <div className="space-y-3">
+        {/* Routing Mode Selector */}
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <Button
+              variant={fxRoutingMode === 'master' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onRoutingModeChange('master')}
+              className={cn(
+                'flex-1 h-7 text-[10px] font-medium',
+                fxRoutingMode === 'master' && 'bg-primary text-primary-foreground'
+              )}
+            >
+              MASTER
+            </Button>
+            <Button
+              variant={fxRoutingMode === 'individual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onRoutingModeChange('individual')}
+              className={cn(
+                'flex-1 h-7 text-[10px] font-medium',
+                fxRoutingMode === 'individual' && 'bg-primary text-primary-foreground'
+              )}
+            >
+              TRACKS
+            </Button>
+          </div>
+          
+          {/* Individual track selectors - only visible in individual mode */}
+          {fxRoutingMode === 'individual' && (
+            <div className="flex gap-1">
+              {individualButtons.map(({ id, label }) => (
+                <Button
+                  key={id}
+                  variant={fxTargets.includes(id) ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => onTargetToggle(id)}
+                  className={cn(
+                    'flex-1 h-6 text-[10px] font-mono transition-all',
+                    fxTargets.includes(id) 
+                      ? 'bg-primary/80 text-primary-foreground border-primary' 
+                      : 'opacity-60 hover:opacity-100'
+                  )}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          )}
+          
+          {/* Warning when no target selected in individual mode */}
+          {showNoTargetWarning && (
+            <div className="text-[9px] text-muted-foreground/60 text-center italic">
+              Select a track
+            </div>
+          )}
+        </div>
+
         {/* Reverb + Delay in 2 columns */}
         <div className="grid grid-cols-2 gap-4">
           {/* Reverb Column */}
