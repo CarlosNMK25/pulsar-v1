@@ -1,32 +1,50 @@
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { WaveshaperEngine, DistortionCurve } from './WaveshaperEngine';
 
 interface DrumSound {
   play: (velocity: number, decay: number) => void;
 }
 
 interface DrumParams {
-  decay: number;  // 0-1, multiplies envelope duration
-  pitch: number;  // 0-100, affects base pitch
-  drive: number;  // 0-100, saturation
-  mix: number;    // 0-100, output mix
+  decay: number;    // 0-1, multiplies envelope duration
+  pitch: number;    // 0-100, affects base pitch
+  drive: number;    // 0-100, saturation
+  driveType: DistortionCurve; // Distortion curve type
+  mix: number;      // 0-100, output mix
 }
 
 export class DrumEngine {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
+  private waveshaper: WaveshaperEngine;
+  private preWaveshaperGain: GainNode;
   private sounds: Map<string, DrumSound> = new Map();
   private loadedSamples: Map<string, AudioBuffer> = new Map();
-  private params: DrumParams = { decay: 50, pitch: 50, drive: 30, mix: 75 };
+  private params: DrumParams = { decay: 50, pitch: 50, drive: 30, driveType: 'soft', mix: 75 };
   private fxConnected = false;
   private muted = false;
 
   constructor() {
     const ctx = audioEngine.getContext();
+    
+    // Pre-waveshaper gain for routing
+    this.preWaveshaperGain = ctx.createGain();
+    this.preWaveshaperGain.gain.value = 1;
+    
+    // Waveshaper for drive/distortion
+    this.waveshaper = new WaveshaperEngine();
+    this.waveshaper.setDrive(this.params.drive);
+    this.waveshaper.setCurve(this.params.driveType);
+    
+    // Output gain
     this.outputGain = ctx.createGain();
     this.outputGain.gain.value = 0.6;
-    // Connect to track bus instead of master gain for per-track glitch routing
+    
+    // Connect chain: preWaveshaperGain -> waveshaper -> outputGain -> trackBus
+    this.preWaveshaperGain.connect(this.waveshaper.getInput());
+    this.waveshaper.getOutput().connect(this.outputGain);
     this.outputGain.connect(audioEngine.getTrackBus('drums'));
 
     // FX send nodes
@@ -54,6 +72,12 @@ export class DrumEngine {
     // Update output gain based on mix parameter
     const ctx = audioEngine.getContext();
     this.outputGain.gain.setTargetAtTime((this.params.mix / 100) * 0.6, ctx.currentTime, 0.05);
+    
+    // Update waveshaper
+    this.waveshaper.setDrive(this.params.drive);
+    if (params.driveType !== undefined) {
+      this.waveshaper.setCurve(this.params.driveType);
+    }
   }
 
   setMuted(muted: boolean): void {
@@ -94,11 +118,11 @@ export class DrumEngine {
         clickGain.gain.setValueAtTime(vel * 0.3, now);
         clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
 
-        // Connect to dry output
+        // Connect to pre-waveshaper gain (for distortion processing)
         osc.connect(gain);
         click.connect(clickGain);
-        gain.connect(this.outputGain);
-        clickGain.connect(this.outputGain);
+        gain.connect(this.preWaveshaperGain);
+        clickGain.connect(this.preWaveshaperGain);
         
         // Connect to FX sends (kick gets less reverb/delay)
         gain.connect(this.reverbSend);
@@ -152,12 +176,12 @@ export class DrumEngine {
         oscGain.gain.setValueAtTime(vel * 0.4, now);
         oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 * decayMult);
 
-        // Connect to dry output
+        // Connect to pre-waveshaper gain
         noise.connect(filter);
         filter.connect(noiseGain);
-        noiseGain.connect(this.outputGain);
+        noiseGain.connect(this.preWaveshaperGain);
         osc.connect(oscGain);
-        oscGain.connect(this.outputGain);
+        oscGain.connect(this.preWaveshaperGain);
         
         // Connect to FX sends (snare gets more reverb)
         noiseGain.connect(this.reverbSend);
@@ -206,11 +230,11 @@ export class DrumEngine {
         gain.gain.setValueAtTime(vel * 0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08 * decayMult);
 
-        // Connect to dry output
+        // Connect to pre-waveshaper gain
         noise.connect(bandpass);
         bandpass.connect(highpass);
         highpass.connect(gain);
-        gain.connect(this.outputGain);
+        gain.connect(this.preWaveshaperGain);
         
         // Connect to FX sends (hat gets subtle delay)
         gain.connect(this.delaySend);
@@ -234,11 +258,9 @@ export class DrumEngine {
     // Fall back to synthesis
     const drum = this.sounds.get(sound);
     if (drum) {
-      // Apply pitch and drive modifiers
-      const pitchMod = 0.5 + (this.params.pitch / 100); // 0.5-1.5 multiplier
-      const driveMod = 1 + (this.params.drive / 100) * 0.5; // 1-1.5 velocity boost
-      const modVelocity = Math.min(127, velocity * driveMod);
-      drum.play(modVelocity, this.params.decay / 100);
+      // Apply pitch modifier (drive is now handled by waveshaper)
+      const pitchMod = 0.5 + (this.params.pitch / 100);
+      drum.play(velocity, this.params.decay / 100);
     }
   }
 
@@ -261,7 +283,7 @@ export class DrumEngine {
     gain.gain.setTargetAtTime(0.001, now + decayTime * 0.5, decayTime * 0.3);
 
     source.connect(gain);
-    gain.connect(this.outputGain);
+    gain.connect(this.preWaveshaperGain);
     gain.connect(this.reverbSend);
     gain.connect(this.delaySend);
 
@@ -285,6 +307,8 @@ export class DrumEngine {
   }
 
   disconnect(): void {
+    this.preWaveshaperGain.disconnect();
+    this.waveshaper.disconnect();
     this.outputGain.disconnect();
     this.reverbSend.disconnect();
     this.delaySend.disconnect();
