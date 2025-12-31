@@ -30,6 +30,7 @@ const Index = () => {
   
   // Glitch targets state
   const [glitchTargets, setGlitchTargets] = useState<GlitchTarget[]>(['master']);
+  const [glitchMuted, setGlitchMuted] = useState(false);
 
   // Instrument state hooks
   const drumState = useDrumState();
@@ -247,11 +248,13 @@ const Index = () => {
               <div className="module p-4 min-h-[200px]">
                 <GlitchModuleCompact 
                   glitchTargets={glitchTargets}
+                  muted={glitchMuted}
+                  onMuteToggle={() => setGlitchMuted(prev => !prev)}
                   onGlitchTargetsChange={setGlitchTargets}
-                  onTriggerGlitch={triggerGlitch}
+                  onTriggerGlitch={(effect) => !glitchMuted && triggerGlitch(effect)}
                   onStutterParamsChange={setGlitchStutterParams}
                   onBitcrushParamsChange={setGlitchBitcrushParams}
-                  onChaosToggle={setChaosEnabled}
+                  onChaosToggle={(enabled, params) => !glitchMuted && setChaosEnabled(enabled, params)}
                   onChaosParamsChange={setGlitchChaosParams}
                 />
               </div>
