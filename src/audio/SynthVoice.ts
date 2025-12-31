@@ -67,7 +67,7 @@ export class SynthVoice {
   private fxConnected = false;
   private muted = false;
   private fxBypassed = false;
-  private savedFxLevels = { reverb: 0.25, delay: 0.2 };
+  private savedFxLevels = { reverb: 0.4, delay: 0.35 };
   private lfo: OscillatorNode | null = null;
   private lfoGain: GainNode | null = null;
   private lastNote: number | null = null;
@@ -94,10 +94,10 @@ export class SynthVoice {
     this.outputGain.connect(audioEngine.getTrackBus('synth'));
     // FX send nodes
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = 0.25;
+    this.reverbSend.gain.value = 0.4;
     
     this.delaySend = ctx.createGain();
-    this.delaySend.gain.value = 0.2;
+    this.delaySend.gain.value = 0.35;
 
     this.params = {
       waveform: 'saw',

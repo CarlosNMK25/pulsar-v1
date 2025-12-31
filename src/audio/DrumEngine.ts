@@ -26,7 +26,7 @@ export class DrumEngine {
   private fxConnected = false;
   private muted = false;
   private fxBypassed = false;
-  private savedFxLevels = { reverb: 0.2, delay: 0.15 };
+  private savedFxLevels = { reverb: 0.4, delay: 0.3 };
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -51,10 +51,10 @@ export class DrumEngine {
 
     // FX send nodes
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = 0.2;
+    this.reverbSend.gain.value = 0.4;
     
     this.delaySend = ctx.createGain();
-    this.delaySend.gain.value = 0.15;
+    this.delaySend.gain.value = 0.3;
 
     // Initialize drum sounds
     this.sounds.set('kick', this.createKick());
