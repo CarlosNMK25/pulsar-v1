@@ -822,23 +822,51 @@ export const useAudioEngine = ({
     }
   }, [glitchTargets]);
 
-  // Update glitch params on all active targets
-  const setGlitchStutterParams = useCallback((params: { division?: '1/4' | '1/8' | '1/16' | '1/32' | '1/64'; decay?: number; mix?: number }) => {
-    glitchEngine.setStutterParams(params);
-    drumsGlitchRef.current?.setStutterParams(params);
-    synthGlitchRef.current?.setStutterParams(params);
-    textureGlitchRef.current?.setStutterParams(params);
-    sampleGlitchRef.current?.setStutterParams(params);
-    fxGlitchRef.current?.setStutterParams(params);
+  // Update glitch params on specific track
+  const setGlitchStutterParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { division?: '1/4' | '1/8' | '1/16' | '1/32' | '1/64'; decay?: number; mix?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setStutterParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setStutterParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setStutterParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setStutterParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setStutterParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setStutterParams(params);
+        break;
+    }
   }, []);
 
-  const setGlitchBitcrushParams = useCallback((params: { bits?: number; sampleRate?: number; mix?: number }) => {
-    glitchEngine.setBitcrushParams(params);
-    drumsGlitchRef.current?.setBitcrushParams(params);
-    synthGlitchRef.current?.setBitcrushParams(params);
-    textureGlitchRef.current?.setBitcrushParams(params);
-    sampleGlitchRef.current?.setBitcrushParams(params);
-    fxGlitchRef.current?.setBitcrushParams(params);
+  const setGlitchBitcrushParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { bits?: number; sampleRate?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setBitcrushParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setBitcrushParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setBitcrushParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setBitcrushParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setBitcrushParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setBitcrushParams(params);
+        break;
+    }
   }, []);
 
   // Chaos mode control - applies to active targets
@@ -881,14 +909,28 @@ export const useAudioEngine = ({
     }
   }, [glitchTargets]);
 
-  // Update chaos params on active targets
-  const setGlitchChaosParams = useCallback((params: { density?: number; intensity?: number }) => {
-    glitchEngine.setChaosParams(params);
-    drumsGlitchRef.current?.setChaosParams(params);
-    synthGlitchRef.current?.setChaosParams(params);
-    textureGlitchRef.current?.setChaosParams(params);
-    sampleGlitchRef.current?.setChaosParams(params);
-    fxGlitchRef.current?.setChaosParams(params);
+  // Update chaos params on specific track
+  const setGlitchChaosParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { density?: number; intensity?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setChaosParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setChaosParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setChaosParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setChaosParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setChaosParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setChaosParams(params);
+        break;
+    }
   }, []);
 
   // Keyboard note control - expose synth noteOn/noteOff for external keyboard

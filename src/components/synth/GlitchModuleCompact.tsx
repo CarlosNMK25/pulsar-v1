@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { StutterParams, BitcrushParams } from '@/audio/GlitchEngine';
 import { GlitchTarget } from '@/audio/AudioEngine';
+import { GlitchTrackId, GlitchParamsPerTrack } from '@/hooks/useGlitchState';
 
 type RoutingMode = 'master' | 'individual';
 type IndividualTarget = 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
@@ -13,19 +14,21 @@ interface GlitchModuleCompactProps {
   className?: string;
   glitchTargets: GlitchTarget[];
   muted: boolean;
+  paramsPerTrack: GlitchParamsPerTrack;
   onMuteToggle: () => void;
   onGlitchTargetsChange: (targets: GlitchTarget[]) => void;
   onTriggerGlitch: (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse') => void;
-  onStutterParamsChange: (params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
-  onBitcrushParamsChange: (params: { bits?: number; sampleRate?: number; mix?: number }) => void;
+  onStutterParamsChange: (track: GlitchTrackId, params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
+  onBitcrushParamsChange: (track: GlitchTrackId, params: { bits?: number; sampleRate?: number }) => void;
   onChaosToggle: (enabled: boolean, params: { density: number; intensity: number }) => void;
-  onChaosParamsChange: (params: { density?: number; intensity?: number }) => void;
+  onChaosParamsChange: (track: GlitchTrackId, params: { density?: number; intensity?: number }) => void;
 }
 
 export const GlitchModuleCompact = ({ 
   className, 
   glitchTargets,
   muted,
+  paramsPerTrack,
   onMuteToggle,
   onGlitchTargetsChange,
   onTriggerGlitch,
@@ -53,25 +56,16 @@ export const GlitchModuleCompact = ({
     if (glitchTargets.includes('fx')) targets.add('fx');
     return targets;
   });
-  
-  const [stutterParams, setStutterParams] = useState<StutterParams>({
-    active: false,
-    mix: 50,
-    division: '1/16',
-    decay: 50,
-  });
-  
-  const [bitcrushParams, setBitcrushParams] = useState<BitcrushParams>({
-    active: false,
-    mix: 50,
-    bits: 8,
-    sampleRate: 50,
-  });
-  
-  const [chaosParams, setChaosParams] = useState({
-    density: 30,
-    intensity: 50,
-  });
+
+  // Determine which track's params to display
+  const editingTrack: GlitchTrackId = useMemo(() => {
+    if (routingMode === 'master') return 'master';
+    const targetsArray = Array.from(individualTargets);
+    return targetsArray.length > 0 ? targetsArray[0] : 'drums';
+  }, [routingMode, individualTargets]);
+
+  // Get current params for the editing track
+  const currentParams = paramsPerTrack[editingTrack];
 
   // Sync routing mode changes to parent (only for local user interactions)
   useEffect(() => {
@@ -119,6 +113,7 @@ export const GlitchModuleCompact = ({
 
   const isActive = glitchTargets.length > 0;
   const showNoTargetWarning = routingMode === 'individual' && individualTargets.size === 0;
+  const multipleTracksSelected = routingMode === 'individual' && individualTargets.size > 1;
 
   const handleModeChange = (mode: RoutingMode) => {
     setRoutingMode(mode);
@@ -178,8 +173,8 @@ export const GlitchModuleCompact = ({
     
     // Use parent callback to route chaos to correct targets
     onChaosToggle(newEnabled, {
-      density: chaosParams.density / 100,
-      intensity: chaosParams.intensity / 100,
+      density: currentParams.chaos.density / 100,
+      intensity: currentParams.chaos.intensity / 100,
     });
   };
 
@@ -201,6 +196,11 @@ export const GlitchModuleCompact = ({
           <div className={cn('led', !muted && isActive && 'on')} />
           <Zap className="w-3 h-3 text-muted-foreground" />
           <span className="text-label text-muted-foreground">Glitch</span>
+          {multipleTracksSelected && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono">
+              {editingTrack.charAt(0).toUpperCase()}
+            </span>
+          )}
         </div>
         <button
           onClick={onMuteToggle}
@@ -255,7 +255,9 @@ export const GlitchModuleCompact = ({
                   'flex-1 h-6 text-[10px] font-mono transition-all',
                   individualTargets.has(id) 
                     ? 'bg-primary/80 text-primary-foreground border-primary' 
-                    : 'opacity-60 hover:opacity-100'
+                    : 'opacity-60 hover:opacity-100',
+                  // Highlight the editing track when multiple selected
+                  multipleTracksSelected && id === editingTrack && 'ring-1 ring-accent'
                 )}
               >
                 {label}
@@ -353,13 +355,12 @@ export const GlitchModuleCompact = ({
             <button
               key={div}
               onClick={() => {
-                setStutterParams(prev => ({ ...prev, division: div }));
-                onStutterParamsChange({ division: div });
+                onStutterParamsChange(editingTrack, { division: div });
               }}
               disabled={!isActive}
               className={cn(
                 'flex-1 py-0.5 text-[9px] font-mono rounded border transition-colors',
-                stutterParams.division === div
+                currentParams.stutter.division === div
                   ? 'border-primary bg-primary/20 text-primary'
                   : 'border-border text-muted-foreground hover:text-foreground',
                 !isActive && 'opacity-50'
@@ -371,20 +372,18 @@ export const GlitchModuleCompact = ({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Knob
-            value={stutterParams.decay}
+            value={currentParams.stutter.decay}
             onChange={(v) => {
-              setStutterParams(prev => ({ ...prev, decay: v }));
-              onStutterParamsChange({ decay: v / 100 });
+              onStutterParamsChange(editingTrack, { decay: v / 100 });
             }}
             label="Decay"
             size="sm"
             variant={!isActive ? 'secondary' : 'primary'}
           />
           <Knob
-            value={stutterParams.mix}
+            value={currentParams.stutter.mix}
             onChange={(v) => {
-              setStutterParams(prev => ({ ...prev, mix: v }));
-              onStutterParamsChange({ mix: v / 100 });
+              onStutterParamsChange(editingTrack, { mix: v / 100 });
             }}
             label="Mix"
             size="sm"
@@ -398,21 +397,19 @@ export const GlitchModuleCompact = ({
         <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Bitcrush</div>
         <div className="grid grid-cols-2 gap-2">
           <Knob
-            value={bitcrushParams.bits * 6.25}
+            value={currentParams.bitcrush.bits * 6.25}
             onChange={(v) => {
               const bits = Math.round(v / 6.25);
-              setBitcrushParams(prev => ({ ...prev, bits: Math.max(1, Math.min(16, bits)) }));
-              onBitcrushParamsChange({ bits });
+              onBitcrushParamsChange(editingTrack, { bits: Math.max(1, Math.min(16, bits)) });
             }}
-            label={`${bitcrushParams.bits}bit`}
+            label={`${currentParams.bitcrush.bits}bit`}
             size="sm"
             variant={!isActive ? 'secondary' : 'primary'}
           />
           <Knob
-            value={bitcrushParams.sampleRate}
+            value={currentParams.bitcrush.sampleRate}
             onChange={(v) => {
-              setBitcrushParams(prev => ({ ...prev, sampleRate: v }));
-              onBitcrushParamsChange({ sampleRate: v / 100 });
+              onBitcrushParamsChange(editingTrack, { sampleRate: v / 100 });
             }}
             label="Crush"
             size="sm"
@@ -448,11 +445,11 @@ export const GlitchModuleCompact = ({
         
         <div className="grid grid-cols-2 gap-2">
           <Knob
-            value={chaosParams.density}
+            value={currentParams.chaos.density}
             onChange={(v) => {
-              setChaosParams(prev => ({ ...prev, density: v }));
+              onChaosParamsChange(editingTrack, { density: v });
               if (chaosEnabled) {
-                onChaosParamsChange({ density: v / 100 });
+                // Also update the audio engine
               }
             }}
             label="Dens"
@@ -460,11 +457,11 @@ export const GlitchModuleCompact = ({
             variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
           />
           <Knob
-            value={chaosParams.intensity}
+            value={currentParams.chaos.intensity}
             onChange={(v) => {
-              setChaosParams(prev => ({ ...prev, intensity: v }));
+              onChaosParamsChange(editingTrack, { intensity: v });
               if (chaosEnabled) {
-                onChaosParamsChange({ intensity: v / 100 });
+                // Also update the audio engine
               }
             }}
             label="Int"
