@@ -27,6 +27,7 @@ const Index = () => {
   const [bpm, setBpm] = useState(120);
   const [swing, setSwing] = useState(0);
   const [humanize, setHumanize] = useState(0);
+  const [fillActive, setFillActive] = useState(false);
   
   // Glitch targets state
   const [glitchTargets, setGlitchTargets] = useState<GlitchTarget[]>(['master']);
@@ -98,6 +99,7 @@ const Index = () => {
     sampleParams: sampleState.sampleParams,
     sampleMuted: sampleState.sampleMuted,
     sampleIsPlaying,
+    fillActive,
   });
 
   const handlePlayPause = useCallback(async () => {
@@ -147,6 +149,7 @@ const Index = () => {
               humanize={humanize}
               isRecording={isRecording}
               recordingTime={recordingTime}
+              fillActive={fillActive}
               onPlayPause={handlePlayPause}
               onStop={handleStop}
               onBpmChange={setBpm}
@@ -154,6 +157,7 @@ const Index = () => {
               onHumanizeChange={setHumanize}
               onRecordStart={startRecording}
               onRecordStop={stopRecording}
+              onFillActivate={setFillActive}
             />
             <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
           </div>

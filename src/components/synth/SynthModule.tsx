@@ -5,7 +5,7 @@ import { StepSequencer } from './StepSequencer';
 import { Knob } from './Knob';
 import { cn } from '@/lib/utils';
 import { WaveformType } from '@/audio/SynthVoice';
-import type { PLocks, AcidModifiers } from '@/hooks/useAudioEngine';
+import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
 interface Step {
   active: boolean;
@@ -13,6 +13,7 @@ interface Step {
   probability: number;
   pLocks?: PLocks;
   acid?: AcidModifiers;
+  condition?: ConditionType;
 }
 
 interface SynthModuleProps {
@@ -74,6 +75,12 @@ export const SynthModule = ({
     ));
   };
 
+  const handleStepCondition = (index: number, condition: ConditionType) => {
+    onStepsChange(steps.map((step, i) => 
+      i === index ? { ...step, condition } : step
+    ));
+  };
+
   return (
     <ModuleCard
       title="Synth"
@@ -100,13 +107,14 @@ export const SynthModule = ({
           ))}
         </div>
 
-        {/* Sequencer with P-Locks and Acid 303 */}
+        {/* Sequencer with P-Locks, Acid 303, and Conditional Triggers */}
         <StepSequencer
           steps={steps}
           currentStep={currentStep}
           onStepToggle={toggleStep}
           onStepPLocks={handleStepPLocks}
           onStepAcid={handleStepAcid}
+          onStepCondition={handleStepCondition}
           onPatternGenerate={onStepsChange}
           showControls={true}
           showLengthSelector={true}
@@ -114,6 +122,7 @@ export const SynthModule = ({
           onLengthChange={onLengthChange}
           showPLocks={true}
           showAcid={true}
+          showConditions={true}
           label="Sequence"
           variant="primary"
           swing={swing}
