@@ -362,6 +362,8 @@ const Index = () => {
                       division: params.division,
                       decay: params.decay !== undefined ? params.decay / 100 : undefined,
                       mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                      repeatCount: params.repeatCount,
+                      probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
                   onBitcrushParamsChange={(track: GlitchTrackId, params) => {

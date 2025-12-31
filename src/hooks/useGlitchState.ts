@@ -6,8 +6,10 @@ export type GlitchTrackId = 'master' | 'drums' | 'synth' | 'texture' | 'sample' 
 export interface TrackGlitchParams {
   stutter: {
     division: StutterParams['division'];
-    decay: number;  // 0-100
-    mix: number;    // 0-100
+    decay: number;      // 0-100
+    mix: number;        // 0-100
+    repeatCount: number; // 1-16
+    probability: number; // 0-100
   };
   bitcrush: {
     bits: number;       // 1-16
@@ -42,7 +44,7 @@ export interface TrackGlitchParams {
 export type GlitchParamsPerTrack = Record<GlitchTrackId, TrackGlitchParams>;
 
 const createDefaultTrackParams = (): TrackGlitchParams => ({
-  stutter: { division: '1/16', decay: 50, mix: 50 },
+  stutter: { division: '1/16', decay: 50, mix: 50, repeatCount: 4, probability: 100 },
   bitcrush: { bits: 8, sampleRate: 50, mix: 50 },
   tapeStop: { speed: 50, duration: 50, mix: 70 },
   freeze: { grainSize: 50, pitch: 50, spread: 50, mix: 50 },
