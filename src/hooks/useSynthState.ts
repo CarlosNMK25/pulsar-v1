@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
+import { DistortionCurve } from '@/audio/WaveshaperEngine';
 import { createInitialSteps, defaultSynthParams, defaultSynthPattern } from '@/constants/initialState';
 import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
@@ -23,6 +24,8 @@ export interface SynthParams {
   lfoSyncDivision: LfoSyncDivision;
   fmAmount: number;
   fmRatio: number;
+  drive: number;
+  driveType: DistortionCurve;
 }
 
 export interface SynthState {

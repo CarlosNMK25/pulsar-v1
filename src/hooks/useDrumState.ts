@@ -9,10 +9,13 @@ export interface Step {
   condition?: ConditionType;
 }
 
+import type { DistortionCurve } from '@/audio/WaveshaperEngine';
+
 export interface DrumParams {
   pitch: number;
   decay: number;
   drive: number;
+  driveType: DistortionCurve;
   mix: number;
 }
 

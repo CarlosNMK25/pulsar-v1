@@ -119,7 +119,7 @@ export const PLockEditor = ({
           </div>
 
           {/* P-Lock Knobs */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="relative">
               <Knob
                 value={localPLocks.cutoff ?? 50}
@@ -182,6 +182,23 @@ export const PLockEditor = ({
               {localPLocks.decay !== undefined && (
                 <button
                   onClick={() => clearPLock('decay')}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Knob
+                value={localPLocks.fmAmount ?? 0}
+                onChange={(v) => handlePLockChange('fmAmount', v)}
+                label="FM"
+                size="sm"
+                variant={localPLocks.fmAmount !== undefined ? 'primary' : 'accent'}
+              />
+              {localPLocks.fmAmount !== undefined && (
+                <button
+                  onClick={() => clearPLock('fmAmount')}
                   className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
                 >
                   ×

@@ -1,5 +1,6 @@
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { WaveshaperEngine, DistortionCurve } from './WaveshaperEngine';
 
 export type WaveformType = 'sine' | 'saw' | 'square' | 'tri';
 
@@ -25,6 +26,8 @@ interface VoiceParams {
   resonance: number;
   fmAmount: number;  // 0-100: FM modulation depth
   fmRatio: number;   // 0-100: modulator/carrier ratio (maps to 0.5x-8x)
+  drive: number;     // 0-100: waveshaper drive
+  driveType: DistortionCurve; // Distortion curve type
 }
 
 // Acid 303 options for noteOn
@@ -58,6 +61,8 @@ export class SynthVoice {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
+  private waveshaper: WaveshaperEngine;
+  private preWaveshaperGain: GainNode;
   private params: Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision };
   private fxConnected = false;
   private muted = false;
@@ -69,11 +74,22 @@ export class SynthVoice {
 
   constructor() {
     const ctx = audioEngine.getContext();
+    
+    // Pre-waveshaper gain for routing
+    this.preWaveshaperGain = ctx.createGain();
+    this.preWaveshaperGain.gain.value = 1;
+    
+    // Waveshaper for drive/distortion
+    this.waveshaper = new WaveshaperEngine();
+    
+    // Output gain
     this.outputGain = ctx.createGain();
     this.outputGain.gain.value = 0.3;
-    // Connect to track bus instead of master gain for per-track glitch routing
+    
+    // Connect chain: preWaveshaperGain -> waveshaper -> outputGain -> trackBus
+    this.preWaveshaperGain.connect(this.waveshaper.getInput());
+    this.waveshaper.getOutput().connect(this.outputGain);
     this.outputGain.connect(audioEngine.getTrackBus('synth'));
-
     // FX send nodes
     this.reverbSend = ctx.createGain();
     this.reverbSend.gain.value = 0.25;
@@ -92,6 +108,8 @@ export class SynthVoice {
       lfoSyncDivision: 'free',
       fmAmount: 0,
       fmRatio: 50,
+      drive: 0,
+      driveType: 'soft',
     };
 
     // Setup LFO for filter modulation
@@ -151,7 +169,7 @@ export class SynthVoice {
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
   }
 
-  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number } {
+  getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number; drive?: number; driveType?: DistortionCurve } {
     return { ...this.params };
   }
 
@@ -159,7 +177,7 @@ export class SynthVoice {
     return this.params.lfoSyncDivision ?? 'free';
   }
 
-  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number }>): void {
+  setParams(params: Partial<Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number; drive?: number; driveType?: DistortionCurve }>): void {
     this.params = { ...this.params, ...params };
     
     const ctx = audioEngine.getContext();
@@ -178,6 +196,14 @@ export class SynthVoice {
       if (this.lfoGain) {
         this.lfoGain.gain.setTargetAtTime(200 + rate * 50, ctx.currentTime, 0.05);
       }
+    }
+    
+    // Update waveshaper drive
+    if (params.drive !== undefined) {
+      this.waveshaper.setDrive(params.drive);
+    }
+    if (params.driveType !== undefined) {
+      this.waveshaper.setCurve(params.driveType);
     }
     
     // Update active voices (including FM parameters)
@@ -305,11 +331,11 @@ export class SynthVoice {
       this.lfoGain.connect(filter.frequency);
     }
 
-    // Connect: oscs -> filter -> voiceGain -> output + FX sends
+    // Connect: oscs -> filter -> voiceGain -> preWaveshaperGain -> waveshaper -> output + FX sends
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(voiceGain);
-    voiceGain.connect(this.outputGain);
+    voiceGain.connect(this.preWaveshaperGain);
     voiceGain.connect(this.reverbSend);
     voiceGain.connect(this.delaySend);
 
@@ -375,6 +401,8 @@ export class SynthVoice {
 
   disconnect(): void {
     this.allNotesOff();
+    this.preWaveshaperGain.disconnect();
+    this.waveshaper.disconnect();
     this.outputGain.disconnect();
     this.reverbSend.disconnect();
     this.delaySend.disconnect();

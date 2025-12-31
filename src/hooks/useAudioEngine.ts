@@ -26,6 +26,7 @@ export interface PLocks {
   pitch?: number;
   decay?: number;
   microTiming?: number; // -50 to +50 ms offset
+  fmAmount?: number;    // 0-100 FM depth per step
 }
 
 // Acid 303 step modifiers
@@ -555,7 +556,7 @@ export const useAudioEngine = ({
           }
           
           // Apply P-Locks temporarily if present
-          let originalParams: { cutoff?: number; resonance?: number; release?: number } | null = null;
+          let originalParams: { cutoff?: number; resonance?: number; release?: number; fmAmount?: number } | null = null;
           if (synth.pLocks) {
             originalParams = {};
             if (synth.pLocks.cutoff !== undefined) {
@@ -570,6 +571,11 @@ export const useAudioEngine = ({
             if (synth.pLocks.decay !== undefined) {
               originalParams.release = synthRef.current?.getParams?.().release;
               synthRef.current?.setParams({ release: 0.05 + (synth.pLocks.decay / 100) * 0.95 });
+            }
+            // Apply FM Amount P-Lock
+            if (synth.pLocks.fmAmount !== undefined) {
+              originalParams.fmAmount = synthRef.current?.getParams?.().fmAmount;
+              synthRef.current?.setParams({ fmAmount: synth.pLocks.fmAmount });
             }
           }
           
@@ -591,6 +597,9 @@ export const useAudioEngine = ({
               }
               if (originalParams.release !== undefined) {
                 synthRef.current?.setParams({ release: originalParams.release });
+              }
+              if (originalParams.fmAmount !== undefined) {
+                synthRef.current?.setParams({ fmAmount: originalParams.fmAmount });
               }
             }
           }, stepDuration * 0.8 * 1000);

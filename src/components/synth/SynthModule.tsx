@@ -6,6 +6,7 @@ import { Knob } from './Knob';
 import { cn } from '@/lib/utils';
 import { WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
+import type { DistortionCurve } from '@/audio/WaveshaperEngine';
 
 interface Step {
   active: boolean;
@@ -33,6 +34,8 @@ interface SynthModuleProps {
     lfoSyncDivision: LfoSyncDivision;
     fmAmount: number;
     fmRatio: number;
+    drive: number;
+    driveType: DistortionCurve;
   };
   onParamsChange: (params: SynthModuleProps['params']) => void;
   muted: boolean;
@@ -43,6 +46,7 @@ interface SynthModuleProps {
 
 const waveforms: WaveformType[] = ['sine', 'saw', 'square', 'tri'];
 const lfoSyncDivisions: LfoSyncDivision[] = ['free', '1/1', '1/2', '1/4', '1/8', '1/16', '3/16', '5/16'];
+const distortionCurves: DistortionCurve[] = ['soft', 'hard', 'tube', 'foldback', 'bitcrush'];
 
 export const SynthModule = ({ 
   currentStep, 
@@ -134,7 +138,7 @@ export const SynthModule = ({
         />
 
         {/* Parameters */}
-        <div className="grid grid-cols-4 gap-3 pt-3 border-t border-border">
+        <div className="grid grid-cols-5 gap-2 pt-3 border-t border-border">
           <Knob
             value={params.cutoff}
             onChange={(v) => updateParam('cutoff', v)}
@@ -162,6 +166,27 @@ export const SynthModule = ({
             size="sm"
             variant="accent"
           />
+          <div className="flex flex-col items-center">
+            <Knob
+              value={params.drive}
+              onChange={(v) => updateParam('drive', v)}
+              label="Drive"
+              size="sm"
+              variant="secondary"
+            />
+            <select
+              value={params.driveType}
+              onChange={(e) => updateParam('driveType', e.target.value as DistortionCurve)}
+              className="w-full text-[9px] bg-surface-sunken border border-border rounded px-0.5 py-0.5 text-center focus:outline-none focus:border-primary mt-1"
+              title="Distortion Type"
+            >
+              {distortionCurves.map((curve) => (
+                <option key={curve} value={curve}>
+                  {curve.charAt(0).toUpperCase() + curve.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-3">

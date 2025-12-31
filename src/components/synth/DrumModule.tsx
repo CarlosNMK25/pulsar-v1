@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
 import type { ConditionType } from '@/hooks/useAudioEngine';
+import type { DistortionCurve } from '@/audio/WaveshaperEngine';
 
 interface Step {
   active: boolean;
@@ -19,8 +20,11 @@ interface DrumParams {
   pitch: number;
   decay: number;
   drive: number;
+  driveType: DistortionCurve;
   mix: number;
 }
+
+const distortionCurves: DistortionCurve[] = ['soft', 'hard', 'tube', 'foldback', 'bitcrush'];
 
 interface DrumModuleProps {
   currentStep: number;
@@ -219,7 +223,7 @@ export const DrumModule = ({
         <input ref={hatInputRef} type="file" accept=".wav,.mp3,.ogg" className="hidden" onChange={handleInputChange('hat')} />
 
         {/* Parameters */}
-        <div className="flex justify-between pt-3 border-t border-border">
+        <div className="grid grid-cols-5 gap-2 pt-3 border-t border-border">
           <Knob
             value={params.pitch}
             onChange={(v) => onParamsChange({ ...params, pitch: v })}
@@ -232,13 +236,27 @@ export const DrumModule = ({
             label="Decay"
             size="sm"
           />
-          <Knob
-            value={params.drive}
-            onChange={(v) => onParamsChange({ ...params, drive: v })}
-            label="Drive"
-            size="sm"
-            variant="secondary"
-          />
+          <div className="flex flex-col items-center">
+            <Knob
+              value={params.drive}
+              onChange={(v) => onParamsChange({ ...params, drive: v })}
+              label="Drive"
+              size="sm"
+              variant="secondary"
+            />
+            <select
+              value={params.driveType}
+              onChange={(e) => onParamsChange({ ...params, driveType: e.target.value as DistortionCurve })}
+              className="w-full text-[9px] bg-surface-sunken border border-border rounded px-0.5 py-0.5 text-center focus:outline-none focus:border-primary mt-1"
+              title="Distortion Type"
+            >
+              {distortionCurves.map((curve) => (
+                <option key={curve} value={curve}>
+                  {curve.charAt(0).toUpperCase() + curve.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
           <Knob
             value={params.mix}
             onChange={(v) => onParamsChange({ ...params, mix: v })}

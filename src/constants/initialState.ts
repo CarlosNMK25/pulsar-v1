@@ -37,7 +37,7 @@ export const createInitialSteps = (pattern: number[]) =>
 export const TRANSITION_DURATION = 500; // ms
 
 // Default parameter values
-export const defaultDrumParams = { pitch: 50, decay: 60, drive: 30, mix: 75 };
+export const defaultDrumParams = { pitch: 50, decay: 60, drive: 30, driveType: 'soft' as const, mix: 75 };
 
 export const defaultSynthParams = {
   waveform: 'saw' as WaveformType,
@@ -50,6 +50,8 @@ export const defaultSynthParams = {
   lfoSyncDivision: 'free' as LfoSyncDivision,
   fmAmount: 0,   // FM off by default (retrocompatible)
   fmRatio: 50,   // ~2x ratio (octave harmonic)
+  drive: 0,      // Waveshaper off by default
+  driveType: 'soft' as const,
 };
 
 export const defaultTextureParams = {
