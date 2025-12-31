@@ -143,26 +143,18 @@ export const GlitchModuleCompact = ({
     });
   };
 
-  // Handle clicking on track button - either toggle or switch editing
+  // Handle clicking on track button - always toggle, set as editing if activating
   const handleTrackClick = (target: IndividualTarget) => {
-    if (individualTargets.has(target)) {
-      // Already active - if multiple tracks, switch to editing this one
-      if (individualTargets.size > 1) {
-        setSelectedEditTrack(target);
-      } else {
-        // Only one track active, toggle it off
-        toggleIndividualTarget(target);
-      }
-    } else {
-      // Not active - activate and set as editing
-      toggleIndividualTarget(target);
+    const isCurrentlyActive = individualTargets.has(target);
+    
+    // Always toggle active state
+    toggleIndividualTarget(target);
+    
+    if (!isCurrentlyActive) {
+      // Just activated - set as editing
       setSelectedEditTrack(target);
     }
-  };
-
-  // Double-click always toggles active state
-  const handleTrackDoubleClick = (target: IndividualTarget) => {
-    toggleIndividualTarget(target);
+    // If deactivated, editingTrack useMemo handles selecting next active
   };
 
   const handleStutterTrigger = () => {
@@ -289,7 +281,6 @@ export const GlitchModuleCompact = ({
                     variant={isActive ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => handleTrackClick(id)}
-                    onDoubleClick={() => handleTrackDoubleClick(id)}
                     className={cn(
                       'flex-1 h-6 text-[10px] font-mono transition-all relative',
                       isActive 
