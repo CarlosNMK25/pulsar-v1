@@ -306,15 +306,24 @@ export class GlitchEngine {
   }
 
   setTapeStopParams(params: Partial<TapeStopParams>): void {
-    this.params.tapeStop = { ...this.params.tapeStop, ...params };
+    // Solo actualizar valores definidos para evitar NaN
+    if (params.speed !== undefined) this.params.tapeStop.speed = params.speed;
+    if (params.duration !== undefined) this.params.tapeStop.duration = params.duration;
+    if (params.mix !== undefined) this.params.tapeStop.mix = params.mix;
   }
 
   setGranularFreezeParams(params: Partial<GranularFreezeParams>): void {
-    this.params.granularFreeze = { ...this.params.granularFreeze, ...params };
+    // Solo actualizar valores definidos para evitar NaN
+    if (params.grainSize !== undefined) this.params.granularFreeze.grainSize = params.grainSize;
+    if (params.pitch !== undefined) this.params.granularFreeze.pitch = params.pitch;
+    if (params.spread !== undefined) this.params.granularFreeze.spread = params.spread;
+    if (params.mix !== undefined) this.params.granularFreeze.mix = params.mix;
   }
 
   setReverseParams(params: Partial<ReverseParams>): void {
-    this.params.reverse = { ...this.params.reverse, ...params };
+    // Solo actualizar valores definidos para evitar NaN
+    if (params.duration !== undefined) this.params.reverse.duration = params.duration;
+    if (params.mix !== undefined) this.params.reverse.mix = params.mix;
   }
 
   // Trigger effects (for momentary activation)
