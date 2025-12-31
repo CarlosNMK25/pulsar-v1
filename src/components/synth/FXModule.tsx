@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
+import { FXMeter } from './FXMeter';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
+import { useFXAnalyser } from '@/hooks/useFXAnalyser';
 import { cn } from '@/lib/utils';
 
 interface FXModuleProps {
@@ -26,6 +28,7 @@ interface FXModuleProps {
     highpass: number;
   };
   bpm: number;
+  isPlaying: boolean;
   onReverbChange: (params: Partial<FXModuleProps['reverbParams']>) => void;
   onDelayChange: (params: Partial<FXModuleProps['delayParams']>) => void;
   onMasterFilterChange: (params: Partial<FXModuleProps['masterFilterParams']>) => void;
@@ -38,11 +41,13 @@ export function FXModule({
   delayParams, 
   masterFilterParams,
   bpm,
+  isPlaying,
   onReverbChange, 
   onDelayChange,
   onMasterFilterChange,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
+  const { reverb: reverbLevel, delay: delayLevel, master: masterLevel } = useFXAnalyser(isPlaying && !muted);
 
   // Apply bypass to FX engine when mute changes
   useEffect(() => {
@@ -68,7 +73,14 @@ export function FXModule({
           {/* Reverb Column */}
           <div className="space-y-2">
             <div className="text-label text-muted-foreground flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+              <span 
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full transition-all duration-100",
+                  reverbLevel > 0.05 
+                    ? "bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
+                    : "bg-primary/30"
+                )} 
+              />
               Reverb
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -121,7 +133,14 @@ export function FXModule({
           <div className="space-y-2">
             <div className="text-label text-muted-foreground flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
+                <span 
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-all duration-100",
+                    delayLevel > 0.05 
+                      ? "bg-accent shadow-[0_0_6px_hsl(var(--accent))]"
+                      : "bg-accent/30"
+                  )} 
+                />
                 Delay
               </div>
               <div className="flex gap-0.5">
@@ -179,6 +198,11 @@ export function FXModule({
               />
             </div>
           </div>
+        </div>
+
+        {/* VU Meter - Wet Signal */}
+        <div className="py-1.5">
+          <FXMeter level={masterLevel} className="mx-0.5" />
         </div>
 
         {/* Master Filter Section */}
