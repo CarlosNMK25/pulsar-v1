@@ -50,7 +50,7 @@ const tabs = [
 const DOCK_HEIGHTS = {
   hidden: 0,
   mini: 48,
-  expanded: 160,
+  expanded: 320,
 };
 
 export const BottomDock = ({
