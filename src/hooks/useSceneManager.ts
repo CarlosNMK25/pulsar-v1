@@ -81,6 +81,7 @@ export const useSceneManager = ({
       textureMuted: textureState.textureMuted,
       reverbParams: fxState.reverbParams,
       delayParams: fxState.delayParams,
+      masterFilterParams: fxState.masterFilterParams,
       bpm,
       swing,
     };
@@ -90,7 +91,7 @@ export const useSceneManager = ({
     drumState.drumParams, drumState.drumMuted,
     synthState.synthSteps, synthState.synthParams, synthState.synthMuted, 
     textureState.textureMode, textureState.textureParams, textureState.textureMuted, 
-    fxState.reverbParams, fxState.delayParams, 
+    fxState.reverbParams, fxState.delayParams, fxState.masterFilterParams,
     bpm, swing
   ]);
 
@@ -100,7 +101,8 @@ export const useSceneManager = ({
     synthState.setSynthParams(prev => ({ ...prev, ...params.synthParams }));
     textureState.setTextureParams(params.textureParams);
     fxState.setReverbParams(params.reverbParams);
-    fxState.setDelayParams(params.delayParams);
+    fxState.setDelayParams(prev => ({ ...prev, ...params.delayParams }));
+    fxState.setMasterFilterParams(params.masterFilterParams);
     setBpm(params.bpm);
     setSwing(params.swing);
   }, [drumState, synthState, textureState, fxState, setBpm, setSwing]);

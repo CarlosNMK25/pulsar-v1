@@ -35,10 +35,14 @@ export interface TextureParams {
   mix: number;
 }
 
+export type SyncDivision = '1/4' | '1/8' | '1/16' | '3/16';
+
 export interface ReverbParams {
   size: number;
   decay: number;
   damping: number;
+  preDelay: number;
+  lofi: number;
   mix: number;
 }
 
@@ -46,7 +50,14 @@ export interface DelayParams {
   time: number;
   feedback: number;
   filter: number;
+  spread: number;
   mix: number;
+  syncDivision: SyncDivision;
+}
+
+export interface MasterFilterParams {
+  lowpass: number;
+  highpass: number;
 }
 
 export interface SceneData {
@@ -76,6 +87,7 @@ export interface SceneData {
   // FX module
   reverbParams: ReverbParams;
   delayParams: DelayParams;
+  masterFilterParams: MasterFilterParams;
   
   // Global
   bpm: number;
@@ -88,7 +100,8 @@ export interface InterpolatedParams {
   synthParams: Omit<SynthParams, 'waveform'>;
   textureParams: TextureParams;
   reverbParams: ReverbParams;
-  delayParams: DelayParams;
+  delayParams: Omit<DelayParams, 'syncDivision'>;
+  masterFilterParams: MasterFilterParams;
   bpm: number;
   swing: number;
 }
@@ -202,13 +215,20 @@ class SceneEngine {
         size: this.lerp(from.reverbParams.size, to.reverbParams.size, t),
         decay: this.lerp(from.reverbParams.decay, to.reverbParams.decay, t),
         damping: this.lerp(from.reverbParams.damping, to.reverbParams.damping, t),
+        preDelay: this.lerp(from.reverbParams.preDelay ?? 0.1, to.reverbParams.preDelay ?? 0.1, t),
+        lofi: this.lerp(from.reverbParams.lofi ?? 0, to.reverbParams.lofi ?? 0, t),
         mix: this.lerp(from.reverbParams.mix, to.reverbParams.mix, t),
       },
       delayParams: {
         time: this.lerp(from.delayParams.time, to.delayParams.time, t),
         feedback: this.lerp(from.delayParams.feedback, to.delayParams.feedback, t),
         filter: this.lerp(from.delayParams.filter, to.delayParams.filter, t),
+        spread: this.lerp(from.delayParams.spread ?? 0.3, to.delayParams.spread ?? 0.3, t),
         mix: this.lerp(from.delayParams.mix, to.delayParams.mix, t),
+      },
+      masterFilterParams: {
+        lowpass: this.lerp(from.masterFilterParams?.lowpass ?? 1, to.masterFilterParams?.lowpass ?? 1, t),
+        highpass: this.lerp(from.masterFilterParams?.highpass ?? 0, to.masterFilterParams?.highpass ?? 0, t),
       },
       bpm: Math.round(this.lerp(from.bpm, to.bpm, t)),
       swing: this.lerp(from.swing, to.swing, t),

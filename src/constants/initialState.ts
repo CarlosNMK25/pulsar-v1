@@ -64,6 +64,8 @@ export const defaultReverbParams = {
   size: 0.5,
   decay: 0.5,
   damping: 0.5,
+  preDelay: 0.1,
+  lofi: 0.0,
   mix: 0.3,
 };
 
@@ -71,7 +73,14 @@ export const defaultDelayParams = {
   time: 0.375,
   feedback: 0.4,
   filter: 0.7,
+  spread: 0.3,
   mix: 0.25,
+  syncDivision: '3/16' as const,
+};
+
+export const defaultMasterFilterParams = {
+  lowpass: 1.0,
+  highpass: 0.0,
 };
 
 // Default step patterns
