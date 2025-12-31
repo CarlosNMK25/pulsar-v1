@@ -9,7 +9,7 @@ import { fxEngine } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
-import { TrackSendLevels } from '@/hooks/useFXState';
+import { TrackSendLevels, TrackRoutingState } from '@/hooks/useFXState';
 // Conditional Trigger types (Elektron-style)
 export type ConditionType = 
   | '1:2' | '1:3' | '1:4'           // X of every N repetitions
@@ -102,6 +102,7 @@ interface UseAudioEngineProps {
     highpass: number;
   };
   sendLevels: TrackSendLevels;
+  trackRouting: TrackRoutingState;
   glitchTargets: GlitchTarget[];
   sampleBuffer: AudioBuffer | null;
   sampleParams: SampleParams;
@@ -167,6 +168,7 @@ export const useAudioEngine = ({
   delayParams,
   masterFilterParams,
   sendLevels,
+  trackRouting,
   glitchTargets,
   sampleBuffer,
   sampleParams,
@@ -415,6 +417,26 @@ export const useAudioEngine = ({
       sampleRef.current.setFXSend(sendLevels.sample.reverb, sendLevels.sample.delay);
     }
   }, [sendLevels, isInitialized]);
+
+  // Sync track routing (FX bypass) to engines
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    drumRef.current?.setFXBypass(trackRouting.drums.fxBypass);
+    synthRef.current?.setFXBypass(trackRouting.synth.fxBypass);
+    textureRef.current?.setFXBypass(trackRouting.texture.fxBypass);
+    sampleRef.current?.setFXBypass(trackRouting.sample.fxBypass);
+  }, [trackRouting, isInitialized]);
+
+  // Sync track glitch bypass
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    drumsGlitchRef.current?.setBypass(trackRouting.drums.glitchBypass);
+    synthGlitchRef.current?.setBypass(trackRouting.synth.glitchBypass);
+    textureGlitchRef.current?.setBypass(trackRouting.texture.glitchBypass);
+    sampleGlitchRef.current?.setBypass(trackRouting.sample.glitchBypass);
+  }, [trackRouting, isInitialized]);
 
   // Handle texture mute and playback
   useEffect(() => {
@@ -861,6 +883,16 @@ export const useAudioEngine = ({
     synthRef.current?.noteOff(note);
   }, []);
 
+  // Drum trigger for keyboard
+  const triggerDrum = useCallback((drum: 'kick' | 'snare' | 'hat', velocity: number = 100) => {
+    drumRef.current?.trigger(drum, velocity);
+  }, []);
+
+  // Sample trigger for keyboard
+  const triggerSample = useCallback((velocity: number = 100) => {
+    sampleRef.current?.trigger();
+  }, []);
+
   // Volume control per channel
   const [volumes, setVolumesState] = useState({
     drum: 0.8,
@@ -905,6 +937,8 @@ export const useAudioEngine = ({
     setGlitchChaosParams,
     playNote,
     stopNote,
+    triggerDrum,
+    triggerSample,
     volumes,
     setChannelVolume,
   };

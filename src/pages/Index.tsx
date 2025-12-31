@@ -27,6 +27,7 @@ import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useUILayout } from '@/hooks/useUILayout';
 import { SampleModule } from '@/components/synth/SampleModule';
+import { KeyboardTarget } from '@/components/synth/dock/KeyboardTab';
 
 import { AutoFillConfig } from '@/components/synth/TransportControls';
 
@@ -61,6 +62,7 @@ const Index = () => {
   const fxState = useFXState();
   const sampleState = useSampleState();
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
+  const [keyboardTarget, setKeyboardTarget] = useState<KeyboardTarget>('synth');
 
   // Scene manager
   const sceneManager = useSceneManager({
@@ -105,6 +107,8 @@ const Index = () => {
     setGlitchChaosParams,
     playNote,
     stopNote,
+    triggerDrum,
+    triggerSample,
     volumes,
     setChannelVolume,
   } = useAudioEngine({
@@ -127,6 +131,7 @@ const Index = () => {
     delayParams: fxState.delayParams,
     masterFilterParams: fxState.masterFilterParams,
     sendLevels: fxState.sendLevels,
+    trackRouting: fxState.trackRouting,
     glitchTargets,
     sampleBuffer: sampleState.sampleBuffer,
     sampleParams: sampleState.sampleParams,
@@ -413,8 +418,12 @@ const Index = () => {
         analyserData={analyserData}
         onNoteOn={playNote}
         onNoteOff={stopNote}
+        onDrumTrigger={triggerDrum}
+        onSampleTrigger={triggerSample}
         isAudioReady={isInitialized}
         onInitAudio={initAudio}
+        keyboardTarget={keyboardTarget}
+        onKeyboardTargetChange={setKeyboardTarget}
         drumMuted={drumState.drumMuted}
         synthMuted={synthState.synthMuted}
         textureMuted={textureState.textureMuted}
@@ -425,6 +434,8 @@ const Index = () => {
         onSampleMuteToggle={sampleState.toggleSampleMute}
         volumes={volumes}
         onVolumeChange={setChannelVolume}
+        trackRouting={fxState.trackRouting}
+        onRoutingChange={fxState.updateTrackRouting}
       />
 
       {/* Performance Panel (Left) */}

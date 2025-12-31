@@ -25,6 +25,8 @@ export class DrumEngine {
   private params: DrumParams = { decay: 50, pitch: 50, drive: 30, driveType: 'soft', mix: 75 };
   private fxConnected = false;
   private muted = false;
+  private fxBypassed = false;
+  private savedFxLevels = { reverb: 0.2, delay: 0.15 };
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -85,9 +87,23 @@ export class DrumEngine {
   }
 
   setFXSend(reverb: number, delay: number): void {
+    this.savedFxLevels = { reverb, delay };
+    if (this.fxBypassed) return;
     const ctx = audioEngine.getContext();
     this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.05);
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
+  }
+
+  setFXBypass(bypass: boolean): void {
+    this.fxBypassed = bypass;
+    const ctx = audioEngine.getContext();
+    if (bypass) {
+      this.reverbSend.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      this.delaySend.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    } else {
+      this.reverbSend.gain.setTargetAtTime(this.savedFxLevels.reverb, ctx.currentTime, 0.05);
+      this.delaySend.gain.setTargetAtTime(this.savedFxLevels.delay, ctx.currentTime, 0.05);
+    }
   }
 
   private createKick(): DrumSound {

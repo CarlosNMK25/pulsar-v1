@@ -66,6 +66,8 @@ export class SynthVoice {
   private params: Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision };
   private fxConnected = false;
   private muted = false;
+  private fxBypassed = false;
+  private savedFxLevels = { reverb: 0.25, delay: 0.2 };
   private lfo: OscillatorNode | null = null;
   private lfoGain: GainNode | null = null;
   private lastNote: number | null = null;
@@ -164,9 +166,23 @@ export class SynthVoice {
   }
 
   setFXSend(reverb: number, delay: number): void {
+    this.savedFxLevels = { reverb, delay };
+    if (this.fxBypassed) return;
     const ctx = audioEngine.getContext();
     this.reverbSend.gain.setTargetAtTime(reverb, ctx.currentTime, 0.05);
     this.delaySend.gain.setTargetAtTime(delay, ctx.currentTime, 0.05);
+  }
+
+  setFXBypass(bypass: boolean): void {
+    this.fxBypassed = bypass;
+    const ctx = audioEngine.getContext();
+    if (bypass) {
+      this.reverbSend.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      this.delaySend.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    } else {
+      this.reverbSend.gain.setTargetAtTime(this.savedFxLevels.reverb, ctx.currentTime, 0.05);
+      this.delaySend.gain.setTargetAtTime(this.savedFxLevels.delay, ctx.currentTime, 0.05);
+    }
   }
 
   getParams(): Omit<VoiceParams, 'frequency' | 'velocity'> & { lfoRate?: number; lfoSyncDivision?: LfoSyncDivision; fmAmount?: number; fmRatio?: number; drive?: number; driveType?: DistortionCurve } {

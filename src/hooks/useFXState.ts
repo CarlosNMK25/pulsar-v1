@@ -40,6 +40,26 @@ export interface TrackSendLevels {
   sample: TrackSend;
 }
 
+// NEW: Track routing for FX and Glitch bypass
+export interface TrackRouting {
+  fxBypass: boolean;      // true = no FX (reverb/delay)
+  glitchBypass: boolean;  // true = no glitch processing
+}
+
+export interface TrackRoutingState {
+  drums: TrackRouting;
+  synth: TrackRouting;
+  texture: TrackRouting;
+  sample: TrackRouting;
+}
+
+export const defaultRoutingState: TrackRoutingState = {
+  drums: { fxBypass: false, glitchBypass: false },
+  synth: { fxBypass: false, glitchBypass: false },
+  texture: { fxBypass: false, glitchBypass: false },
+  sample: { fxBypass: false, glitchBypass: false },
+};
+
 export const defaultSendLevels: TrackSendLevels = {
   drums: { reverb: 0.2, delay: 0.15 },
   synth: { reverb: 0.25, delay: 0.2 },
@@ -52,6 +72,7 @@ export interface FXState {
   delayParams: DelayParams;
   masterFilterParams: MasterFilterParams;
   sendLevels: TrackSendLevels;
+  trackRouting: TrackRoutingState;
 }
 
 export const useFXState = () => {
@@ -59,6 +80,7 @@ export const useFXState = () => {
   const [delayParams, setDelayParams] = useState<DelayParams>(defaultDelayParams);
   const [masterFilterParams, setMasterFilterParams] = useState<MasterFilterParams>(defaultMasterFilterParams);
   const [sendLevels, setSendLevels] = useState<TrackSendLevels>(defaultSendLevels);
+  const [trackRouting, setTrackRouting] = useState<TrackRoutingState>(defaultRoutingState);
 
   const updateReverbParams = useCallback((params: Partial<ReverbParams>) => {
     setReverbParams(prev => ({ ...prev, ...params }));
@@ -79,12 +101,21 @@ export const useFXState = () => {
     }));
   }, []);
 
+  // NEW: Update track routing (FX/Glitch bypass)
+  const updateTrackRouting = useCallback((track: TrackName, routing: Partial<TrackRouting>) => {
+    setTrackRouting(prev => ({
+      ...prev,
+      [track]: { ...prev[track], ...routing },
+    }));
+  }, []);
+
   // Batch setter for scene loading
   const setAllFXState = useCallback((state: Partial<FXState>) => {
     if (state.reverbParams !== undefined) setReverbParams(state.reverbParams);
     if (state.delayParams !== undefined) setDelayParams(state.delayParams);
     if (state.masterFilterParams !== undefined) setMasterFilterParams(state.masterFilterParams);
     if (state.sendLevels !== undefined) setSendLevels(state.sendLevels);
+    if (state.trackRouting !== undefined) setTrackRouting(state.trackRouting);
   }, []);
 
   return {
@@ -96,10 +127,13 @@ export const useFXState = () => {
     setMasterFilterParams,
     sendLevels,
     setSendLevels,
+    trackRouting,
+    setTrackRouting,
     updateReverbParams,
     updateDelayParams,
     updateMasterFilterParams,
     updateSendLevel,
+    updateTrackRouting,
     setAllFXState,
   };
 };
