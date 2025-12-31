@@ -1,0 +1,145 @@
+import { Keyboard, SlidersHorizontal, Activity, Settings2, ChevronUp, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DockState } from '@/hooks/useUILayout';
+import { KeyboardTab } from './dock/KeyboardTab';
+import { MixerTab } from './dock/MixerTab';
+import { ScopeTab } from './dock/ScopeTab';
+import { ParamsTab } from './dock/ParamsTab';
+
+interface BottomDockProps {
+  state: DockState;
+  onStateChange: (state: DockState) => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  // Audio data for tabs
+  analyserData?: Uint8Array;
+  // Mixer data
+  drumMuted?: boolean;
+  synthMuted?: boolean;
+  textureMuted?: boolean;
+  sampleMuted?: boolean;
+  onDrumMuteToggle?: () => void;
+  onSynthMuteToggle?: () => void;
+  onTextureMuteToggle?: () => void;
+  onSampleMuteToggle?: () => void;
+}
+
+const tabs = [
+  { id: 'keys', label: 'Keys', icon: Keyboard },
+  { id: 'mixer', label: 'Mixer', icon: SlidersHorizontal },
+  { id: 'scope', label: 'Scope', icon: Activity },
+  { id: 'params', label: 'Params', icon: Settings2 },
+];
+
+const DOCK_HEIGHTS = {
+  hidden: 0,
+  mini: 48,
+  expanded: 160,
+};
+
+export const BottomDock = ({
+  state,
+  onStateChange,
+  activeTab,
+  onTabChange,
+  analyserData,
+  drumMuted = false,
+  synthMuted = false,
+  textureMuted = false,
+  sampleMuted = false,
+  onDrumMuteToggle,
+  onSynthMuteToggle,
+  onTextureMuteToggle,
+  onSampleMuteToggle,
+}: BottomDockProps) => {
+  const height = DOCK_HEIGHTS[state];
+  const isVisible = state !== 'hidden';
+  const isExpanded = state === 'expanded';
+
+  const handleToggleExpand = () => {
+    onStateChange(isExpanded ? 'mini' : 'expanded');
+  };
+
+  const handleClose = () => {
+    onStateChange('hidden');
+  };
+
+  return (
+    <div
+      className={cn(
+        "fixed bottom-0 left-0 right-0 z-40",
+        "border-t border-border bg-card/95 backdrop-blur-sm",
+        "transition-all duration-200 ease-out",
+        !isVisible && "translate-y-full"
+      )}
+      style={{ height: isVisible ? height : 0 }}
+    >
+      {/* Tab bar - always visible when dock is open */}
+      <div className="flex items-center justify-between px-4 h-12 border-b border-border/50">
+        <div className="flex items-center gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  onTabChange(tab.id);
+                  if (state === 'mini') onStateChange('expanded');
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium",
+                  "transition-colors duration-150",
+                  isActive
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleExpand}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title={isExpanded ? "Minimize" : "Expand"}
+          >
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title="Close dock"
+          >
+            <span className="text-xs">✕</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tab content - only visible when expanded */}
+      {isExpanded && (
+        <div className="h-[calc(100%-48px)] overflow-hidden">
+          {activeTab === 'keys' && <KeyboardTab />}
+          {activeTab === 'mixer' && (
+            <MixerTab
+              drumMuted={drumMuted}
+              synthMuted={synthMuted}
+              textureMuted={textureMuted}
+              sampleMuted={sampleMuted}
+              onDrumMuteToggle={onDrumMuteToggle}
+              onSynthMuteToggle={onSynthMuteToggle}
+              onTextureMuteToggle={onTextureMuteToggle}
+              onSampleMuteToggle={onSampleMuteToggle}
+            />
+          )}
+          {activeTab === 'scope' && <ScopeTab analyserData={analyserData} />}
+          {activeTab === 'params' && <ParamsTab />}
+        </div>
+      )}
+    </div>
+  );
+};
