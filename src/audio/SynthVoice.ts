@@ -362,7 +362,14 @@ export class SynthVoice {
 
   noteOff(note: number): void {
     const voice = this.voices.get(note);
-    if (!voice) return;
+    if (!voice) {
+      console.log(`[SynthVoice] noteOff: note=${note} NOT FOUND in voices. Active voices: ${Array.from(this.voices.keys()).join(',')}`);
+      return;
+    }
+
+    // Remove from map IMMEDIATELY to prevent race conditions
+    this.voices.delete(note);
+    console.log(`[SynthVoice] noteOff: note=${note} FOUND and removed. Remaining voices: ${Array.from(this.voices.keys()).join(',')}`);
 
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
@@ -387,7 +394,6 @@ export class SynthVoice {
       if (voice.fmGain) voice.fmGain.disconnect();
       voice.filter.disconnect();
       voice.gainNode.disconnect();
-      this.voices.delete(note);
     }, (this.params.release + 0.2) * 1000);
   }
 
