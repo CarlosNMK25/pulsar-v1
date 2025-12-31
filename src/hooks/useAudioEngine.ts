@@ -852,6 +852,45 @@ export const useAudioEngine = ({
     fxGlitchRef.current?.setChaosParams(params);
   }, []);
 
+  // Keyboard note control - expose synth noteOn/noteOff for external keyboard
+  const playNote = useCallback((note: number, velocity: number = 100) => {
+    synthRef.current?.noteOn(note, velocity);
+  }, []);
+
+  const stopNote = useCallback((note: number) => {
+    synthRef.current?.noteOff(note);
+  }, []);
+
+  // Volume control per channel
+  const [volumes, setVolumesState] = useState({
+    drum: 0.8,
+    synth: 0.8,
+    texture: 0.8,
+    sample: 0.8,
+    master: 0.8,
+  });
+
+  const setChannelVolume = useCallback((channel: string, value: number) => {
+    switch (channel) {
+      case 'drum':
+        drumRef.current?.setVolume(value);
+        break;
+      case 'synth':
+        synthRef.current?.setVolume(value);
+        break;
+      case 'texture':
+        textureRef.current?.setVolume(value);
+        break;
+      case 'sample':
+        sampleRef.current?.setVolume(value);
+        break;
+      case 'master':
+        audioEngine.setMasterVolume(value);
+        break;
+    }
+    setVolumesState(prev => ({ ...prev, [channel]: value }));
+  }, []);
+
   return {
     initAudio,
     isInitialized,
@@ -864,5 +903,9 @@ export const useAudioEngine = ({
     setGlitchBitcrushParams,
     setChaosEnabled,
     setGlitchChaosParams,
+    playNote,
+    stopNote,
+    volumes,
+    setChannelVolume,
   };
 };

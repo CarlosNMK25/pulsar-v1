@@ -306,6 +306,11 @@ export class DrumEngine {
     return this.loadedSamples.has(drumType);
   }
 
+  setVolume(value: number): void {
+    const ctx = audioEngine.getContext();
+    this.outputGain.gain.setTargetAtTime(value * 0.6, ctx.currentTime, 0.05);
+  }
+
   disconnect(): void {
     this.preWaveshaperGain.disconnect();
     this.waveshaper.disconnect();

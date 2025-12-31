@@ -207,6 +207,11 @@ export class SampleEngine {
     return this.isPlaying;
   }
 
+  setVolume(value: number): void {
+    const ctx = audioEngine.getContext();
+    this.outputGain.gain.setTargetAtTime(value, ctx.currentTime, 0.05);
+  }
+
   disconnect(): void {
     this.stop();
     this.outputGain.disconnect();
