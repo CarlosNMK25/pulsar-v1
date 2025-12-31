@@ -505,6 +505,11 @@ export class TextureEngine {
     }
   }
 
+  setVolume(value: number): void {
+    const ctx = audioEngine.getContext();
+    this.outputGain.gain.setTargetAtTime(value * 0.4, ctx.currentTime, 0.05);
+  }
+
   disconnect(): void {
     this.stop();
     try {

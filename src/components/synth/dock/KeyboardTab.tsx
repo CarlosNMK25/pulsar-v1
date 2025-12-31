@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
+interface KeyboardTabProps {
+  onNoteOn?: (note: number, velocity?: number) => void;
+  onNoteOff?: (note: number) => void;
+}
+
 const KEYBOARD_MAP: Record<string, { note: string; octaveOffset: number }> = {
   // Lower row - C3 to B3
   'z': { note: 'C', octaveOffset: 0 },
@@ -33,32 +38,53 @@ const KEYBOARD_MAP: Record<string, { note: string; octaveOffset: number }> = {
 const WHITE_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-export const KeyboardTab = () => {
+// Convert note name + octave to MIDI number
+const noteToMidi = (note: string, octave: number): number => {
+  const noteMap: Record<string, number> = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+  };
+  return (octave + 1) * 12 + noteMap[note];
+};
+
+export const KeyboardTab = ({ onNoteOn, onNoteOff }: KeyboardTabProps) => {
   const [octave, setOctave] = useState(3);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
     if (KEYBOARD_MAP[key] && !e.repeat) {
       const { note, octaveOffset } = KEYBOARD_MAP[key];
       const fullNote = `${note}${octave + octaveOffset}`;
+      const midiNote = noteToMidi(note, octave + octaveOffset);
+      
       setPressedKeys(prev => new Set(prev).add(fullNote));
-      // TODO: Trigger audio engine note
+      setPressedMidi(prev => new Set(prev).add(midiNote));
+      onNoteOn?.(midiNote, 100);
     }
-  }, [octave]);
+  }, [octave, onNoteOn]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
     if (KEYBOARD_MAP[key]) {
       const { note, octaveOffset } = KEYBOARD_MAP[key];
       const fullNote = `${note}${octave + octaveOffset}`;
+      const midiNote = noteToMidi(note, octave + octaveOffset);
+      
       setPressedKeys(prev => {
         const next = new Set(prev);
         next.delete(fullNote);
         return next;
       });
+      setPressedMidi(prev => {
+        const next = new Set(prev);
+        next.delete(midiNote);
+        return next;
+      });
+      onNoteOff?.(midiNote);
     }
-  }, [octave]);
+  }, [octave, onNoteOff]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -69,6 +95,31 @@ export const KeyboardTab = () => {
     };
   }, [handleKeyDown, handleKeyUp]);
 
+  // Mouse/touch handlers for visual keys
+  const handleMouseDown = useCallback((note: string, oct: number) => {
+    const fullNote = `${note}${oct}`;
+    const midiNote = noteToMidi(note, oct);
+    setPressedKeys(prev => new Set(prev).add(fullNote));
+    setPressedMidi(prev => new Set(prev).add(midiNote));
+    onNoteOn?.(midiNote, 100);
+  }, [onNoteOn]);
+
+  const handleMouseUp = useCallback((note: string, oct: number) => {
+    const fullNote = `${note}${oct}`;
+    const midiNote = noteToMidi(note, oct);
+    setPressedKeys(prev => {
+      const next = new Set(prev);
+      next.delete(fullNote);
+      return next;
+    });
+    setPressedMidi(prev => {
+      const next = new Set(prev);
+      next.delete(midiNote);
+      return next;
+    });
+    onNoteOff?.(midiNote);
+  }, [onNoteOff]);
+
   const renderOctave = (oct: number) => (
     <div key={oct} className="flex relative h-full">
       {/* White keys */}
@@ -78,8 +129,11 @@ export const KeyboardTab = () => {
         return (
           <button
             key={fullNote}
+            onMouseDown={() => handleMouseDown(note, oct)}
+            onMouseUp={() => handleMouseUp(note, oct)}
+            onMouseLeave={() => pressedKeys.has(fullNote) && handleMouseUp(note, oct)}
             className={cn(
-              "w-8 h-full border border-border rounded-b-sm transition-colors",
+              "w-8 h-full border border-border rounded-b-sm transition-colors select-none",
               isPressed ? "bg-primary" : "bg-foreground/90 hover:bg-foreground/80"
             )}
           />
@@ -91,14 +145,20 @@ export const KeyboardTab = () => {
           if (!note.includes('#')) return <div key={note} className="w-8" />;
           const fullNote = `${note}${oct}`;
           const isPressed = pressedKeys.has(fullNote);
+          // Position black keys correctly between white keys
+          const whiteKeyIndex = Math.floor(i / 2);
+          const offset = whiteKeyIndex * 32 + 20; // 32px per white key, offset to center
           return (
             <button
               key={fullNote}
+              onMouseDown={() => handleMouseDown(note, oct)}
+              onMouseUp={() => handleMouseUp(note, oct)}
+              onMouseLeave={() => pressedKeys.has(fullNote) && handleMouseUp(note, oct)}
               className={cn(
-                "absolute w-5 h-full rounded-b-sm pointer-events-auto transition-colors",
+                "absolute w-5 h-full rounded-b-sm pointer-events-auto transition-colors select-none",
                 isPressed ? "bg-primary" : "bg-background hover:bg-muted"
               )}
-              style={{ left: `${(i - 0.5) * (32 / 12) * 12 + 12}px` }}
+              style={{ left: `${offset}px` }}
             />
           );
         })}

@@ -103,6 +103,10 @@ const Index = () => {
     setGlitchBitcrushParams,
     setChaosEnabled,
     setGlitchChaosParams,
+    playNote,
+    stopNote,
+    volumes,
+    setChannelVolume,
   } = useAudioEngine({
     isPlaying,
     bpm,
@@ -407,6 +411,8 @@ const Index = () => {
         activeTab={uiLayout.activeDockTab}
         onTabChange={uiLayout.setActiveDockTab}
         analyserData={analyserData}
+        onNoteOn={playNote}
+        onNoteOff={stopNote}
         drumMuted={drumState.drumMuted}
         synthMuted={synthState.synthMuted}
         textureMuted={textureState.textureMuted}
@@ -415,6 +421,8 @@ const Index = () => {
         onSynthMuteToggle={synthState.toggleSynthMute}
         onTextureMuteToggle={textureState.toggleTextureMute}
         onSampleMuteToggle={sampleState.toggleSampleMute}
+        volumes={volumes}
+        onVolumeChange={setChannelVolume}
       />
 
       {/* Performance Panel (Left) */}

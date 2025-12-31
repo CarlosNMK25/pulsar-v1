@@ -13,6 +13,9 @@ interface BottomDockProps {
   onTabChange: (tab: string) => void;
   // Audio data for tabs
   analyserData?: Uint8Array;
+  // Keyboard callbacks
+  onNoteOn?: (note: number, velocity?: number) => void;
+  onNoteOff?: (note: number) => void;
   // Mixer data
   drumMuted?: boolean;
   synthMuted?: boolean;
@@ -22,6 +25,8 @@ interface BottomDockProps {
   onSynthMuteToggle?: () => void;
   onTextureMuteToggle?: () => void;
   onSampleMuteToggle?: () => void;
+  volumes?: Record<string, number>;
+  onVolumeChange?: (channel: string, value: number) => void;
 }
 
 const tabs = [
@@ -43,6 +48,8 @@ export const BottomDock = ({
   activeTab,
   onTabChange,
   analyserData,
+  onNoteOn,
+  onNoteOff,
   drumMuted = false,
   synthMuted = false,
   textureMuted = false,
@@ -51,6 +58,8 @@ export const BottomDock = ({
   onSynthMuteToggle,
   onTextureMuteToggle,
   onSampleMuteToggle,
+  volumes,
+  onVolumeChange,
 }: BottomDockProps) => {
   const height = DOCK_HEIGHTS[state];
   const isVisible = state !== 'hidden';
@@ -123,7 +132,12 @@ export const BottomDock = ({
       {/* Tab content - only visible when expanded */}
       {isExpanded && (
         <div className="h-[calc(100%-48px)] overflow-hidden">
-          {activeTab === 'keys' && <KeyboardTab />}
+          {activeTab === 'keys' && (
+            <KeyboardTab 
+              onNoteOn={onNoteOn} 
+              onNoteOff={onNoteOff} 
+            />
+          )}
           {activeTab === 'mixer' && (
             <MixerTab
               drumMuted={drumMuted}
@@ -134,6 +148,8 @@ export const BottomDock = ({
               onSynthMuteToggle={onSynthMuteToggle}
               onTextureMuteToggle={onTextureMuteToggle}
               onSampleMuteToggle={onSampleMuteToggle}
+              volumes={volumes}
+              onVolumeChange={onVolumeChange}
             />
           )}
           {activeTab === 'scope' && <ScopeTab analyserData={analyserData} />}

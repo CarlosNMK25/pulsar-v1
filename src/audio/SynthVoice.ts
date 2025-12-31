@@ -399,6 +399,11 @@ export class SynthVoice {
     return 440 * Math.pow(2, (note - 69) / 12);
   }
 
+  setVolume(value: number): void {
+    const ctx = audioEngine.getContext();
+    this.outputGain.gain.setTargetAtTime(value * 0.3, ctx.currentTime, 0.05);
+  }
+
   disconnect(): void {
     this.allNotesOff();
     this.preWaveshaperGain.disconnect();
