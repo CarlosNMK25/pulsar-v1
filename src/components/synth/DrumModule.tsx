@@ -6,11 +6,13 @@ import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
+import type { ConditionType } from '@/hooks/useAudioEngine';
 
 interface Step {
   active: boolean;
   velocity: number;
   probability: number;
+  condition?: ConditionType;
 }
 
 interface DrumParams {
@@ -80,6 +82,24 @@ export const DrumModule = ({
       i === index ? { ...step, active: !step.active } : step
     ));
   }, [kickSteps, snareSteps, hatSteps, onKickChange, onSnareChange, onHatChange]);
+
+  const handleKickCondition = useCallback((index: number, condition: ConditionType) => {
+    onKickChange(kickSteps.map((step, i) => 
+      i === index ? { ...step, condition } : step
+    ));
+  }, [kickSteps, onKickChange]);
+
+  const handleSnareCondition = useCallback((index: number, condition: ConditionType) => {
+    onSnareChange(snareSteps.map((step, i) => 
+      i === index ? { ...step, condition } : step
+    ));
+  }, [snareSteps, onSnareChange]);
+
+  const handleHatCondition = useCallback((index: number, condition: ConditionType) => {
+    onHatChange(hatSteps.map((step, i) => 
+      i === index ? { ...step, condition } : step
+    ));
+  }, [hatSteps, onHatChange]);
 
   const handleFileSelect = useCallback(async (drumType: 'kick' | 'snare' | 'hat', file: File) => {
     const validation = validateAudioFile(file);
@@ -156,6 +176,8 @@ export const DrumModule = ({
             variant="primary"
             swing={swing}
             humanize={humanize}
+            showConditions={true}
+            onStepCondition={handleKickCondition}
           />
           <StepSequencer
             steps={snareSteps}
@@ -170,6 +192,8 @@ export const DrumModule = ({
             variant="secondary"
             swing={swing}
             humanize={humanize}
+            showConditions={true}
+            onStepCondition={handleSnareCondition}
           />
           <StepSequencer
             steps={hatSteps}
@@ -184,6 +208,8 @@ export const DrumModule = ({
             variant="muted"
             swing={swing}
             humanize={humanize}
+            showConditions={true}
+            onStepCondition={handleHatCondition}
           />
         </div>
 
