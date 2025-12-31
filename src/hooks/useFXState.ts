@@ -71,6 +71,45 @@ export const defaultSendLevels: TrackSendLevels = {
   sample: { reverb: 0.35, delay: 0.3 },
 };
 
+// NEW: FX Offsets per track (-0.5 to +0.5, where 0 = no offset)
+export interface ReverbOffsets {
+  size: number;
+  decay: number;
+  damping: number;
+  preDelay: number;
+  lofi: number;
+}
+
+export interface DelayOffsets {
+  time: number;
+  feedback: number;
+  filter: number;
+  spread: number;
+}
+
+export interface TrackFXOffsets {
+  reverb: ReverbOffsets;
+  delay: DelayOffsets;
+}
+
+export interface FXOffsetsPerTrack {
+  drums: TrackFXOffsets;
+  synth: TrackFXOffsets;
+  texture: TrackFXOffsets;
+  sample: TrackFXOffsets;
+}
+
+const defaultReverbOffsets: ReverbOffsets = { size: 0, decay: 0, damping: 0, preDelay: 0, lofi: 0 };
+const defaultDelayOffsets: DelayOffsets = { time: 0, feedback: 0, filter: 0, spread: 0 };
+const defaultTrackOffsets: TrackFXOffsets = { reverb: { ...defaultReverbOffsets }, delay: { ...defaultDelayOffsets } };
+
+export const defaultFXOffsets: FXOffsetsPerTrack = {
+  drums: { reverb: { ...defaultReverbOffsets }, delay: { ...defaultDelayOffsets } },
+  synth: { reverb: { ...defaultReverbOffsets }, delay: { ...defaultDelayOffsets } },
+  texture: { reverb: { ...defaultReverbOffsets }, delay: { ...defaultDelayOffsets } },
+  sample: { reverb: { ...defaultReverbOffsets }, delay: { ...defaultDelayOffsets } },
+};
+
 export interface FXState {
   reverbParams: ReverbParams;
   delayParams: DelayParams;
@@ -79,6 +118,7 @@ export interface FXState {
   trackRouting: TrackRoutingState;
   fxRoutingMode: FXRoutingMode;
   fxTargets: FXTarget[];
+  fxOffsetsPerTrack: FXOffsetsPerTrack;
 }
 
 export const useFXState = () => {
@@ -89,6 +129,7 @@ export const useFXState = () => {
   const [trackRouting, setTrackRouting] = useState<TrackRoutingState>(defaultRoutingState);
   const [fxRoutingMode, setFxRoutingMode] = useState<FXRoutingMode>('master');
   const [fxTargets, setFxTargets] = useState<FXTarget[]>([]);
+  const [fxOffsetsPerTrack, setFxOffsetsPerTrack] = useState<FXOffsetsPerTrack>(defaultFXOffsets);
 
   const updateReverbParams = useCallback((params: Partial<ReverbParams>) => {
     setReverbParams(prev => ({ ...prev, ...params }));
@@ -128,6 +169,36 @@ export const useFXState = () => {
     });
   }, []);
 
+  // NEW: Update FX offset for a specific track/effect/param
+  const updateFXOffset = useCallback((
+    track: TrackName,
+    effect: 'reverb' | 'delay',
+    param: string,
+    value: number
+  ) => {
+    setFxOffsetsPerTrack(prev => ({
+      ...prev,
+      [track]: {
+        ...prev[track],
+        [effect]: {
+          ...prev[track][effect],
+          [param]: value,
+        },
+      },
+    }));
+  }, []);
+
+  // NEW: Reset offsets for a track
+  const resetTrackOffsets = useCallback((track: TrackName) => {
+    setFxOffsetsPerTrack(prev => ({
+      ...prev,
+      [track]: {
+        reverb: { size: 0, decay: 0, damping: 0, preDelay: 0, lofi: 0 },
+        delay: { time: 0, feedback: 0, filter: 0, spread: 0 },
+      },
+    }));
+  }, []);
+
   // Batch setter for scene loading
   const setAllFXState = useCallback((state: Partial<FXState>) => {
     if (state.reverbParams !== undefined) setReverbParams(state.reverbParams);
@@ -137,6 +208,7 @@ export const useFXState = () => {
     if (state.trackRouting !== undefined) setTrackRouting(state.trackRouting);
     if (state.fxRoutingMode !== undefined) setFxRoutingMode(state.fxRoutingMode);
     if (state.fxTargets !== undefined) setFxTargets(state.fxTargets);
+    if (state.fxOffsetsPerTrack !== undefined) setFxOffsetsPerTrack(state.fxOffsetsPerTrack);
   }, []);
 
   return {
@@ -155,11 +227,15 @@ export const useFXState = () => {
     fxTargets,
     setFxTargets,
     toggleFxTarget,
+    fxOffsetsPerTrack,
+    setFxOffsetsPerTrack,
     updateReverbParams,
     updateDelayParams,
     updateMasterFilterParams,
     updateSendLevel,
     updateTrackRouting,
+    updateFXOffset,
+    resetTrackOffsets,
     setAllFXState,
   };
 };

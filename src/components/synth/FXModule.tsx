@@ -1,13 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { FXVisualizer } from './FXVisualizer';
 import { SendMatrix } from './SendMatrix';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { useFXAnalyser } from '@/hooks/useFXAnalyser';
-import { TrackName, TrackSendLevels, FXRoutingMode, FXTarget } from '@/hooks/useFXState';
+import { 
+  TrackName, 
+  TrackSendLevels, 
+  FXRoutingMode, 
+  FXTarget,
+  FXOffsetsPerTrack,
+  TrackFXOffsets,
+} from '@/hooks/useFXState';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { RotateCcw } from 'lucide-react';
 
 interface FXModuleProps {
   reverbParams: {
@@ -35,21 +43,30 @@ interface FXModuleProps {
   isPlaying: boolean;
   fxRoutingMode: FXRoutingMode;
   fxTargets: FXTarget[];
+  fxOffsetsPerTrack: FXOffsetsPerTrack;
   onReverbChange: (params: Partial<FXModuleProps['reverbParams']>) => void;
   onDelayChange: (params: Partial<FXModuleProps['delayParams']>) => void;
   onMasterFilterChange: (params: Partial<FXModuleProps['masterFilterParams']>) => void;
   onSendChange: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
   onRoutingModeChange: (mode: FXRoutingMode) => void;
   onTargetToggle: (target: FXTarget) => void;
+  onFXOffsetChange: (track: TrackName, effect: 'reverb' | 'delay', param: string, value: number) => void;
+  onResetTrackOffsets: (track: TrackName) => void;
 }
 
 const syncDivisions: SyncDivision[] = ['1/4', '1/8', '3/16'];
 
-const individualButtons: { id: FXTarget; label: string }[] = [
+// Only tracks that can have offsets (excludes glitch)
+type OffsetTrack = Exclude<FXTarget, 'glitch'>;
+const trackButtons: { id: OffsetTrack; label: string }[] = [
   { id: 'drums', label: 'D' },
   { id: 'synth', label: 'S' },
   { id: 'texture', label: 'T' },
   { id: 'sample', label: 'Smp' },
+];
+
+const individualButtons: { id: FXTarget; label: string }[] = [
+  ...trackButtons,
   { id: 'glitch', label: 'G' },
 ];
 
@@ -62,19 +79,50 @@ export function FXModule({
   isPlaying,
   fxRoutingMode,
   fxTargets,
+  fxOffsetsPerTrack,
   onReverbChange, 
   onDelayChange,
   onMasterFilterChange,
   onSendChange,
   onRoutingModeChange,
   onTargetToggle,
+  onFXOffsetChange,
+  onResetTrackOffsets,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
+  const [selectedEditTrack, setSelectedEditTrack] = useState<OffsetTrack | null>(null);
+  
   const levels = useFXAnalyser(isPlaying && !muted);
   const { reverb: reverbLevel, delay: delayLevel } = levels;
   
   const isActive = fxRoutingMode === 'master' || fxTargets.length > 0;
   const showNoTargetWarning = fxRoutingMode === 'individual' && fxTargets.length === 0;
+
+  // Determine which track to show offsets for
+  const editingTrack: OffsetTrack = useMemo(() => {
+    if (fxRoutingMode === 'master') return 'drums';
+    // Filter to only offset-capable tracks (no glitch)
+    const offsetTargets = fxTargets.filter((t): t is OffsetTrack => t !== 'glitch');
+    if (selectedEditTrack && offsetTargets.includes(selectedEditTrack)) {
+      return selectedEditTrack;
+    }
+    return offsetTargets[0] || 'drums';
+  }, [fxRoutingMode, fxTargets, selectedEditTrack]);
+
+  const currentOffsets: TrackFXOffsets = fxOffsetsPerTrack[editingTrack];
+  const offsetTargets = fxTargets.filter((t): t is OffsetTrack => t !== 'glitch');
+  const multipleTracksSelected = fxRoutingMode === 'individual' && offsetTargets.length > 1;
+
+  // Handle track button click
+  const handleTrackClick = (target: FXTarget) => {
+    const isCurrentlyActive = fxTargets.includes(target);
+    onTargetToggle(target);
+    
+    // If activating and it's an offset-capable track, set as editing
+    if (!isCurrentlyActive && target !== 'glitch') {
+      setSelectedEditTrack(target as OffsetTrack);
+    }
+  };
 
   // Apply bypass to FX engine when mute changes
   useEffect(() => {
@@ -86,6 +134,11 @@ export function FXModule({
     onDelayChange({ syncDivision: division });
     fxEngine.syncDelayToBpm(bpm, division);
   };
+
+  // Helper to convert offset value to knob value (0-100 where 50 = neutral)
+  const offsetToKnob = (offset: number) => 50 + offset * 100;
+  // Helper to convert knob value to offset (-0.5 to +0.5)
+  const knobToOffset = (knob: number) => (knob - 50) / 100;
   
   return (
     <ModuleCard 
@@ -125,22 +178,36 @@ export function FXModule({
           {/* Individual track selectors - only visible in individual mode */}
           {fxRoutingMode === 'individual' && (
             <div className="flex gap-1">
-              {individualButtons.map(({ id, label }) => (
-                <Button
-                  key={id}
-                  variant={fxTargets.includes(id) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => onTargetToggle(id)}
-                  className={cn(
-                    'flex-1 h-6 text-[10px] font-mono transition-all',
-                    fxTargets.includes(id) 
-                      ? 'bg-primary/80 text-primary-foreground border-primary' 
-                      : 'opacity-60 hover:opacity-100'
-                  )}
-                >
-                  {label}
-                </Button>
-              ))}
+              {individualButtons.map(({ id, label }) => {
+                const isActiveTarget = fxTargets.includes(id);
+                const isEditing = id !== 'glitch' && id === editingTrack;
+                
+                return (
+                  <Button
+                    key={id}
+                    variant={isActiveTarget ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTrackClick(id)}
+                    className={cn(
+                      'flex-1 h-6 text-[10px] font-mono transition-all relative',
+                      isActiveTarget 
+                        ? 'bg-primary/80 text-primary-foreground border-primary' 
+                        : 'opacity-60 hover:opacity-100',
+                      isEditing && isActiveTarget && 'ring-2 ring-yellow-400/70 ring-offset-1 ring-offset-background'
+                    )}
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Editing indicator */}
+          {fxRoutingMode === 'individual' && multipleTracksSelected && (
+            <div className="text-[9px] text-yellow-400 text-center flex items-center justify-center gap-1">
+              <span>✏️ Editing:</span>
+              <span className="font-mono uppercase">{editingTrack}</span>
             </div>
           )}
           
@@ -327,6 +394,93 @@ export function FXModule({
             </div>
           </div>
         </div>
+
+        {/* Track Offsets Section - only visible in individual mode with tracks selected */}
+        {fxRoutingMode === 'individual' && offsetTargets.length > 0 && (
+          <div className="pt-2 border-t border-border/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                Track Offsets
+                {multipleTracksSelected && (
+                  <span className="text-yellow-400 font-mono">({editingTrack})</span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onResetTrackOffsets(editingTrack)}
+                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
+                title="Reset offsets"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {/* Reverb Offsets */}
+              <div className="space-y-1">
+                <div className="text-[8px] text-muted-foreground/60 flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-primary/50" />
+                  Rev Offsets
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <Knob
+                    value={offsetToKnob(currentOffsets.reverb.size)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'reverb', 'size', knobToOffset(v))}
+                    label="Size"
+                    size="sm"
+                    variant="secondary"
+                  />
+                  <Knob
+                    value={offsetToKnob(currentOffsets.reverb.decay)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'reverb', 'decay', knobToOffset(v))}
+                    label="Decay"
+                    size="sm"
+                    variant="secondary"
+                  />
+                  <Knob
+                    value={offsetToKnob(currentOffsets.reverb.damping)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'reverb', 'damping', knobToOffset(v))}
+                    label="Damp"
+                    size="sm"
+                    variant="secondary"
+                  />
+                </div>
+              </div>
+              
+              {/* Delay Offsets */}
+              <div className="space-y-1">
+                <div className="text-[8px] text-muted-foreground/60 flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-accent/50" />
+                  Dly Offsets
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <Knob
+                    value={offsetToKnob(currentOffsets.delay.time)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'delay', 'time', knobToOffset(v))}
+                    label="Time"
+                    size="sm"
+                    variant="secondary"
+                  />
+                  <Knob
+                    value={offsetToKnob(currentOffsets.delay.feedback)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'delay', 'feedback', knobToOffset(v))}
+                    label="Fdbk"
+                    size="sm"
+                    variant="secondary"
+                  />
+                  <Knob
+                    value={offsetToKnob(currentOffsets.delay.filter)}
+                    onChange={(v) => onFXOffsetChange(editingTrack, 'delay', 'filter', knobToOffset(v))}
+                    label="Filt"
+                    size="sm"
+                    variant="secondary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Wet Signal Visualizer */}
         <div className="py-2">
