@@ -956,6 +956,88 @@ export const useAudioEngine = ({
     }
   }, []);
 
+  // TapeStop params - FIX: ahora los knobs Speed/Mix tienen efecto
+  const setGlitchTapeStopParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { speed?: number; duration?: number; mix?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setTapeStopParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setTapeStopParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setTapeStopParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setTapeStopParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setTapeStopParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setTapeStopParams(params);
+        break;
+    }
+  }, []);
+
+  // Freeze params - FIX: ahora el knob Pitch tiene efecto
+  const setGlitchFreezeParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { grainSize?: number; pitch?: number; spread?: number; mix?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setGranularFreezeParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setGranularFreezeParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setGranularFreezeParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setGranularFreezeParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setGranularFreezeParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setGranularFreezeParams(params);
+        break;
+    }
+  }, []);
+
+  // Reverse params
+  const setGlitchReverseParams = useCallback((track: 'master' | 'drums' | 'synth' | 'texture' | 'sample' | 'fx', params: { duration?: number; mix?: number }) => {
+    switch (track) {
+      case 'master':
+        glitchEngine.setReverseParams(params);
+        break;
+      case 'drums':
+        drumsGlitchRef.current?.setReverseParams(params);
+        break;
+      case 'synth':
+        synthGlitchRef.current?.setReverseParams(params);
+        break;
+      case 'texture':
+        textureGlitchRef.current?.setReverseParams(params);
+        break;
+      case 'sample':
+        sampleGlitchRef.current?.setReverseParams(params);
+        break;
+      case 'fx':
+        fxGlitchRef.current?.setReverseParams(params);
+        break;
+    }
+  }, []);
+
+  // Master mix - controla el balance global wet/dry de todos los efectos glitch
+  const setGlitchMasterMix = useCallback((mix: number) => {
+    glitchEngine.setMasterMix(mix);
+  }, []);
+
+  // FX Sends - controla cuánto glitch va a reverb/delay
+  const setGlitchFXSends = useCallback((reverb: number, delay: number) => {
+    glitchEngine.setFXSend(reverb, delay);
+  }, []);
+
   // Keyboard note control - expose synth noteOn/noteOff for external keyboard
   const playNote = useCallback((note: number, velocity: number = 100) => {
     synthRef.current?.noteOn(note, velocity);
@@ -1015,6 +1097,11 @@ export const useAudioEngine = ({
     triggerGlitch,
     setGlitchStutterParams,
     setGlitchBitcrushParams,
+    setGlitchTapeStopParams,
+    setGlitchFreezeParams,
+    setGlitchReverseParams,
+    setGlitchMasterMix,
+    setGlitchFXSends,
     setChaosEnabled,
     setGlitchChaosParams,
     playNote,
