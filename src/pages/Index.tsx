@@ -114,6 +114,8 @@ const Index = () => {
     setGlitchFXSends,
     setChaosEnabled,
     setGlitchChaosParams,
+    startGlitchFreezeSustain,
+    stopGlitchFreezeSustain,
     playNote,
     stopNote,
     triggerDrum,
@@ -437,6 +439,8 @@ const Index = () => {
                     // FIX: Ahora aplicamos master mix al engine
                     setGlitchMasterMix(value);
                   }}
+                  onFreezeHoldStart={() => !glitchMuted && startGlitchFreezeSustain()}
+                  onFreezeHoldStop={stopGlitchFreezeSustain}
                 />
               </div>
             </div>

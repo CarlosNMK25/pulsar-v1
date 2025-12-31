@@ -32,6 +32,8 @@ interface GlitchModuleCompactProps {
   onChaosParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['chaos']>) => void;
   onFXSendsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['fxSends']>) => void;
   onMasterMixChange: (value: number) => void;
+  onFreezeHoldStart?: () => void;
+  onFreezeHoldStop?: () => void;
 }
 
 export const GlitchModuleCompact = ({ 
@@ -54,8 +56,11 @@ export const GlitchModuleCompact = ({
   onChaosParamsChange,
   onFXSendsChange,
   onMasterMixChange,
+  onFreezeHoldStart,
+  onFreezeHoldStop,
 }: GlitchModuleCompactProps) => {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
+  const [freezeHolding, setFreezeHolding] = useState(false);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState('stutter');
   
@@ -472,7 +477,48 @@ export const GlitchModuleCompact = ({
               )}
             >
               <Disc className="w-3 h-3 mr-1" />
-              TRIGGER
+              TRIG
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onMouseDown={() => {
+                if (!isActive) return;
+                setFreezeHolding(true);
+                setActiveEffect('freeze');
+                onFreezeHoldStart?.();
+              }}
+              onMouseUp={() => {
+                setFreezeHolding(false);
+                setActiveEffect(null);
+                onFreezeHoldStop?.();
+              }}
+              onMouseLeave={() => {
+                if (freezeHolding) {
+                  setFreezeHolding(false);
+                  setActiveEffect(null);
+                  onFreezeHoldStop?.();
+                }
+              }}
+              onTouchStart={() => {
+                if (!isActive) return;
+                setFreezeHolding(true);
+                setActiveEffect('freeze');
+                onFreezeHoldStart?.();
+              }}
+              onTouchEnd={() => {
+                setFreezeHolding(false);
+                setActiveEffect(null);
+                onFreezeHoldStop?.();
+              }}
+              disabled={!isActive}
+              className={cn(
+                'h-7 flex-1 text-[10px]',
+                freezeHolding && 'bg-primary/30 border-primary animate-pulse'
+              )}
+            >
+              <Disc className="w-3 h-3 mr-1" />
+              HOLD
             </Button>
             <button
               onClick={() => onFreezeParamsChange(editingTrack, { reverse: !currentParams.freeze.reverse })}
