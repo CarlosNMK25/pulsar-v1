@@ -1,10 +1,11 @@
 import { Keyboard, SlidersHorizontal, Activity, Settings2, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DockState } from '@/hooks/useUILayout';
-import { KeyboardTab } from './dock/KeyboardTab';
+import { KeyboardTab, KeyboardTarget } from './dock/KeyboardTab';
 import { MixerTab } from './dock/MixerTab';
 import { ScopeTab } from './dock/ScopeTab';
 import { ParamsTab } from './dock/ParamsTab';
+import { TrackName, TrackRoutingState } from '@/hooks/useFXState';
 
 interface BottomDockProps {
   state: DockState;
@@ -16,8 +17,13 @@ interface BottomDockProps {
   // Keyboard callbacks
   onNoteOn?: (note: number, velocity?: number) => void;
   onNoteOff?: (note: number) => void;
+  onDrumTrigger?: (drum: 'kick' | 'snare' | 'hat', velocity?: number) => void;
+  onSampleTrigger?: (velocity?: number) => void;
   isAudioReady?: boolean;
   onInitAudio?: () => Promise<void>;
+  // Keyboard target
+  keyboardTarget?: KeyboardTarget;
+  onKeyboardTargetChange?: (target: KeyboardTarget) => void;
   // Mixer data
   drumMuted?: boolean;
   synthMuted?: boolean;
@@ -29,6 +35,9 @@ interface BottomDockProps {
   onSampleMuteToggle?: () => void;
   volumes?: Record<string, number>;
   onVolumeChange?: (channel: string, value: number) => void;
+  // Track routing
+  trackRouting?: TrackRoutingState;
+  onRoutingChange?: (track: TrackName, routing: { fxBypass?: boolean; glitchBypass?: boolean }) => void;
 }
 
 const tabs = [
@@ -52,8 +61,12 @@ export const BottomDock = ({
   analyserData,
   onNoteOn,
   onNoteOff,
+  onDrumTrigger,
+  onSampleTrigger,
   isAudioReady = false,
   onInitAudio,
+  keyboardTarget = 'synth',
+  onKeyboardTargetChange,
   drumMuted = false,
   synthMuted = false,
   textureMuted = false,
@@ -64,6 +77,8 @@ export const BottomDock = ({
   onSampleMuteToggle,
   volumes,
   onVolumeChange,
+  trackRouting,
+  onRoutingChange,
 }: BottomDockProps) => {
   const height = DOCK_HEIGHTS[state];
   const isVisible = state !== 'hidden';
@@ -140,8 +155,12 @@ export const BottomDock = ({
             <KeyboardTab 
               onNoteOn={onNoteOn} 
               onNoteOff={onNoteOff}
+              onDrumTrigger={onDrumTrigger}
+              onSampleTrigger={onSampleTrigger}
               isAudioReady={isAudioReady}
               onInitAudio={onInitAudio}
+              target={keyboardTarget}
+              onTargetChange={onKeyboardTargetChange}
             />
           )}
           {activeTab === 'mixer' && (
@@ -156,6 +175,8 @@ export const BottomDock = ({
               onSampleMuteToggle={onSampleMuteToggle}
               volumes={volumes}
               onVolumeChange={onVolumeChange}
+              trackRouting={trackRouting}
+              onRoutingChange={onRoutingChange}
             />
           )}
           {activeTab === 'scope' && <ScopeTab analyserData={analyserData} />}

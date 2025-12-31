@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { Music, Drum, FileAudio } from 'lucide-react';
+
+export type KeyboardTarget = 'synth' | 'drums' | 'sample';
 
 interface KeyboardTabProps {
   onNoteOn?: (note: number, velocity?: number) => void;
   onNoteOff?: (note: number) => void;
+  onDrumTrigger?: (drum: 'kick' | 'snare' | 'hat', velocity?: number) => void;
+  onSampleTrigger?: (velocity?: number) => void;
   isAudioReady?: boolean;
   onInitAudio?: () => Promise<void>;
+  target?: KeyboardTarget;
+  onTargetChange?: (target: KeyboardTarget) => void;
 }
 
+// Synth keyboard mapping
 const KEYBOARD_MAP: Record<string, { note: string; octaveOffset: number }> = {
   // Lower row - C3 to B3
   'z': { note: 'C', octaveOffset: 0 },
@@ -37,6 +45,16 @@ const KEYBOARD_MAP: Record<string, { note: string; octaveOffset: number }> = {
   'u': { note: 'B', octaveOffset: 1 },
 };
 
+// Drum keyboard mapping
+const DRUM_MAP: Record<string, 'kick' | 'snare' | 'hat'> = {
+  'z': 'kick',
+  'x': 'snare',
+  'c': 'hat',
+  'v': 'kick',
+  'b': 'snare',
+  'n': 'hat',
+};
+
 const WHITE_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -57,21 +75,37 @@ const midiToNoteName = (midi: number): string => {
   return `${noteName}${noteOctave}`;
 };
 
-export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitAudio }: KeyboardTabProps) => {
+export const KeyboardTab = ({ 
+  onNoteOn, 
+  onNoteOff, 
+  onDrumTrigger,
+  onSampleTrigger,
+  isAudioReady = false, 
+  onInitAudio,
+  target = 'synth',
+  onTargetChange,
+}: KeyboardTabProps) => {
   const [octave, setOctave] = useState(3);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
+  const [pressedDrums, setPressedDrums] = useState<Set<string>>(new Set());
   
   // Use refs to avoid stale closures in event handlers
   const activeKeyMapRef = useRef<Map<string, number>>(new Map());
   const octaveRef = useRef(octave);
+  const targetRef = useRef(target);
   const onNoteOnRef = useRef(onNoteOn);
   const onNoteOffRef = useRef(onNoteOff);
+  const onDrumTriggerRef = useRef(onDrumTrigger);
+  const onSampleTriggerRef = useRef(onSampleTrigger);
   
   // Keep refs in sync
   useEffect(() => { octaveRef.current = octave; }, [octave]);
+  useEffect(() => { targetRef.current = target; }, [target]);
   useEffect(() => { onNoteOnRef.current = onNoteOn; }, [onNoteOn]);
   useEffect(() => { onNoteOffRef.current = onNoteOff; }, [onNoteOff]);
+  useEffect(() => { onDrumTriggerRef.current = onDrumTrigger; }, [onDrumTrigger]);
+  useEffect(() => { onSampleTriggerRef.current = onSampleTrigger; }, [onSampleTrigger]);
 
   // Initialize audio on first interaction (fire-and-forget)
   const ensureAudioReady = useCallback(() => {
@@ -83,38 +117,45 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      const currentTarget = targetRef.current;
       const keyMap = activeKeyMapRef.current;
       
-      if (KEYBOARD_MAP[key] && !e.repeat && !keyMap.has(key)) {
-        ensureAudioReady();
-        
+      if (e.repeat) return;
+      
+      ensureAudioReady();
+      
+      // Handle based on target
+      if (currentTarget === 'synth' && KEYBOARD_MAP[key] && !keyMap.has(key)) {
         const { note, octaveOffset } = KEYBOARD_MAP[key];
         const midiNote = noteToMidi(note, octaveRef.current + octaveOffset);
         const fullNote = `${note}${octaveRef.current + octaveOffset}`;
         
-        // Store mapping immediately (synchronous, no state batching issues)
         keyMap.set(key, midiNote);
-        
-        console.log(`[KeyboardTab] noteOn: key=${key} midi=${midiNote} activeKeys=${Array.from(keyMap.keys()).join(',')}`);
         
         setPressedKeys(prev => new Set(prev).add(fullNote));
         setPressedMidi(prev => new Set(prev).add(midiNote));
         onNoteOnRef.current?.(midiNote, 100);
+      } else if (currentTarget === 'drums' && DRUM_MAP[key]) {
+        const drum = DRUM_MAP[key];
+        setPressedDrums(prev => new Set(prev).add(drum));
+        onDrumTriggerRef.current?.(drum, 100);
+      } else if (currentTarget === 'sample') {
+        // Any key triggers sample
+        if (!keyMap.has(key)) {
+          keyMap.set(key, 0);
+          onSampleTriggerRef.current?.(100);
+        }
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      const currentTarget = targetRef.current;
       const keyMap = activeKeyMapRef.current;
       const midiNote = keyMap.get(key);
       
-      console.log(`[KeyboardTab] keyUp: key=${key} midi=${midiNote} activeKeys=${Array.from(keyMap.keys()).join(',')}`);
-      
-      if (midiNote !== undefined) {
-        // Remove mapping immediately
+      if (currentTarget === 'synth' && midiNote !== undefined) {
         keyMap.delete(key);
-        
-        console.log(`[KeyboardTab] noteOff: midi=${midiNote}`);
         onNoteOffRef.current?.(midiNote);
         
         setPressedMidi(prev => {
@@ -129,8 +170,15 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
           next.delete(fullNote);
           return next;
         });
-      } else {
-        console.log(`[KeyboardTab] keyUp MISSED: key=${key} not in activeKeyMap`);
+      } else if (currentTarget === 'drums' && DRUM_MAP[key]) {
+        const drum = DRUM_MAP[key];
+        setPressedDrums(prev => {
+          const next = new Set(prev);
+          next.delete(drum);
+          return next;
+        });
+      } else if (currentTarget === 'sample') {
+        keyMap.delete(key);
       }
     };
 
@@ -142,6 +190,7 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
       keyMap.clear();
       setPressedKeys(new Set());
       setPressedMidi(new Set());
+      setPressedDrums(new Set());
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -158,15 +207,17 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
 
   // Mouse/touch handlers for visual keys
   const handleMouseDown = useCallback((note: string, oct: number) => {
+    if (target !== 'synth') return;
     ensureAudioReady();
     const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
     setPressedKeys(prev => new Set(prev).add(fullNote));
     setPressedMidi(prev => new Set(prev).add(midiNote));
     onNoteOn?.(midiNote, 100);
-  }, [onNoteOn, ensureAudioReady]);
+  }, [onNoteOn, ensureAudioReady, target]);
 
   const handleMouseUp = useCallback((note: string, oct: number) => {
+    if (target !== 'synth') return;
     const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
     setPressedKeys(prev => {
@@ -180,7 +231,17 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
       return next;
     });
     onNoteOff?.(midiNote);
-  }, [onNoteOff]);
+  }, [onNoteOff, target]);
+
+  const handleDrumClick = useCallback((drum: 'kick' | 'snare' | 'hat') => {
+    ensureAudioReady();
+    onDrumTrigger?.(drum, 100);
+  }, [onDrumTrigger, ensureAudioReady]);
+
+  const handleSampleClick = useCallback(() => {
+    ensureAudioReady();
+    onSampleTrigger?.(100);
+  }, [onSampleTrigger, ensureAudioReady]);
 
   const renderOctave = (oct: number) => (
     <div key={oct} className="flex relative h-full">
@@ -228,34 +289,116 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
     </div>
   );
 
+  // Render drum pads
+  const renderDrumPads = () => (
+    <div className="flex items-center justify-center gap-4 h-full">
+      {(['kick', 'snare', 'hat'] as const).map((drum) => (
+        <button
+          key={drum}
+          onClick={() => handleDrumClick(drum)}
+          className={cn(
+            "w-16 h-16 rounded-lg flex flex-col items-center justify-center gap-1 transition-all",
+            "border-2 font-medium uppercase text-xs",
+            pressedDrums.has(drum) 
+              ? "bg-primary border-primary scale-95" 
+              : "bg-muted hover:bg-muted/80 border-border"
+          )}
+        >
+          <span>{drum === 'hat' ? 'HH' : drum.charAt(0).toUpperCase()}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {drum === 'kick' ? 'Z/V' : drum === 'snare' ? 'X/B' : 'C/N'}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
+  // Render sample trigger
+  const renderSampleTrigger = () => (
+    <div className="flex items-center justify-center h-full">
+      <button
+        onClick={handleSampleClick}
+        className={cn(
+          "w-24 h-20 rounded-lg flex flex-col items-center justify-center gap-2 transition-all",
+          "border-2 font-medium text-sm",
+          "bg-muted hover:bg-muted/80 border-border hover:border-primary"
+        )}
+      >
+        <FileAudio className="w-8 h-8" />
+        <span className="text-xs text-muted-foreground">Any key</span>
+      </button>
+    </div>
+  );
+
   return (
     <div className="flex items-center justify-center h-full gap-4 px-4">
-      {/* Octave controls */}
+      {/* Target selector */}
       <div className="flex flex-col items-center gap-1">
-        <button
-          onClick={() => setOctave(o => Math.min(o + 1, 6))}
-          className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
-        >
-          +
-        </button>
-        <span className="text-xs text-muted-foreground">Oct {octave}</span>
-        <button
-          onClick={() => setOctave(o => Math.max(o - 1, 1))}
-          className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
-        >
-          -
-        </button>
+        {(['synth', 'drums', 'sample'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => onTargetChange?.(t)}
+            className={cn(
+              "p-1.5 rounded transition-colors",
+              target === t 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted hover:bg-muted/80 text-muted-foreground"
+            )}
+            title={t.charAt(0).toUpperCase() + t.slice(1)}
+          >
+            {t === 'synth' && <Music className="w-4 h-4" />}
+            {t === 'drums' && <Drum className="w-4 h-4" />}
+            {t === 'sample' && <FileAudio className="w-4 h-4" />}
+          </button>
+        ))}
       </div>
       
-      {/* Keyboard */}
-      <div className="flex h-[90px]">
-        {renderOctave(octave)}
-        {renderOctave(octave + 1)}
-      </div>
+      {/* Synth-specific octave controls */}
+      {target === 'synth' && (
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={() => setOctave(o => Math.min(o + 1, 6))}
+            className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
+          >
+            +
+          </button>
+          <span className="text-xs text-muted-foreground">Oct {octave}</span>
+          <button
+            onClick={() => setOctave(o => Math.max(o - 1, 1))}
+            className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
+          >
+            -
+          </button>
+        </div>
+      )}
+      
+      {/* Content based on target */}
+      {target === 'synth' && (
+        <div className="flex h-[90px]">
+          {renderOctave(octave)}
+          {renderOctave(octave + 1)}
+        </div>
+      )}
+      {target === 'drums' && renderDrumPads()}
+      {target === 'sample' && renderSampleTrigger()}
       
       <div className="text-xs text-muted-foreground ml-4 space-y-1">
-        <div>Lower: Z-M</div>
-        <div>Upper: Q-U</div>
+        {target === 'synth' && (
+          <>
+            <div>Lower: Z-M</div>
+            <div>Upper: Q-U</div>
+          </>
+        )}
+        {target === 'drums' && (
+          <>
+            <div>Kick: Z/V</div>
+            <div>Snare: X/B</div>
+            <div>Hat: C/N</div>
+          </>
+        )}
+        {target === 'sample' && (
+          <div>Press any key</div>
+        )}
         {!isAudioReady && (
           <div className="text-primary/70 text-[10px]">Press key to init</div>
         )}
