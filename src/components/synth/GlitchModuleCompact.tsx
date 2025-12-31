@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
+import { Zap, Radio, Square, Disc, Sparkles, Rewind, Lock } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,6 +61,7 @@ export const GlitchModuleCompact = ({
 }: GlitchModuleCompactProps) => {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [freezeHolding, setFreezeHolding] = useState(false);
+  const [freezeLocked, setFreezeLocked] = useState(false);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState('stutter');
   
@@ -465,60 +466,84 @@ export const GlitchModuleCompact = ({
 
         {/* FREEZE Tab - Real Granular Synthesis */}
         <TabsContent value="freeze" className="space-y-2 mt-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleTrigger('freeze', 300)}
               disabled={!isActive}
               className={cn(
-                'h-7 flex-1 text-[10px]',
-                activeEffect === 'freeze' && 'bg-primary/20 border-primary'
+                'h-7 flex-1 text-[9px] px-2',
+                activeEffect === 'freeze' && !freezeHolding && !freezeLocked && 'bg-primary/20 border-primary'
               )}
             >
-              <Disc className="w-3 h-3 mr-1" />
               TRIG
             </Button>
             <Button
               variant="outline"
               size="sm"
               onMouseDown={() => {
-                if (!isActive) return;
+                if (!isActive || freezeLocked) return;
                 setFreezeHolding(true);
                 setActiveEffect('freeze');
                 onFreezeHoldStart?.();
               }}
               onMouseUp={() => {
+                if (freezeLocked) return;
                 setFreezeHolding(false);
                 setActiveEffect(null);
                 onFreezeHoldStop?.();
               }}
               onMouseLeave={() => {
-                if (freezeHolding) {
+                if (freezeHolding && !freezeLocked) {
                   setFreezeHolding(false);
                   setActiveEffect(null);
                   onFreezeHoldStop?.();
                 }
               }}
               onTouchStart={() => {
-                if (!isActive) return;
+                if (!isActive || freezeLocked) return;
                 setFreezeHolding(true);
                 setActiveEffect('freeze');
                 onFreezeHoldStart?.();
               }}
               onTouchEnd={() => {
+                if (freezeLocked) return;
                 setFreezeHolding(false);
                 setActiveEffect(null);
                 onFreezeHoldStop?.();
               }}
-              disabled={!isActive}
+              disabled={!isActive || freezeLocked}
               className={cn(
-                'h-7 flex-1 text-[10px]',
+                'h-7 flex-1 text-[9px] px-2',
                 freezeHolding && 'bg-primary/30 border-primary animate-pulse'
               )}
             >
-              <Disc className="w-3 h-3 mr-1" />
               HOLD
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!isActive) return;
+                if (freezeLocked) {
+                  setFreezeLocked(false);
+                  setActiveEffect(null);
+                  onFreezeHoldStop?.();
+                } else {
+                  setFreezeLocked(true);
+                  setActiveEffect('freeze');
+                  onFreezeHoldStart?.();
+                }
+              }}
+              disabled={!isActive}
+              className={cn(
+                'h-7 flex-1 text-[9px] px-2',
+                freezeLocked && 'bg-primary/30 border-primary'
+              )}
+            >
+              <Lock className="w-3 h-3 mr-0.5" />
+              LOCK
             </Button>
             <button
               onClick={() => onFreezeParamsChange(editingTrack, { reverse: !currentParams.freeze.reverse })}
