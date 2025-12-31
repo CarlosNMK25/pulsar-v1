@@ -322,10 +322,14 @@ const Index = () => {
                   sendLevels={fxState.sendLevels}
                   bpm={bpm}
                   isPlaying={isPlaying}
+                  fxRoutingMode={fxState.fxRoutingMode}
+                  fxTargets={fxState.fxTargets}
                   onReverbChange={fxState.updateReverbParams}
                   onDelayChange={fxState.updateDelayParams}
                   onMasterFilterChange={fxState.updateMasterFilterParams}
                   onSendChange={fxState.updateSendLevel}
+                  onRoutingModeChange={fxState.setFxRoutingMode}
+                  onTargetToggle={fxState.toggleFxTarget}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">

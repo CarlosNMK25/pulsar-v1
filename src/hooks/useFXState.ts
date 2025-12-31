@@ -3,6 +3,10 @@ import { defaultReverbParams, defaultDelayParams, defaultMasterFilterParams } fr
 
 export type SyncDivision = '1/4' | '1/8' | '1/16' | '3/16';
 
+// FX routing targets
+export type FXRoutingMode = 'master' | 'individual';
+export type FXTarget = 'drums' | 'synth' | 'texture' | 'sample' | 'glitch';
+
 export interface ReverbParams {
   size: number;
   decay: number;
@@ -73,6 +77,8 @@ export interface FXState {
   masterFilterParams: MasterFilterParams;
   sendLevels: TrackSendLevels;
   trackRouting: TrackRoutingState;
+  fxRoutingMode: FXRoutingMode;
+  fxTargets: FXTarget[];
 }
 
 export const useFXState = () => {
@@ -81,6 +87,8 @@ export const useFXState = () => {
   const [masterFilterParams, setMasterFilterParams] = useState<MasterFilterParams>(defaultMasterFilterParams);
   const [sendLevels, setSendLevels] = useState<TrackSendLevels>(defaultSendLevels);
   const [trackRouting, setTrackRouting] = useState<TrackRoutingState>(defaultRoutingState);
+  const [fxRoutingMode, setFxRoutingMode] = useState<FXRoutingMode>('master');
+  const [fxTargets, setFxTargets] = useState<FXTarget[]>([]);
 
   const updateReverbParams = useCallback((params: Partial<ReverbParams>) => {
     setReverbParams(prev => ({ ...prev, ...params }));
@@ -109,6 +117,17 @@ export const useFXState = () => {
     }));
   }, []);
 
+  // Toggle individual FX target
+  const toggleFxTarget = useCallback((target: FXTarget) => {
+    setFxTargets(prev => {
+      if (prev.includes(target)) {
+        return prev.filter(t => t !== target);
+      } else {
+        return [...prev, target];
+      }
+    });
+  }, []);
+
   // Batch setter for scene loading
   const setAllFXState = useCallback((state: Partial<FXState>) => {
     if (state.reverbParams !== undefined) setReverbParams(state.reverbParams);
@@ -116,6 +135,8 @@ export const useFXState = () => {
     if (state.masterFilterParams !== undefined) setMasterFilterParams(state.masterFilterParams);
     if (state.sendLevels !== undefined) setSendLevels(state.sendLevels);
     if (state.trackRouting !== undefined) setTrackRouting(state.trackRouting);
+    if (state.fxRoutingMode !== undefined) setFxRoutingMode(state.fxRoutingMode);
+    if (state.fxTargets !== undefined) setFxTargets(state.fxTargets);
   }, []);
 
   return {
@@ -129,6 +150,11 @@ export const useFXState = () => {
     setSendLevels,
     trackRouting,
     setTrackRouting,
+    fxRoutingMode,
+    setFxRoutingMode,
+    fxTargets,
+    setFxTargets,
+    toggleFxTarget,
     updateReverbParams,
     updateDelayParams,
     updateMasterFilterParams,
