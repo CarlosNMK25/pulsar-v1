@@ -21,6 +21,8 @@ export interface SynthParams {
   detune: number;
   lfoRate: number;
   lfoSyncDivision: LfoSyncDivision;
+  fmAmount: number;
+  fmRatio: number;
 }
 
 export interface SynthState {
