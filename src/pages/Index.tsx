@@ -11,6 +11,10 @@ import { GlitchModuleCompact } from '@/components/synth/GlitchModuleCompact';
 import { MacroKnobs } from '@/components/synth/MacroKnobs';
 import { SceneSlots } from '@/components/synth/SceneSlots';
 import { PatternChain } from '@/components/synth/PatternChain';
+import { CollapsibleSection } from '@/components/synth/CollapsibleSection';
+import { BottomDock } from '@/components/synth/BottomDock';
+import { PerformancePanel } from '@/components/synth/panels/PerformancePanel';
+import { SettingsPanel } from '@/components/synth/panels/SettingsPanel';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDrumState } from '@/hooks/useDrumState';
@@ -21,11 +25,18 @@ import { useSampleState } from '@/hooks/useSampleState';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useUILayout } from '@/hooks/useUILayout';
 import { SampleModule } from '@/components/synth/SampleModule';
 
 import { AutoFillConfig } from '@/components/synth/TransportControls';
 
+// Dock height for padding calculation
+const DOCK_HEIGHTS = { hidden: 0, mini: 48, expanded: 160 };
+
 const Index = () => {
+  // UI Layout state
+  const uiLayout = useUILayout();
+
   // Transport state
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
@@ -152,14 +163,33 @@ const Index = () => {
     scenes: sceneManager.scenes,
   });
 
+  // Calculate main content padding based on dock state
+  const dockHeight = DOCK_HEIGHTS[uiLayout.dockState];
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <Header projectName="Untitled Session" />
+      {/* Header with panel toggles and status */}
+      <Header 
+        projectName="Untitled Session"
+        onToggleLeftPanel={uiLayout.toggleLeftPanel}
+        onToggleRightPanel={uiLayout.toggleRightPanel}
+        onToggleDock={uiLayout.cycleDockState}
+        leftPanelOpen={uiLayout.leftPanelOpen}
+        rightPanelOpen={uiLayout.rightPanelOpen}
+        dockState={uiLayout.dockState}
+        currentStep={currentStep}
+        activeSceneName={sceneManager.scenes.find(s => s.id === sceneManager.activeScene)?.name}
+        morphTargetName={sceneManager.morphTargetScene ? sceneManager.scenes.find(s => s.id === sceneManager.morphTargetScene)?.name : undefined}
+        audioState={audioState}
+        isInitialized={isInitialized}
+      />
 
       {/* Main content */}
-      <main className="flex-1 p-6 overflow-auto scrollbar-thin">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <main 
+        className="flex-1 p-6 overflow-auto scrollbar-thin transition-all duration-200"
+        style={{ paddingBottom: dockHeight + 24 }}
+      >
+        <div className="max-w-7xl mx-auto space-y-6">
           {/* Transport & Waveform */}
           <div className="space-y-4">
             <TransportControls
@@ -185,12 +215,12 @@ const Index = () => {
           </div>
 
           {/* GENERADORES - Sound Sources */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <div className="h-px flex-1 bg-border/50" />
-              <span>Generadores</span>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
+          <CollapsibleSection
+            title="Generadores"
+            isOpen={uiLayout.generatorsOpen}
+            onToggle={uiLayout.toggleGenerators}
+            moduleCount={4}
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <DrumModule 
                 currentStep={currentStep}
@@ -251,18 +281,18 @@ const Index = () => {
                 onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
               />
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* PROCESAMIENTO - Effects */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <div className="h-px flex-1 bg-border/50" />
-              <span>Procesamiento</span>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
+          <CollapsibleSection
+            title="Procesamiento"
+            isOpen={uiLayout.processingOpen}
+            onToggle={uiLayout.toggleProcessing}
+            moduleCount={2}
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="min-h-[200px]">
-              <FXModule
+                <FXModule
                   reverbParams={fxState.reverbParams}
                   delayParams={fxState.delayParams}
                   masterFilterParams={fxState.masterFilterParams}
@@ -289,79 +319,61 @@ const Index = () => {
                 />
               </div>
             </div>
-          </section>
+          </CollapsibleSection>
 
           {/* CONTROL - Performance */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <div className="h-px flex-1 bg-border/50" />
-              <span>Control</span>
-              <div className="h-px flex-1 bg-border/50" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="module">
-                <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
+          <CollapsibleSection
+            title="Control"
+            isOpen={uiLayout.controlOpen}
+            onToggle={uiLayout.toggleControl}
+            moduleCount={3}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="module">
+                  <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
+                </div>
+                <div className="module">
+                  <SceneSlots
+                    scenes={sceneManager.scenes}
+                    activeScene={sceneManager.activeScene}
+                    morphTargetScene={sceneManager.morphTargetScene}
+                    savedSceneIds={sceneManager.savedSceneIds}
+                    hasClipboard={sceneManager.hasClipboard}
+                    clipboardName={sceneManager.clipboardName}
+                    onSceneSelect={sceneManager.handleSceneSelect}
+                    onSceneSave={sceneManager.handleSceneSave}
+                    onMorphTargetSet={sceneManager.handleMorphTargetSet}
+                    onSceneCopy={sceneManager.handleSceneCopy}
+                    onScenePaste={sceneManager.handleScenePaste}
+                    onSceneRename={sceneManager.handleSceneRename}
+                    onLoadPreset={sceneManager.handleLoadPreset}
+                    onExportScene={sceneManager.handleExportScene}
+                    onExportAll={sceneManager.handleExportAll}
+                    onImportScene={sceneManager.handleImportScene}
+                    onImportAll={sceneManager.handleImportAll}
+                  />
+                </div>
               </div>
+              {/* Pattern Chain */}
               <div className="module">
-                <SceneSlots
+                <PatternChain
+                  config={patternChain.config}
+                  currentChainIndex={patternChain.currentChainIndex}
+                  isChainActive={patternChain.isChainActive}
                   scenes={sceneManager.scenes}
-                  activeScene={sceneManager.activeScene}
-                  morphTargetScene={sceneManager.morphTargetScene}
                   savedSceneIds={sceneManager.savedSceneIds}
-                  hasClipboard={sceneManager.hasClipboard}
-                  clipboardName={sceneManager.clipboardName}
-                  onSceneSelect={sceneManager.handleSceneSelect}
-                  onSceneSave={sceneManager.handleSceneSave}
-                  onMorphTargetSet={sceneManager.handleMorphTargetSet}
-                  onSceneCopy={sceneManager.handleSceneCopy}
-                  onScenePaste={sceneManager.handleScenePaste}
-                  onSceneRename={sceneManager.handleSceneRename}
-                  onLoadPreset={sceneManager.handleLoadPreset}
-                  onExportScene={sceneManager.handleExportScene}
-                  onExportAll={sceneManager.handleExportAll}
-                  onImportScene={sceneManager.handleImportScene}
-                  onImportAll={sceneManager.handleImportAll}
+                  activeScene={sceneManager.activeScene}
+                  onAddToChain={patternChain.addToChain}
+                  onRemoveFromChain={patternChain.removeFromChain}
+                  onBarsPerPatternChange={patternChain.setBarsPerPattern}
+                  onLoopChainChange={patternChain.setLoopChain}
+                  onToggleEnabled={patternChain.toggleChainEnabled}
+                  onClearChain={patternChain.clearChain}
                 />
               </div>
             </div>
-            {/* Pattern Chain */}
-            <div className="module">
-              <PatternChain
-                config={patternChain.config}
-                currentChainIndex={patternChain.currentChainIndex}
-                isChainActive={patternChain.isChainActive}
-                scenes={sceneManager.scenes}
-                savedSceneIds={sceneManager.savedSceneIds}
-                activeScene={sceneManager.activeScene}
-                onAddToChain={patternChain.addToChain}
-                onRemoveFromChain={patternChain.removeFromChain}
-                onBarsPerPatternChange={patternChain.setBarsPerPattern}
-                onLoopChainChange={patternChain.setLoopChain}
-                onToggleEnabled={patternChain.toggleChainEnabled}
-                onClearChain={patternChain.clearChain}
-              />
-            </div>
-          </section>
-
-          {/* Status bar */}
-          <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-card/50 border border-border text-xs text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <span>Step: {currentStep + 1}/16</span>
-              <span>Scene: {sceneManager.scenes.find(s => s.id === sceneManager.activeScene)?.name}</span>
-              {sceneManager.morphTargetScene && (
-                <span className="text-primary">
-                  Morph → {sceneManager.scenes.find(s => s.id === sceneManager.morphTargetScene)?.name}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <span>Audio: {audioState}</span>
-              <span className="flex items-center gap-1">
-                <span className={`led ${isInitialized ? 'on' : ''}`} />
-                {isInitialized ? 'Engine Ready' : 'Click Play to Init'}
-              </span>
-            </div>
-          </div>
+          </CollapsibleSection>
         </div>
       </main>
 
@@ -384,9 +396,51 @@ const Index = () => {
       {/* Footer hint */}
       <footer className="px-6 py-2 border-t border-border text-xs text-muted-foreground text-center">
         <span className="opacity-50">
-          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Ctrl+C/V: Copy/Paste • Right-Click: Menu
+          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Ctrl+C/V: Copy/Paste
         </span>
       </footer>
+
+      {/* Bottom Dock */}
+      <BottomDock
+        state={uiLayout.dockState}
+        onStateChange={uiLayout.setDockState}
+        activeTab={uiLayout.activeDockTab}
+        onTabChange={uiLayout.setActiveDockTab}
+        analyserData={analyserData}
+        drumMuted={drumState.drumMuted}
+        synthMuted={synthState.synthMuted}
+        textureMuted={textureState.textureMuted}
+        sampleMuted={sampleState.sampleMuted}
+        onDrumMuteToggle={drumState.toggleDrumMute}
+        onSynthMuteToggle={synthState.toggleSynthMute}
+        onTextureMuteToggle={textureState.toggleTextureMute}
+        onSampleMuteToggle={sampleState.toggleSampleMute}
+      />
+
+      {/* Performance Panel (Left) */}
+      <PerformancePanel
+        open={uiLayout.leftPanelOpen}
+        onOpenChange={(open) => !open && uiLayout.toggleLeftPanel()}
+        drumMuted={drumState.drumMuted}
+        synthMuted={synthState.synthMuted}
+        textureMuted={textureState.textureMuted}
+        sampleMuted={sampleState.sampleMuted}
+        onDrumMuteToggle={drumState.toggleDrumMute}
+        onSynthMuteToggle={synthState.toggleSynthMute}
+        onTextureMuteToggle={textureState.toggleTextureMute}
+        onSampleMuteToggle={sampleState.toggleSampleMute}
+        scenes={sceneManager.scenes}
+        activeScene={sceneManager.activeScene}
+        onSceneSelect={sceneManager.handleSceneSelect}
+      />
+
+      {/* Settings Panel (Right) */}
+      <SettingsPanel
+        open={uiLayout.rightPanelOpen}
+        onOpenChange={(open) => !open && uiLayout.toggleRightPanel()}
+        projectName="Untitled Session"
+        bpm={bpm}
+      />
     </div>
   );
 };
