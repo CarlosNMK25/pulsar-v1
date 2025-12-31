@@ -5,7 +5,7 @@ import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
 import { SampleEngine, SampleParams } from '@/audio/SampleEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
-import { fxEngine } from '@/audio/FXEngine';
+import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
@@ -96,6 +96,7 @@ interface UseAudioEngineProps {
     filter: number;
     spread: number;
     mix: number;
+    syncDivision?: SyncDivision;
   };
   masterFilterParams: {
     lowpass: number;
