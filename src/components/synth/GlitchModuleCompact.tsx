@@ -2,10 +2,12 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Zap, Radio, Square, Disc, Sparkles, Rewind } from 'lucide-react';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { StutterParams, BitcrushParams } from '@/audio/GlitchEngine';
+import { StutterParams } from '@/audio/GlitchEngine';
 import { GlitchTarget } from '@/audio/AudioEngine';
-import { GlitchTrackId, GlitchParamsPerTrack } from '@/hooks/useGlitchState';
+import { GlitchTrackId, GlitchParamsPerTrack, TrackGlitchParams } from '@/hooks/useGlitchState';
+import { GlitchWaveformDisplay } from './GlitchWaveformDisplay';
 
 type RoutingMode = 'master' | 'individual';
 type IndividualTarget = 'drums' | 'synth' | 'texture' | 'sample' | 'fx';
@@ -15,13 +17,21 @@ interface GlitchModuleCompactProps {
   glitchTargets: GlitchTarget[];
   muted: boolean;
   paramsPerTrack: GlitchParamsPerTrack;
+  masterMix: number;
+  isPlaying: boolean;
+  analyserData: Uint8Array;
   onMuteToggle: () => void;
   onGlitchTargetsChange: (targets: GlitchTarget[]) => void;
   onTriggerGlitch: (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse') => void;
-  onStutterParamsChange: (track: GlitchTrackId, params: { division?: StutterParams['division']; decay?: number; mix?: number }) => void;
-  onBitcrushParamsChange: (track: GlitchTrackId, params: { bits?: number; sampleRate?: number }) => void;
+  onStutterParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['stutter']>) => void;
+  onBitcrushParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['bitcrush']>) => void;
+  onTapeStopParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['tapeStop']>) => void;
+  onFreezeParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['freeze']>) => void;
+  onReverseParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['reverse']>) => void;
   onChaosToggle: (enabled: boolean, params: { density: number; intensity: number }) => void;
-  onChaosParamsChange: (track: GlitchTrackId, params: { density?: number; intensity?: number }) => void;
+  onChaosParamsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['chaos']>) => void;
+  onFXSendsChange: (track: GlitchTrackId, params: Partial<TrackGlitchParams['fxSends']>) => void;
+  onMasterMixChange: (value: number) => void;
 }
 
 export const GlitchModuleCompact = ({ 
@@ -29,21 +39,28 @@ export const GlitchModuleCompact = ({
   glitchTargets,
   muted,
   paramsPerTrack,
+  masterMix,
+  isPlaying,
+  analyserData,
   onMuteToggle,
   onGlitchTargetsChange,
   onTriggerGlitch,
   onStutterParamsChange,
   onBitcrushParamsChange,
+  onTapeStopParamsChange,
+  onFreezeParamsChange,
+  onReverseParamsChange,
   onChaosToggle,
   onChaosParamsChange,
+  onFXSendsChange,
+  onMasterMixChange,
 }: GlitchModuleCompactProps) => {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [chaosEnabled, setChaosEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState('stutter');
   
-  // Flag to prevent notifying parent of changes that came from props
   const isExternalUpdateRef = useRef(false);
   
-  // Routing mode: master vs individual tracks
   const [routingMode, setRoutingMode] = useState<RoutingMode>(() => 
     glitchTargets.includes('master') ? 'master' : 'individual'
   );
@@ -57,27 +74,20 @@ export const GlitchModuleCompact = ({
     return targets;
   });
 
-  // Explicit track being edited (user-selectable when multiple tracks active)
   const [selectedEditTrack, setSelectedEditTrack] = useState<IndividualTarget | null>(null);
 
-  // Determine which track's params to display
   const editingTrack: GlitchTrackId = useMemo(() => {
     if (routingMode === 'master') return 'master';
-    // If user explicitly selected an edit track and it's still active, use it
     if (selectedEditTrack && individualTargets.has(selectedEditTrack)) {
       return selectedEditTrack;
     }
-    // Otherwise use first active track
     const targetsArray = Array.from(individualTargets);
     return targetsArray.length > 0 ? targetsArray[0] : 'drums';
   }, [routingMode, individualTargets, selectedEditTrack]);
 
-  // Get current params for the editing track
   const currentParams = paramsPerTrack[editingTrack];
 
-  // Sync routing mode changes to parent (only for local user interactions)
   useEffect(() => {
-    // Skip if this change came from external props
     if (isExternalUpdateRef.current) {
       isExternalUpdateRef.current = false;
       return;
@@ -90,11 +100,8 @@ export const GlitchModuleCompact = ({
     }
   }, [routingMode, individualTargets, onGlitchTargetsChange]);
 
-  // Sync local state with props when glitchTargets changes externally (e.g. preset load)
   useEffect(() => {
     const isMasterMode = glitchTargets.includes('master');
-    
-    // Compare current state with incoming props
     const currentIsMaster = routingMode === 'master';
     const currentTargetsArray = Array.from(individualTargets).sort();
     const incomingTargetsArray = glitchTargets.filter(t => t !== 'master').sort() as IndividualTarget[];
@@ -105,7 +112,6 @@ export const GlitchModuleCompact = ({
       currentTargetsArray.some((t, i) => t !== incomingTargetsArray[i])
     );
     
-    // Only update if there's an actual difference
     if (modeChanged || targetsChanged) {
       isExternalUpdateRef.current = true;
       
@@ -132,7 +138,6 @@ export const GlitchModuleCompact = ({
       const next = new Set(prev);
       if (next.has(target)) {
         next.delete(target);
-        // If we're removing the currently edited track, clear selection
         if (selectedEditTrack === target) {
           setSelectedEditTrack(null);
         }
@@ -143,53 +148,19 @@ export const GlitchModuleCompact = ({
     });
   };
 
-  // Handle clicking on track button - always toggle, set as editing if activating
   const handleTrackClick = (target: IndividualTarget) => {
     const isCurrentlyActive = individualTargets.has(target);
-    
-    // Always toggle active state
     toggleIndividualTarget(target);
-    
     if (!isCurrentlyActive) {
-      // Just activated - set as editing
       setSelectedEditTrack(target);
     }
-    // If deactivated, editingTrack useMemo handles selecting next active
   };
 
-  const handleStutterTrigger = () => {
+  const handleTrigger = (effect: 'stutter' | 'tapestop' | 'freeze' | 'bitcrush' | 'reverse', duration: number = 200) => {
     if (!isActive) return;
-    setActiveEffect('stutter');
-    onTriggerGlitch('stutter');
-    setTimeout(() => setActiveEffect(null), 200);
-  };
-
-  const handleTapeStopTrigger = () => {
-    if (!isActive) return;
-    setActiveEffect('tapestop');
-    onTriggerGlitch('tapestop');
-    setTimeout(() => setActiveEffect(null), 500);
-  };
-
-  const handleFreezeTrigger = () => {
-    if (!isActive) return;
-    setActiveEffect('freeze');
-    onTriggerGlitch('freeze');
-    setTimeout(() => setActiveEffect(null), 300);
-  };
-  
-  const handleBitcrushTrigger = () => {
-    if (!isActive) return;
-    setActiveEffect('crush');
-    onTriggerGlitch('bitcrush');
-    setTimeout(() => setActiveEffect(null), 500);
-  };
-
-  const handleReverseTrigger = () => {
-    if (!isActive) return;
-    setActiveEffect('reverse');
-    onTriggerGlitch('reverse');
-    setTimeout(() => setActiveEffect(null), 400);
+    setActiveEffect(effect);
+    onTriggerGlitch(effect);
+    setTimeout(() => setActiveEffect(null), duration);
   };
   
   const handleChaosToggle = () => {
@@ -197,7 +168,6 @@ export const GlitchModuleCompact = ({
     const newEnabled = !chaosEnabled;
     setChaosEnabled(newEnabled);
     
-    // Use parent callback to route chaos to correct targets
     onChaosToggle(newEnabled, {
       density: currentParams.chaos.density / 100,
       intensity: currentParams.chaos.intensity / 100,
@@ -206,16 +176,25 @@ export const GlitchModuleCompact = ({
 
   const divisions: StutterParams['division'][] = ['1/4', '1/8', '1/16', '1/32', '1/64'];
   
-  const individualButtons: { id: IndividualTarget; label: string; color: string }[] = [
-    { id: 'drums', label: 'D', color: 'hsl(var(--primary))' },
-    { id: 'synth', label: 'S', color: 'hsl(var(--accent))' },
-    { id: 'texture', label: 'T', color: 'hsl(var(--secondary))' },
-    { id: 'sample', label: 'Smp', color: 'hsl(var(--muted))' },
-    { id: 'fx', label: 'FX', color: 'hsl(var(--chart-4))' },
+  const individualButtons: { id: IndividualTarget; label: string }[] = [
+    { id: 'drums', label: 'D' },
+    { id: 'synth', label: 'S' },
+    { id: 'texture', label: 'T' },
+    { id: 'sample', label: 'Smp' },
+    { id: 'fx', label: 'FX' },
+  ];
+
+  const effectTabs = [
+    { id: 'stutter', label: 'Stut', icon: Radio },
+    { id: 'tape', label: 'Tape', icon: Square },
+    { id: 'freeze', label: 'Frz', icon: Disc },
+    { id: 'crush', label: 'Crsh', icon: Zap },
+    { id: 'reverse', label: 'Rev', icon: Rewind },
+    { id: 'chaos', label: 'Chaos', icon: Sparkles },
   ];
 
   return (
-    <div className={cn('space-y-3', className, muted && 'opacity-50')}>
+    <div className={cn('space-y-2', className, muted && 'opacity-50')}>
       {/* Header with Mute */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -241,271 +220,369 @@ export const GlitchModuleCompact = ({
         </button>
       </div>
 
-      {/* Routing Mode Selector */}
-      <div className="space-y-2">
-        <div className="flex gap-1">
-          <Button
-            variant={routingMode === 'master' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleModeChange('master')}
-            className={cn(
-              'flex-1 h-7 text-[10px] font-medium',
-              routingMode === 'master' && 'bg-primary text-primary-foreground'
-            )}
-          >
-            MASTER
-          </Button>
-          <Button
-            variant={routingMode === 'individual' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => handleModeChange('individual')}
-            className={cn(
-              'flex-1 h-7 text-[10px] font-medium',
-              routingMode === 'individual' && 'bg-primary text-primary-foreground'
-            )}
-          >
-            TRACKS
-          </Button>
-        </div>
+      {/* Routing Mode Selector - Compact */}
+      <div className="flex gap-1">
+        <Button
+          variant={routingMode === 'master' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => handleModeChange('master')}
+          className={cn(
+            'h-6 text-[9px] font-medium px-2',
+            routingMode === 'master' && 'bg-primary text-primary-foreground'
+          )}
+        >
+          MASTER
+        </Button>
+        <Button
+          variant={routingMode === 'individual' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => handleModeChange('individual')}
+          className={cn(
+            'h-6 text-[9px] font-medium px-2',
+            routingMode === 'individual' && 'bg-primary text-primary-foreground'
+          )}
+        >
+          TRACKS
+        </Button>
         
-        {/* Individual track selectors - only visible in individual mode */}
         {routingMode === 'individual' && (
-          <>
-            <div className="flex gap-1">
-              {individualButtons.map(({ id, label }) => {
-                const isActive = individualTargets.has(id);
-                const isEditing = id === editingTrack;
-                return (
-                  <Button
-                    key={id}
-                    variant={isActive ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleTrackClick(id)}
-                    className={cn(
-                      'flex-1 h-6 text-[10px] font-mono transition-all relative',
-                      isActive 
-                        ? isEditing
-                          ? 'bg-primary text-primary-foreground ring-2 ring-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.5)]'
-                          : 'bg-primary/60 text-primary-foreground'
-                        : 'opacity-50 hover:opacity-80'
-                    )}
-                  >
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
-            
-            {/* Editing indicator when multiple tracks selected */}
-            {multipleTracksSelected && (
-              <div className="text-[9px] text-yellow-400/80 font-mono text-center">
-                ✏️ Editing: {individualButtons.find(b => b.id === editingTrack)?.label || editingTrack}
-              </div>
-            )}
-          </>
-        )}
-        
-        {/* Warning when no target selected in individual mode */}
-        {showNoTargetWarning && (
-          <div className="text-[9px] text-muted-foreground/60 text-center italic">
-            Select a track
+          <div className="flex gap-0.5 ml-1">
+            {individualButtons.map(({ id, label }) => {
+              const isActive = individualTargets.has(id);
+              const isEditing = id === editingTrack;
+              return (
+                <Button
+                  key={id}
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleTrackClick(id)}
+                  className={cn(
+                    'h-6 text-[9px] font-mono px-1.5 min-w-0',
+                    isActive 
+                      ? isEditing
+                        ? 'bg-primary text-primary-foreground ring-1 ring-yellow-400'
+                        : 'bg-primary/60 text-primary-foreground'
+                      : 'opacity-50 hover:opacity-80'
+                  )}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </div>
         )}
-      </div>
-
-      {/* 5 Trigger Buttons - compact */}
-      <div className="grid grid-cols-5 gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleStutterTrigger}
-          disabled={!isActive}
-          className={cn(
-            'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
-            activeEffect === 'stutter' && 'bg-primary/20 border-primary'
-          )}
-        >
-          <Radio className="w-3 h-3" />
-          <span className="text-[8px]">Stut</span>
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleTapeStopTrigger}
-          disabled={!isActive}
-          className={cn(
-            'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
-            activeEffect === 'tapestop' && 'bg-primary/20 border-primary'
-          )}
-        >
-          <Square className="w-3 h-3" />
-          <span className="text-[8px]">Tape</span>
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleFreezeTrigger}
-          disabled={!isActive}
-          className={cn(
-            'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
-            activeEffect === 'freeze' && 'bg-primary/20 border-primary'
-          )}
-        >
-          <Disc className="w-3 h-3" />
-          <span className="text-[8px]">Frz</span>
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleBitcrushTrigger}
-          disabled={!isActive}
-          className={cn(
-            'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
-            activeEffect === 'crush' && 'bg-primary/20 border-primary'
-          )}
-        >
-          <Zap className="w-3 h-3" />
-          <span className="text-[8px]">Crsh</span>
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleReverseTrigger}
-          disabled={!isActive}
-          className={cn(
-            'h-8 flex flex-col items-center justify-center gap-0 px-0.5',
-            activeEffect === 'reverse' && 'bg-primary/20 border-primary'
-          )}
-        >
-          <Rewind className="w-3 h-3" />
-          <span className="text-[8px]">Rev</span>
-        </Button>
-      </div>
-
-      {/* Stutter: Division selector + 2 knobs */}
-      <div className="space-y-1.5">
-        <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Stutter</div>
-        <div className="flex gap-0.5">
-          {divisions.map((div) => (
-            <button
-              key={div}
-              onClick={() => {
-                onStutterParamsChange(editingTrack, { division: div });
-              }}
-              disabled={!isActive}
-              className={cn(
-                'flex-1 py-0.5 text-[9px] font-mono rounded border transition-colors',
-                currentParams.stutter.division === div
-                  ? 'border-primary bg-primary/20 text-primary'
-                  : 'border-border text-muted-foreground hover:text-foreground',
-                !isActive && 'opacity-50'
-              )}
-            >
-              {div}
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Knob
-            value={currentParams.stutter.decay}
-            onChange={(v) => {
-              onStutterParamsChange(editingTrack, { decay: v / 100 });
-            }}
-            label="Decay"
-            size="sm"
-            variant={!isActive ? 'secondary' : 'primary'}
-          />
-          <Knob
-            value={currentParams.stutter.mix}
-            onChange={(v) => {
-              onStutterParamsChange(editingTrack, { mix: v / 100 });
-            }}
-            label="Mix"
-            size="sm"
-            variant={!isActive ? 'secondary' : 'accent'}
-          />
-        </div>
-      </div>
-
-      {/* Bitcrush: 2 knobs */}
-      <div className="space-y-1.5">
-        <div className="text-[9px] text-muted-foreground uppercase tracking-wider">Bitcrush</div>
-        <div className="grid grid-cols-2 gap-2">
-          <Knob
-            value={currentParams.bitcrush.bits * 6.25}
-            onChange={(v) => {
-              const bits = Math.round(v / 6.25);
-              onBitcrushParamsChange(editingTrack, { bits: Math.max(1, Math.min(16, bits)) });
-            }}
-            label={`${currentParams.bitcrush.bits}bit`}
-            size="sm"
-            variant={!isActive ? 'secondary' : 'primary'}
-          />
-          <Knob
-            value={currentParams.bitcrush.sampleRate}
-            onChange={(v) => {
-              onBitcrushParamsChange(editingTrack, { sampleRate: v / 100 });
-            }}
-            label="Crush"
-            size="sm"
-            variant={!isActive ? 'secondary' : 'accent'}
-          />
-        </div>
       </div>
       
-      {/* Chaos Mode: Toggle + 2 knobs in row */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-            <span className={cn(
-              'w-1.5 h-1.5 rounded-full',
-              chaosEnabled ? 'bg-destructive animate-pulse' : 'bg-muted-foreground/40'
-            )} />
-            Chaos
+      {showNoTargetWarning && (
+        <div className="text-[9px] text-muted-foreground/60 text-center italic">
+          Select a track
+        </div>
+      )}
+
+      {/* Integrated Waveform Display */}
+      <GlitchWaveformDisplay 
+        isPlaying={isPlaying} 
+        analyserData={analyserData}
+        className="h-14 rounded-sm"
+      />
+
+      {/* Effect Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-6 h-7 p-0.5">
+          {effectTabs.map(tab => {
+            const Icon = tab.icon;
+            const isTabActive = activeEffect === tab.id || (tab.id === 'chaos' && chaosEnabled);
+            return (
+              <TabsTrigger 
+                key={tab.id} 
+                value={tab.id} 
+                className={cn(
+                  'text-[8px] h-6 px-1 gap-0.5',
+                  isTabActive && 'bg-primary/20'
+                )}
+              >
+                <Icon className="w-2.5 h-2.5" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+        
+        {/* STUTTER Tab */}
+        <TabsContent value="stutter" className="space-y-2 mt-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleTrigger('stutter', 200)}
+              disabled={!isActive}
+              className={cn(
+                'h-7 flex-1 text-[10px]',
+                activeEffect === 'stutter' && 'bg-primary/20 border-primary'
+              )}
+            >
+              <Radio className="w-3 h-3 mr-1" />
+              TRIGGER
+            </Button>
           </div>
+          <div className="flex gap-0.5">
+            {divisions.map((div) => (
+              <button
+                key={div}
+                onClick={() => onStutterParamsChange(editingTrack, { division: div })}
+                disabled={!isActive}
+                className={cn(
+                  'flex-1 py-0.5 text-[9px] font-mono rounded border transition-colors',
+                  currentParams.stutter.division === div
+                    ? 'border-primary bg-primary/20 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground',
+                  !isActive && 'opacity-50'
+                )}
+              >
+                {div}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={currentParams.stutter.decay}
+              onChange={(v) => onStutterParamsChange(editingTrack, { decay: v })}
+              label="Decay"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.stutter.mix}
+              onChange={(v) => onStutterParamsChange(editingTrack, { mix: v })}
+              label="Mix"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'accent'}
+            />
+          </div>
+        </TabsContent>
+
+        {/* TAPE STOP Tab */}
+        <TabsContent value="tape" className="space-y-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleTrigger('tapestop', 500)}
+            disabled={!isActive}
+            className={cn(
+              'h-7 w-full text-[10px]',
+              activeEffect === 'tapestop' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Square className="w-3 h-3 mr-1" />
+            TRIGGER
+          </Button>
+          <div className="grid grid-cols-3 gap-2">
+            <Knob
+              value={currentParams.tapeStop.speed}
+              onChange={(v) => onTapeStopParamsChange(editingTrack, { speed: v })}
+              label="Speed"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.tapeStop.duration}
+              onChange={(v) => onTapeStopParamsChange(editingTrack, { duration: v })}
+              label="Dur"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.tapeStop.mix}
+              onChange={(v) => onTapeStopParamsChange(editingTrack, { mix: v })}
+              label="Mix"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'accent'}
+            />
+          </div>
+        </TabsContent>
+
+        {/* FREEZE Tab */}
+        <TabsContent value="freeze" className="space-y-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleTrigger('freeze', 300)}
+            disabled={!isActive}
+            className={cn(
+              'h-7 w-full text-[10px]',
+              activeEffect === 'freeze' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Disc className="w-3 h-3 mr-1" />
+            TRIGGER
+          </Button>
+          <div className="grid grid-cols-4 gap-1">
+            <Knob
+              value={currentParams.freeze.grainSize}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { grainSize: v })}
+              label="Grain"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.pitch}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { pitch: v })}
+              label="Pitch"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.spread}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { spread: v })}
+              label="Spread"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.freeze.mix}
+              onChange={(v) => onFreezeParamsChange(editingTrack, { mix: v })}
+              label="Mix"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'accent'}
+            />
+          </div>
+        </TabsContent>
+
+        {/* BITCRUSH Tab */}
+        <TabsContent value="crush" className="space-y-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleTrigger('bitcrush', 500)}
+            disabled={!isActive}
+            className={cn(
+              'h-7 w-full text-[10px]',
+              activeEffect === 'crush' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Zap className="w-3 h-3 mr-1" />
+            TRIGGER
+          </Button>
+          <div className="grid grid-cols-3 gap-2">
+            <Knob
+              value={currentParams.bitcrush.bits * 6.25}
+              onChange={(v) => {
+                const bits = Math.round(v / 6.25);
+                onBitcrushParamsChange(editingTrack, { bits: Math.max(1, Math.min(16, bits)) });
+              }}
+              label={`${currentParams.bitcrush.bits}bit`}
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.bitcrush.sampleRate}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { sampleRate: v })}
+              label="Crush"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.bitcrush.mix}
+              onChange={(v) => onBitcrushParamsChange(editingTrack, { mix: v })}
+              label="Mix"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'accent'}
+            />
+          </div>
+        </TabsContent>
+
+        {/* REVERSE Tab */}
+        <TabsContent value="reverse" className="space-y-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleTrigger('reverse', 400)}
+            disabled={!isActive}
+            className={cn(
+              'h-7 w-full text-[10px]',
+              activeEffect === 'reverse' && 'bg-primary/20 border-primary'
+            )}
+          >
+            <Rewind className="w-3 h-3 mr-1" />
+            TRIGGER
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={currentParams.reverse.duration}
+              onChange={(v) => onReverseParamsChange(editingTrack, { duration: v })}
+              label="Duration"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={currentParams.reverse.mix}
+              onChange={(v) => onReverseParamsChange(editingTrack, { mix: v })}
+              label="Mix"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'accent'}
+            />
+          </div>
+        </TabsContent>
+
+        {/* CHAOS Tab */}
+        <TabsContent value="chaos" className="space-y-2 mt-2">
           <Button
             variant={chaosEnabled ? 'destructive' : 'outline'}
             size="sm"
             onClick={handleChaosToggle}
             disabled={!isActive}
             className={cn(
-              'h-5 px-2 text-[9px] ml-auto',
+              'h-7 w-full text-[10px]',
               chaosEnabled && 'animate-pulse'
             )}
           >
-            <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-            {chaosEnabled ? 'On' : 'Off'}
+            <Sparkles className="w-3 h-3 mr-1" />
+            {chaosEnabled ? 'CHAOS ON' : 'CHAOS OFF'}
           </Button>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
+              value={currentParams.chaos.density}
+              onChange={(v) => onChaosParamsChange(editingTrack, { density: v })}
+              label="Density"
+              size="sm"
+              variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            />
+            <Knob
+              value={currentParams.chaos.intensity}
+              onChange={(v) => onChaosParamsChange(editingTrack, { intensity: v })}
+              label="Intensity"
+              size="sm"
+              variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Footer: Master Mix + FX Sends */}
+      <div className="flex gap-3 pt-2 border-t border-border/30">
+        <div className="flex-shrink-0">
           <Knob
-            value={currentParams.chaos.density}
-            onChange={(v) => {
-              onChaosParamsChange(editingTrack, { density: v });
-              if (chaosEnabled) {
-                // Also update the audio engine
-              }
-            }}
-            label="Dens"
+            value={masterMix}
+            onChange={onMasterMixChange}
+            label="Master"
             size="sm"
-            variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            variant="primary"
+          />
+        </div>
+        <div className="flex gap-2 flex-1 justify-end">
+          <Knob
+            value={currentParams.fxSends.reverb}
+            onChange={(v) => onFXSendsChange(editingTrack, { reverb: v })}
+            label="RevSnd"
+            size="sm"
+            variant="secondary"
           />
           <Knob
-            value={currentParams.chaos.intensity}
-            onChange={(v) => {
-              onChaosParamsChange(editingTrack, { intensity: v });
-              if (chaosEnabled) {
-                // Also update the audio engine
-              }
-            }}
-            label="Int"
+            value={currentParams.fxSends.delay}
+            onChange={(v) => onFXSendsChange(editingTrack, { delay: v })}
+            label="DlySnd"
             size="sm"
-            variant={!isActive ? 'secondary' : chaosEnabled ? 'accent' : 'secondary'}
+            variant="secondary"
           />
         </div>
       </div>
