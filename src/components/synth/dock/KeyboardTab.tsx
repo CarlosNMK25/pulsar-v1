@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Music, Drum, FileAudio } from 'lucide-react';
 
@@ -13,6 +13,11 @@ interface KeyboardTabProps {
   onInitAudio?: () => Promise<void>;
   target?: KeyboardTarget;
   onTargetChange?: (target: KeyboardTarget) => void;
+  // Lifted state from parent
+  octave?: number;
+  onOctaveChange?: (octave: number) => void;
+  pressedMidi?: Set<number>;
+  pressedDrums?: Set<string>;
 }
 
 // Synth keyboard mapping
@@ -84,154 +89,54 @@ export const KeyboardTab = ({
   onInitAudio,
   target = 'synth',
   onTargetChange,
+  octave = 3,
+  onOctaveChange,
+  pressedMidi = new Set(),
+  pressedDrums = new Set(),
 }: KeyboardTabProps) => {
-  const [octave, setOctave] = useState(3);
-  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
-  const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
-  const [pressedDrums, setPressedDrums] = useState<Set<string>>(new Set());
-  
-  // Use refs to avoid stale closures in event handlers
-  const activeKeyMapRef = useRef<Map<string, number>>(new Map());
-  const octaveRef = useRef(octave);
-  const targetRef = useRef(target);
-  const onNoteOnRef = useRef(onNoteOn);
-  const onNoteOffRef = useRef(onNoteOff);
-  const onDrumTriggerRef = useRef(onDrumTrigger);
-  const onSampleTriggerRef = useRef(onSampleTrigger);
-  
-  // Keep refs in sync
-  useEffect(() => { octaveRef.current = octave; }, [octave]);
-  useEffect(() => { targetRef.current = target; }, [target]);
-  useEffect(() => { onNoteOnRef.current = onNoteOn; }, [onNoteOn]);
-  useEffect(() => { onNoteOffRef.current = onNoteOff; }, [onNoteOff]);
-  useEffect(() => { onDrumTriggerRef.current = onDrumTrigger; }, [onDrumTrigger]);
-  useEffect(() => { onSampleTriggerRef.current = onSampleTrigger; }, [onSampleTrigger]);
-
-  // Initialize audio on first interaction (fire-and-forget)
+  // Initialize audio on first interaction
   const ensureAudioReady = useCallback(() => {
     if (!isAudioReady && onInitAudio) {
       onInitAudio();
     }
   }, [isAudioReady, onInitAudio]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      const currentTarget = targetRef.current;
-      const keyMap = activeKeyMapRef.current;
-      
-      if (e.repeat) return;
-      
-      ensureAudioReady();
-      
-      // Handle based on target
-      if (currentTarget === 'synth' && KEYBOARD_MAP[key] && !keyMap.has(key)) {
-        const { note, octaveOffset } = KEYBOARD_MAP[key];
-        const midiNote = noteToMidi(note, octaveRef.current + octaveOffset);
-        const fullNote = `${note}${octaveRef.current + octaveOffset}`;
-        
-        keyMap.set(key, midiNote);
-        
-        setPressedKeys(prev => new Set(prev).add(fullNote));
-        setPressedMidi(prev => new Set(prev).add(midiNote));
-        onNoteOnRef.current?.(midiNote, 100);
-      } else if (currentTarget === 'drums' && DRUM_MAP[key]) {
-        const drum = DRUM_MAP[key];
-        setPressedDrums(prev => new Set(prev).add(drum));
-        onDrumTriggerRef.current?.(drum, 100);
-      } else if (currentTarget === 'sample') {
-        // Any key triggers sample
-        if (!keyMap.has(key)) {
-          keyMap.set(key, 0);
-          onSampleTriggerRef.current?.(100);
-        }
-      }
-    };
+  // Convert MIDI to note name for display
+  const midiToNoteName = (midi: number): string => {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const noteName = noteNames[midi % 12];
+    const noteOctave = Math.floor(midi / 12) - 1;
+    return `${noteName}${noteOctave}`;
+  };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      const currentTarget = targetRef.current;
-      const keyMap = activeKeyMapRef.current;
-      const midiNote = keyMap.get(key);
-      
-      if (currentTarget === 'synth' && midiNote !== undefined) {
-        keyMap.delete(key);
-        onNoteOffRef.current?.(midiNote);
-        
-        setPressedMidi(prev => {
-          const next = new Set(prev);
-          next.delete(midiNote);
-          return next;
-        });
-        
-        const fullNote = midiToNoteName(midiNote);
-        setPressedKeys(prev => {
-          const next = new Set(prev);
-          next.delete(fullNote);
-          return next;
-        });
-      } else if (currentTarget === 'drums' && DRUM_MAP[key]) {
-        const drum = DRUM_MAP[key];
-        setPressedDrums(prev => {
-          const next = new Set(prev);
-          next.delete(drum);
-          return next;
-        });
-      } else if (currentTarget === 'sample') {
-        keyMap.delete(key);
-      }
+  // Convert note name + octave to MIDI number
+  const noteToMidi = (note: string, oct: number): number => {
+    const noteMap: Record<string, number> = {
+      'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+      'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
     };
+    return (oct + 1) * 12 + noteMap[note];
+  };
 
-    const handleBlur = () => {
-      const keyMap = activeKeyMapRef.current;
-      keyMap.forEach((midiNote) => {
-        onNoteOffRef.current?.(midiNote);
-      });
-      keyMap.clear();
-      setPressedKeys(new Set());
-      setPressedMidi(new Set());
-      setPressedDrums(new Set());
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [ensureAudioReady]);
-
+  // Check if a key is pressed based on MIDI
+  const isKeyPressed = (note: string, oct: number): boolean => {
+    const midi = noteToMidi(note, oct);
+    return pressedMidi.has(midi);
+  };
 
   // Mouse/touch handlers for visual keys
   const handleMouseDown = useCallback((note: string, oct: number) => {
     if (target !== 'synth') return;
     ensureAudioReady();
-    const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
-    setPressedKeys(prev => new Set(prev).add(fullNote));
-    setPressedMidi(prev => new Set(prev).add(midiNote));
     onNoteOn?.(midiNote, 100);
-  }, [onNoteOn, ensureAudioReady, target]);
+  }, [onNoteOn, ensureAudioReady, target, noteToMidi]);
 
   const handleMouseUp = useCallback((note: string, oct: number) => {
     if (target !== 'synth') return;
-    const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
-    setPressedKeys(prev => {
-      const next = new Set(prev);
-      next.delete(fullNote);
-      return next;
-    });
-    setPressedMidi(prev => {
-      const next = new Set(prev);
-      next.delete(midiNote);
-      return next;
-    });
     onNoteOff?.(midiNote);
-  }, [onNoteOff, target]);
+  }, [onNoteOff, target, noteToMidi]);
 
   const handleDrumClick = useCallback((drum: 'kick' | 'snare' | 'hat') => {
     ensureAudioReady();
@@ -247,14 +152,13 @@ export const KeyboardTab = ({
     <div key={oct} className="flex relative h-full">
       {/* White keys */}
       {WHITE_KEYS.map((note) => {
-        const fullNote = `${note}${oct}`;
-        const isPressed = pressedKeys.has(fullNote);
+        const isPressed = isKeyPressed(note, oct);
         return (
           <button
-            key={fullNote}
+            key={`${note}${oct}`}
             onMouseDown={() => handleMouseDown(note, oct)}
             onMouseUp={() => handleMouseUp(note, oct)}
-            onMouseLeave={() => pressedKeys.has(fullNote) && handleMouseUp(note, oct)}
+            onMouseLeave={() => isKeyPressed(note, oct) && handleMouseUp(note, oct)}
             className={cn(
               "w-8 h-full border border-border rounded-b-sm transition-colors select-none",
               isPressed ? "bg-primary" : "bg-foreground/90 hover:bg-foreground/80"
@@ -266,17 +170,16 @@ export const KeyboardTab = ({
       <div className="absolute top-0 left-0 flex h-[60%] pointer-events-none">
         {ALL_NOTES.map((note, i) => {
           if (!note.includes('#')) return <div key={note} className="w-8" />;
-          const fullNote = `${note}${oct}`;
-          const isPressed = pressedKeys.has(fullNote);
+          const isPressed = isKeyPressed(note, oct);
           // Position black keys correctly between white keys
           const whiteKeyIndex = Math.floor(i / 2);
           const offset = whiteKeyIndex * 32 + 20; // 32px per white key, offset to center
           return (
             <button
-              key={fullNote}
+              key={`${note}${oct}`}
               onMouseDown={() => handleMouseDown(note, oct)}
               onMouseUp={() => handleMouseUp(note, oct)}
-              onMouseLeave={() => pressedKeys.has(fullNote) && handleMouseUp(note, oct)}
+              onMouseLeave={() => isKeyPressed(note, oct) && handleMouseUp(note, oct)}
               className={cn(
                 "absolute w-5 h-full rounded-b-sm pointer-events-auto transition-colors select-none",
                 isPressed ? "bg-primary" : "bg-background hover:bg-muted"
@@ -357,14 +260,14 @@ export const KeyboardTab = ({
       {target === 'synth' && (
         <div className="flex flex-col items-center gap-1">
           <button
-            onClick={() => setOctave(o => Math.min(o + 1, 6))}
+            onClick={() => onOctaveChange?.(Math.min(octave + 1, 6))}
             className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
           >
             +
           </button>
           <span className="text-xs text-muted-foreground">Oct {octave}</span>
           <button
-            onClick={() => setOctave(o => Math.max(o - 1, 1))}
+            onClick={() => onOctaveChange?.(Math.max(octave - 1, 1))}
             className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 text-foreground"
           >
             -

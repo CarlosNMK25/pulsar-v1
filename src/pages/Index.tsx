@@ -25,6 +25,7 @@ import { useSampleState } from '@/hooks/useSampleState';
 import { useSceneManager } from '@/hooks/useSceneManager';
 import { usePatternChain } from '@/hooks/usePatternChain';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useMusicalKeyboard } from '@/hooks/useMusicalKeyboard';
 import { useUILayout } from '@/hooks/useUILayout';
 import { SampleModule } from '@/components/synth/SampleModule';
 import { KeyboardTarget } from '@/components/synth/dock/KeyboardTab';
@@ -63,6 +64,7 @@ const Index = () => {
   const sampleState = useSampleState();
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
   const [keyboardTarget, setKeyboardTarget] = useState<KeyboardTarget>('synth');
+  const [keyboardOctave, setKeyboardOctave] = useState(3);
 
   // Scene manager
   const sceneManager = useSceneManager({
@@ -170,6 +172,18 @@ const Index = () => {
     activeScene: sceneManager.activeScene,
     hasClipboard: sceneManager.hasClipboard,
     scenes: sceneManager.scenes,
+  });
+
+  // Musical keyboard (global - works in any tab)
+  const { pressedMidi, pressedDrums } = useMusicalKeyboard({
+    target: keyboardTarget,
+    octave: keyboardOctave,
+    onNoteOn: playNote,
+    onNoteOff: stopNote,
+    onDrumTrigger: triggerDrum,
+    onSampleTrigger: triggerSample,
+    isAudioReady: isInitialized,
+    onInitAudio: initAudio,
   });
 
   // Calculate main content padding based on dock state
@@ -424,6 +438,10 @@ const Index = () => {
         onInitAudio={initAudio}
         keyboardTarget={keyboardTarget}
         onKeyboardTargetChange={setKeyboardTarget}
+        keyboardOctave={keyboardOctave}
+        onKeyboardOctaveChange={setKeyboardOctave}
+        pressedMidi={pressedMidi}
+        pressedDrums={pressedDrums}
         drumMuted={drumState.drumMuted}
         synthMuted={synthState.synthMuted}
         textureMuted={textureState.textureMuted}
