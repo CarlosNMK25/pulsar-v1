@@ -1,6 +1,7 @@
 // Scene System Engine - Manages save/load/morph between scenes
-import { WaveformType } from './SynthVoice';
+import { WaveformType, LfoSyncDivision } from './SynthVoice';
 import { TextureMode } from './TextureEngine';
+import { DistortionCurve } from './WaveshaperEngine';
 import { factoryPresets, FactoryPresetName } from './factoryPresets';
 
 export interface Step {
@@ -13,6 +14,7 @@ export interface DrumParams {
   pitch: number;
   decay: number;
   drive: number;
+  driveType: DistortionCurve;
   mix: number;
 }
 
@@ -24,6 +26,11 @@ export interface SynthParams {
   release: number;
   detune: number;
   lfoRate: number;
+  lfoSyncDivision: LfoSyncDivision;
+  fmAmount: number;
+  fmRatio: number;
+  drive: number;
+  driveType: DistortionCurve;
 }
 
 export interface TextureParams {
@@ -96,8 +103,8 @@ export interface SceneData {
 
 // Interpolated params (all numeric values that can be smoothly transitioned)
 export interface InterpolatedParams {
-  drumParams: DrumParams;
-  synthParams: Omit<SynthParams, 'waveform'>;
+  drumParams: Omit<DrumParams, 'driveType'> & { driveType: DistortionCurve };
+  synthParams: Omit<SynthParams, 'waveform' | 'lfoSyncDivision' | 'driveType'> & { driveType: DistortionCurve };
   textureParams: TextureParams;
   reverbParams: ReverbParams;
   delayParams: Omit<DelayParams, 'syncDivision'>;
@@ -193,6 +200,7 @@ class SceneEngine {
         pitch: this.lerp(from.drumParams.pitch, to.drumParams.pitch, t),
         decay: this.lerp(from.drumParams.decay, to.drumParams.decay, t),
         drive: this.lerp(from.drumParams.drive, to.drumParams.drive, t),
+        driveType: t < 0.5 ? from.drumParams.driveType : to.drumParams.driveType,
         mix: this.lerp(from.drumParams.mix, to.drumParams.mix, t),
       },
       synthParams: {
@@ -202,6 +210,10 @@ class SceneEngine {
         release: this.lerp(from.synthParams.release, to.synthParams.release, t),
         detune: this.lerp(from.synthParams.detune, to.synthParams.detune, t),
         lfoRate: this.lerp(from.synthParams.lfoRate, to.synthParams.lfoRate, t),
+        fmAmount: this.lerp(from.synthParams.fmAmount ?? 0, to.synthParams.fmAmount ?? 0, t),
+        fmRatio: this.lerp(from.synthParams.fmRatio ?? 50, to.synthParams.fmRatio ?? 50, t),
+        drive: this.lerp(from.synthParams.drive ?? 0, to.synthParams.drive ?? 0, t),
+        driveType: t < 0.5 ? (from.synthParams.driveType ?? 'soft') : (to.synthParams.driveType ?? 'soft'),
       },
       textureParams: {
         density: this.lerp(from.textureParams.density, to.textureParams.density, t),
