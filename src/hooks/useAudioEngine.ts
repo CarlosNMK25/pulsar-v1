@@ -117,6 +117,9 @@ interface UseAudioEngineProps {
     probability: number; // 0-100
   };
   onAutoFillTrigger?: (active: boolean) => void;  // Callback to sync UI
+  // NEW: FX routing mode and targets
+  fxRoutingMode: 'master' | 'individual';
+  fxTargets: ('drums' | 'synth' | 'texture' | 'sample' | 'glitch')[];
 }
 
 // Evaluate conditional trigger
@@ -178,6 +181,8 @@ export const useAudioEngine = ({
   fillActive = false,
   autoFillConfig,
   onAutoFillTrigger,
+  fxRoutingMode,
+  fxTargets,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -419,15 +424,26 @@ export const useAudioEngine = ({
     }
   }, [sendLevels, isInitialized]);
 
-  // Sync track routing (FX bypass) to engines
+  // Sync track routing (FX bypass) to engines based on fxRoutingMode
   useEffect(() => {
     if (!isInitialized) return;
     
-    drumRef.current?.setFXBypass(trackRouting.drums.fxBypass);
-    synthRef.current?.setFXBypass(trackRouting.synth.fxBypass);
-    textureRef.current?.setFXBypass(trackRouting.texture.fxBypass);
-    sampleRef.current?.setFXBypass(trackRouting.sample.fxBypass);
-  }, [trackRouting, isInitialized]);
+    if (fxRoutingMode === 'master') {
+      // Master mode: all tracks send to FX (no bypass)
+      drumRef.current?.setFXBypass(false);
+      synthRef.current?.setFXBypass(false);
+      textureRef.current?.setFXBypass(false);
+      sampleRef.current?.setFXBypass(false);
+      glitchEngine.setFXBypass?.(false);
+    } else {
+      // Individual mode: only selected targets send to FX
+      drumRef.current?.setFXBypass(!fxTargets.includes('drums'));
+      synthRef.current?.setFXBypass(!fxTargets.includes('synth'));
+      textureRef.current?.setFXBypass(!fxTargets.includes('texture'));
+      sampleRef.current?.setFXBypass(!fxTargets.includes('sample'));
+      glitchEngine.setFXBypass?.(!fxTargets.includes('glitch'));
+    }
+  }, [fxRoutingMode, fxTargets, isInitialized]);
 
   // Sync track glitch bypass
   useEffect(() => {
