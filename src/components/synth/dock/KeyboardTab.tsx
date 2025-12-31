@@ -49,54 +49,90 @@ const noteToMidi = (note: string, octave: number): number => {
   return (octave + 1) * 12 + noteMap[note];
 };
 
+// Convert MIDI to note name for display
+const midiToNoteName = (midi: number): string => {
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const noteName = noteNames[midi % 12];
+  const noteOctave = Math.floor(midi / 12) - 1;
+  return `${noteName}${noteOctave}`;
+};
+
 export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitAudio }: KeyboardTabProps) => {
   const [octave, setOctave] = useState(3);
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const [pressedMidi, setPressedMidi] = useState<Set<number>>(new Set());
-  const [isInitializing, setIsInitializing] = useState(false);
+  // Track which physical key triggered which MIDI note
+  const [activeKeyMap, setActiveKeyMap] = useState<Map<string, number>>(new Map());
 
-  const ensureAudioReady = useCallback(async () => {
-    if (!isAudioReady && onInitAudio && !isInitializing) {
-      setIsInitializing(true);
-      await onInitAudio();
-      setIsInitializing(false);
+  // Initialize audio on first interaction (fire-and-forget)
+  const ensureAudioReady = useCallback(() => {
+    if (!isAudioReady && onInitAudio) {
+      onInitAudio(); // Don't await - let it init in background
     }
-  }, [isAudioReady, onInitAudio, isInitializing]);
+  }, [isAudioReady, onInitAudio]);
 
-  const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
-    if (KEYBOARD_MAP[key] && !e.repeat) {
-      await ensureAudioReady();
-      const { note, octaveOffset } = KEYBOARD_MAP[key];
-      const fullNote = `${note}${octave + octaveOffset}`;
-      const midiNote = noteToMidi(note, octave + octaveOffset);
+    // Check if key is mapped and not already pressed
+    if (KEYBOARD_MAP[key] && !e.repeat && !activeKeyMap.has(key)) {
+      ensureAudioReady();
       
+      const { note, octaveOffset } = KEYBOARD_MAP[key];
+      const midiNote = noteToMidi(note, octave + octaveOffset);
+      const fullNote = `${note}${octave + octaveOffset}`;
+      
+      // Store the mapping so keyup knows which MIDI note to release
+      setActiveKeyMap(prev => new Map(prev).set(key, midiNote));
       setPressedKeys(prev => new Set(prev).add(fullNote));
       setPressedMidi(prev => new Set(prev).add(midiNote));
       onNoteOn?.(midiNote, 100);
     }
-  }, [octave, onNoteOn, ensureAudioReady]);
+  }, [octave, onNoteOn, ensureAudioReady, activeKeyMap]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase();
-    if (KEYBOARD_MAP[key]) {
-      const { note, octaveOffset } = KEYBOARD_MAP[key];
-      const fullNote = `${note}${octave + octaveOffset}`;
-      const midiNote = noteToMidi(note, octave + octaveOffset);
+    const midiNote = activeKeyMap.get(key);
+    
+    if (midiNote !== undefined) {
+      onNoteOff?.(midiNote);
       
-      setPressedKeys(prev => {
-        const next = new Set(prev);
-        next.delete(fullNote);
+      // Clean up mappings
+      setActiveKeyMap(prev => {
+        const next = new Map(prev);
+        next.delete(key);
         return next;
       });
+      
       setPressedMidi(prev => {
         const next = new Set(prev);
         next.delete(midiNote);
         return next;
       });
-      onNoteOff?.(midiNote);
+      
+      // Remove from visual pressed keys
+      const fullNote = midiToNoteName(midiNote);
+      setPressedKeys(prev => {
+        const next = new Set(prev);
+        next.delete(fullNote);
+        return next;
+      });
     }
-  }, [octave, onNoteOff]);
+  }, [activeKeyMap, onNoteOff]);
+
+  // Release all notes when window loses focus
+  useEffect(() => {
+    const handleBlur = () => {
+      activeKeyMap.forEach((midiNote) => {
+        onNoteOff?.(midiNote);
+      });
+      setActiveKeyMap(new Map());
+      setPressedKeys(new Set());
+      setPressedMidi(new Set());
+    };
+    
+    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('blur', handleBlur);
+  }, [activeKeyMap, onNoteOff]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -108,8 +144,8 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
   }, [handleKeyDown, handleKeyUp]);
 
   // Mouse/touch handlers for visual keys
-  const handleMouseDown = useCallback(async (note: string, oct: number) => {
-    await ensureAudioReady();
+  const handleMouseDown = useCallback((note: string, oct: number) => {
+    ensureAudioReady();
     const fullNote = `${note}${oct}`;
     const midiNote = noteToMidi(note, oct);
     setPressedKeys(prev => new Set(prev).add(fullNote));
@@ -208,9 +244,7 @@ export const KeyboardTab = ({ onNoteOn, onNoteOff, isAudioReady = false, onInitA
         <div>Lower: Z-M</div>
         <div>Upper: Q-U</div>
         {!isAudioReady && (
-          <div className="text-primary/70 text-[10px]">
-            {isInitializing ? 'Starting...' : 'Press key to init'}
-          </div>
+          <div className="text-primary/70 text-[10px]">Press key to init</div>
         )}
       </div>
     </div>
