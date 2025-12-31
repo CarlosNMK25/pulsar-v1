@@ -375,11 +375,13 @@ const Index = () => {
                   }}
                   onTapeStopParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateTapeStopParams(track, params);
-                    // FIX: Ahora aplicamos los params al engine en tiempo real
                     setGlitchTapeStopParams(track, {
                       speed: params.speed !== undefined ? params.speed / 100 : undefined,
                       duration: params.duration !== undefined ? params.duration / 100 : undefined,
                       mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                      curve: params.curve,
+                      wobble: params.wobble !== undefined ? params.wobble / 100 : undefined,
+                      probability: params.probability !== undefined ? params.probability / 100 : undefined,
                     });
                   }}
                   onFreezeParamsChange={(track: GlitchTrackId, params) => {

@@ -393,6 +393,28 @@ export const GlitchModuleCompact = ({
             <Square className="w-3 h-3 mr-1" />
             TRIGGER
           </Button>
+          
+          {/* Curve selector */}
+          <div className="flex gap-0.5">
+            {(['linear', 'exp', 'log', 'scurve'] as const).map((curve) => (
+              <button
+                key={curve}
+                onClick={() => onTapeStopParamsChange(editingTrack, { curve })}
+                disabled={!isActive}
+                className={cn(
+                  'flex-1 py-0.5 text-[9px] font-mono uppercase rounded border transition-colors',
+                  currentParams.tapeStop.curve === curve
+                    ? 'border-primary bg-primary/20 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground',
+                  !isActive && 'opacity-50'
+                )}
+              >
+                {curve === 'scurve' ? 'S' : curve.slice(0, 3)}
+              </button>
+            ))}
+          </div>
+          
+          {/* Knobs: Speed, Dur, Wobble */}
           <div className="grid grid-cols-3 gap-2">
             <Knob
               value={currentParams.tapeStop.speed}
@@ -409,11 +431,29 @@ export const GlitchModuleCompact = ({
               variant={!isActive ? 'secondary' : 'primary'}
             />
             <Knob
+              value={currentParams.tapeStop.wobble}
+              onChange={(v) => onTapeStopParamsChange(editingTrack, { wobble: v })}
+              label="Wobble"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
+            />
+          </div>
+          
+          {/* Knobs: Mix, Prob */}
+          <div className="grid grid-cols-2 gap-2">
+            <Knob
               value={currentParams.tapeStop.mix}
               onChange={(v) => onTapeStopParamsChange(editingTrack, { mix: v })}
               label="Mix"
               size="sm"
               variant={!isActive ? 'secondary' : 'accent'}
+            />
+            <Knob
+              value={currentParams.tapeStop.probability}
+              onChange={(v) => onTapeStopParamsChange(editingTrack, { probability: v })}
+              label="Prob"
+              size="sm"
+              variant={!isActive ? 'secondary' : 'primary'}
             />
           </div>
         </TabsContent>
