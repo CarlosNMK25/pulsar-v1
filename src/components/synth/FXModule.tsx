@@ -1,30 +1,46 @@
 import { useState, useEffect } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
-import { fxEngine } from '@/audio/FXEngine';
+import { fxEngine, SyncDivision } from '@/audio/FXEngine';
+import { cn } from '@/lib/utils';
 
 interface FXModuleProps {
   reverbParams: {
     size: number;
     decay: number;
     damping: number;
+    preDelay: number;
+    lofi: number;
     mix: number;
   };
   delayParams: {
     time: number;
     feedback: number;
     filter: number;
+    spread: number;
     mix: number;
+    syncDivision: SyncDivision;
   };
+  masterFilterParams: {
+    lowpass: number;
+    highpass: number;
+  };
+  bpm: number;
   onReverbChange: (params: Partial<FXModuleProps['reverbParams']>) => void;
   onDelayChange: (params: Partial<FXModuleProps['delayParams']>) => void;
+  onMasterFilterChange: (params: Partial<FXModuleProps['masterFilterParams']>) => void;
 }
+
+const syncDivisions: SyncDivision[] = ['1/4', '1/8', '3/16'];
 
 export function FXModule({ 
   reverbParams, 
   delayParams, 
+  masterFilterParams,
+  bpm,
   onReverbChange, 
-  onDelayChange 
+  onDelayChange,
+  onMasterFilterChange,
 }: FXModuleProps) {
   const [muted, setMuted] = useState(false);
 
@@ -32,6 +48,12 @@ export function FXModule({
   useEffect(() => {
     fxEngine.setBypass('all', muted);
   }, [muted]);
+
+  // Sync delay to BPM when division changes
+  const handleSyncChange = (division: SyncDivision) => {
+    onDelayChange({ syncDivision: division });
+    fxEngine.syncDelayToBpm(bpm, division);
+  };
   
   return (
     <ModuleCard 
@@ -40,14 +62,14 @@ export function FXModule({
       muted={muted} 
       onMuteToggle={() => setMuted(!muted)}
     >
-      <div className="space-y-4">
-        {/* Reverb Section */}
+      <div className="space-y-3">
+        {/* Reverb Section - 6 knobs */}
         <div className="space-y-2">
           <div className="text-label text-muted-foreground flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
             Reverb
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-6 gap-2">
             <Knob
               value={reverbParams.size * 100}
               onChange={(v) => onReverbChange({ size: v / 100 })}
@@ -70,6 +92,20 @@ export function FXModule({
               variant={muted ? 'secondary' : 'primary'}
             />
             <Knob
+              value={reverbParams.preDelay * 100}
+              onChange={(v) => onReverbChange({ preDelay: v / 100 })}
+              label="PreDly"
+              size="sm"
+              variant={muted ? 'secondary' : 'primary'}
+            />
+            <Knob
+              value={reverbParams.lofi * 100}
+              onChange={(v) => onReverbChange({ lofi: v / 100 })}
+              label="LoFi"
+              size="sm"
+              variant={muted ? 'secondary' : 'primary'}
+            />
+            <Knob
               value={reverbParams.mix * 100}
               onChange={(v) => onReverbChange({ mix: v / 100 })}
               label="Mix"
@@ -79,13 +115,31 @@ export function FXModule({
           </div>
         </div>
 
-        {/* Delay Section */}
+        {/* Delay Section - 5 knobs + sync buttons */}
         <div className="space-y-2">
-          <div className="text-label text-muted-foreground flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
-            Delay
+          <div className="text-label text-muted-foreground flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent/60" />
+              Delay
+            </div>
+            <div className="flex gap-1">
+              {syncDivisions.map(div => (
+                <button 
+                  key={div}
+                  onClick={() => handleSyncChange(div)}
+                  className={cn(
+                    "px-1.5 py-0.5 text-[10px] rounded transition-colors",
+                    delayParams.syncDivision === div 
+                      ? "bg-accent text-accent-foreground" 
+                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                  )}
+                >
+                  {div}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-2">
             <Knob
               value={delayParams.time * 100}
               onChange={(v) => onDelayChange({ time: v / 100 })}
@@ -108,11 +162,43 @@ export function FXModule({
               variant={muted ? 'secondary' : 'primary'}
             />
             <Knob
+              value={delayParams.spread * 100}
+              onChange={(v) => onDelayChange({ spread: v / 100 })}
+              label="Spread"
+              size="sm"
+              variant={muted ? 'secondary' : 'primary'}
+            />
+            <Knob
               value={delayParams.mix * 100}
               onChange={(v) => onDelayChange({ mix: v / 100 })}
               label="Mix"
               size="sm"
               variant={muted ? 'secondary' : 'accent'}
+            />
+          </div>
+        </div>
+
+        {/* Master Filter Section */}
+        <div className="space-y-2 pt-2 border-t border-border/30">
+          <div className="text-label text-muted-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary/60" />
+            Master Filter
+          </div>
+          <div className="flex items-center justify-between gap-4 px-2">
+            <Knob 
+              value={masterFilterParams.highpass * 100}
+              onChange={(v) => onMasterFilterChange({ highpass: v / 100 })}
+              label="HiPass" 
+              size="sm" 
+              variant="secondary" 
+            />
+            <div className="flex-1 h-px bg-gradient-to-r from-border/50 via-border to-border/50" />
+            <Knob 
+              value={masterFilterParams.lowpass * 100}
+              onChange={(v) => onMasterFilterChange({ lowpass: v / 100 })}
+              label="LoPass" 
+              size="sm" 
+              variant="secondary" 
             />
           </div>
         </div>

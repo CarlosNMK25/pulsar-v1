@@ -90,6 +90,7 @@ const Index = () => {
     textureMode: textureState.textureMode,
     reverbParams: fxState.reverbParams,
     delayParams: fxState.delayParams,
+    masterFilterParams: fxState.masterFilterParams,
     glitchTargets,
     sampleBuffer: sampleState.sampleBuffer,
     sampleParams: sampleState.sampleParams,
@@ -236,8 +237,11 @@ const Index = () => {
                 <FXModule
                   reverbParams={fxState.reverbParams}
                   delayParams={fxState.delayParams}
+                  masterFilterParams={fxState.masterFilterParams}
+                  bpm={bpm}
                   onReverbChange={fxState.updateReverbParams}
                   onDelayChange={fxState.updateDelayParams}
+                  onMasterFilterChange={fxState.updateMasterFilterParams}
                 />
               </div>
               <div className="module p-4 min-h-[200px]">

@@ -73,13 +73,20 @@ interface UseAudioEngineProps {
     size: number;
     decay: number;
     damping: number;
+    preDelay: number;
+    lofi: number;
     mix: number;
   };
   delayParams: {
     time: number;
     feedback: number;
     filter: number;
+    spread: number;
     mix: number;
+  };
+  masterFilterParams: {
+    lowpass: number;
+    highpass: number;
   };
   glitchTargets: GlitchTarget[];
   sampleBuffer: AudioBuffer | null;
@@ -109,6 +116,7 @@ export const useAudioEngine = ({
   textureMode,
   reverbParams,
   delayParams,
+  masterFilterParams,
   glitchTargets,
   sampleBuffer,
   sampleParams,
@@ -306,6 +314,11 @@ export const useAudioEngine = ({
     if (!isInitialized) return;
     fxEngine.setDelayParams(delayParams);
   }, [delayParams, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    fxEngine.setMasterFilterParams(masterFilterParams);
+  }, [masterFilterParams, isInitialized]);
 
   // Handle texture mute and playback
   useEffect(() => {
