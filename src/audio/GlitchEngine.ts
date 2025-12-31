@@ -369,11 +369,22 @@ export class GlitchEngine {
   }
 
   triggerTapeStop(): void {
-    if (this.bypass || !this.outputNode || !this.inputNode) return;
+    if (this.bypass || !this.outputNode || !this.inputNode || !this.wetNode || !this.dryNode) return;
     
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
-    const duration = 0.3 + (this.params.tapeStop.duration * 1.2);
+    
+    // USAR speed para controlar la velocidad de la curva de decaimiento
+    // speed 0 = muy lento (2s), speed 1 = muy rápido (0.3s)
+    const speedFactor = 0.3 + this.params.tapeStop.speed * 1.7; // 0.3 - 2.0
+    const baseDuration = 0.3 + (this.params.tapeStop.duration * 1.2);
+    const duration = baseDuration / speedFactor;
+    
+    // USAR mix para blend wet/dry durante el efecto
+    this.wetNode.gain.cancelScheduledValues(now);
+    this.dryNode.gain.cancelScheduledValues(now);
+    this.wetNode.gain.setValueAtTime(this.params.tapeStop.mix, now);
+    this.dryNode.gain.setValueAtTime(1 - this.params.tapeStop.mix * 0.5, now);
     
     // Create a more realistic tape stop using playbackRate simulation
     // We'll use gain automation combined with pitch-shifting feel
@@ -397,7 +408,12 @@ export class GlitchEngine {
     // Restore after effect
     this.outputNode.gain.linearRampToValueAtTime(1, now + duration + 0.15);
     
-    console.log('[GlitchEngine] Tape stop triggered with pitch simulation, duration:', duration.toFixed(2), 's');
+    // Restaurar wet/dry después del efecto
+    const endTime = now + duration + 0.1;
+    this.wetNode.gain.setTargetAtTime(0, endTime, 0.05);
+    this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
+    
+    console.log('[GlitchEngine] Tape stop triggered, speed:', this.params.tapeStop.speed.toFixed(2), 'mix:', this.params.tapeStop.mix.toFixed(2), 'duration:', duration.toFixed(2), 's');
   }
   
   triggerBitcrush(duration?: number): void {
@@ -454,15 +470,26 @@ export class GlitchEngine {
     const now = ctx.currentTime;
     const freezeDuration = 0.5 + (this.params.granularFreeze.grainSize * 1.5);
     
+    // USAR pitch para modular el timing de los grains
+    // pitch < 0.5 = grains más lentos/espaciados, pitch > 0.5 = grains más rápidos/densos
+    const pitchFactor = 0.5 + this.params.granularFreeze.pitch; // 0.5 - 1.5
+    
     // Simulate freeze with rapid micro-stutters (granular-like)
-    const grainTime = 0.02 + (this.params.granularFreeze.grainSize * 0.08);
+    const baseGrainTime = 0.02 + (this.params.granularFreeze.grainSize * 0.08);
+    const grainTime = baseGrainTime / pitchFactor; // Pitch afecta el timing
     const numGrains = Math.floor(freezeDuration / grainTime);
     
-    // Activate wet
+    // Activate wet with mix control
     this.wetNode.gain.cancelScheduledValues(now);
     this.dryNode.gain.cancelScheduledValues(now);
     this.wetNode.gain.setValueAtTime(this.params.granularFreeze.mix, now);
-    this.dryNode.gain.setValueAtTime(0.3, now);
+    this.dryNode.gain.setValueAtTime(1 - this.params.granularFreeze.mix * 0.7, now);
+    
+    // USAR pitch para variar el envelope de cada grain
+    // pitch alto = attack más corto, decay más largo (sonido más brillante)
+    // pitch bajo = attack más largo, decay más corto (sonido más suave)
+    const attackRatio = 0.1 + (1 - this.params.granularFreeze.pitch) * 0.2; // 0.1-0.3
+    const releaseRatio = 0.6 + this.params.granularFreeze.pitch * 0.3; // 0.6-0.9
     
     // Rapid grain-like gates
     this.stutterGain.gain.cancelScheduledValues(now);
@@ -470,9 +497,10 @@ export class GlitchEngine {
       const time = now + (i * grainTime);
       const spreadRandom = 1 - (Math.random() * this.params.granularFreeze.spread * 0.5);
       
+      // Pitch afecta la forma del envelope del grain
       this.stutterGain.gain.setValueAtTime(spreadRandom, time);
-      this.stutterGain.gain.setValueAtTime(0, time + grainTime * 0.3);
-      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + grainTime * 0.9);
+      this.stutterGain.gain.setValueAtTime(0, time + grainTime * attackRatio);
+      this.stutterGain.gain.linearRampToValueAtTime(spreadRandom * 0.7, time + grainTime * releaseRatio);
     }
     
     // Return to normal
@@ -481,7 +509,7 @@ export class GlitchEngine {
     this.dryNode.gain.setTargetAtTime(1, endTime, 0.05);
     this.stutterGain.gain.setValueAtTime(1, endTime);
     
-    console.log('[GlitchEngine] Freeze triggered:', numGrains, 'grains over', freezeDuration.toFixed(2), 's');
+    console.log('[GlitchEngine] Freeze triggered, pitch:', this.params.granularFreeze.pitch.toFixed(2), 'grains:', numGrains, 'duration:', freezeDuration.toFixed(2), 's');
   }
 
   triggerReverse(duration?: number): void {

@@ -107,6 +107,11 @@ const Index = () => {
     triggerGlitch,
     setGlitchStutterParams,
     setGlitchBitcrushParams,
+    setGlitchTapeStopParams,
+    setGlitchFreezeParams,
+    setGlitchReverseParams,
+    setGlitchMasterMix,
+    setGlitchFXSends,
     setChaosEnabled,
     setGlitchChaosParams,
     playNote,
@@ -368,15 +373,30 @@ const Index = () => {
                   }}
                   onTapeStopParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateTapeStopParams(track, params);
-                    // TapeStop params applied to engine when triggered
+                    // FIX: Ahora aplicamos los params al engine en tiempo real
+                    setGlitchTapeStopParams(track, {
+                      speed: params.speed !== undefined ? params.speed / 100 : undefined,
+                      duration: params.duration !== undefined ? params.duration / 100 : undefined,
+                      mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                    });
                   }}
                   onFreezeParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateFreezeParams(track, params);
-                    // Freeze params applied to engine when triggered
+                    // FIX: Ahora aplicamos los params al engine en tiempo real
+                    setGlitchFreezeParams(track, {
+                      grainSize: params.grainSize !== undefined ? params.grainSize / 100 : undefined,
+                      pitch: params.pitch !== undefined ? params.pitch / 100 : undefined,
+                      spread: params.spread !== undefined ? params.spread / 100 : undefined,
+                      mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                    });
                   }}
                   onReverseParamsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateReverseParams(track, params);
-                    // Reverse params applied to engine when triggered
+                    // FIX: Ahora aplicamos los params al engine en tiempo real
+                    setGlitchReverseParams(track, {
+                      duration: params.duration !== undefined ? params.duration / 100 : undefined,
+                      mix: params.mix !== undefined ? params.mix / 100 : undefined,
+                    });
                   }}
                   onChaosToggle={(enabled, params) => !glitchMuted && setChaosEnabled(enabled, params)}
                   onChaosParamsChange={(track: GlitchTrackId, params) => {
@@ -388,11 +408,17 @@ const Index = () => {
                   }}
                   onFXSendsChange={(track: GlitchTrackId, params) => {
                     glitchState.updateFXSendsParams(track, params);
-                    // FX sends applied through glitch engine when triggered
+                    // FIX: Ahora aplicamos FX sends al engine
+                    const current = glitchState.paramsPerTrack[track].fxSends;
+                    setGlitchFXSends(
+                      (params.reverb ?? current.reverb) / 100,
+                      (params.delay ?? current.delay) / 100
+                    );
                   }}
                   onMasterMixChange={(value) => {
                     glitchState.setMasterMix(value);
-                    // Apply to audio engine
+                    // FIX: Ahora aplicamos master mix al engine
+                    setGlitchMasterMix(value);
                   }}
                 />
               </div>
