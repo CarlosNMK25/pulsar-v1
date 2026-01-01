@@ -209,6 +209,23 @@ export const PLockEditor = ({
                 </button>
               )}
             </div>
+            <div className="relative">
+              <Knob
+                value={localPLocks.volume ?? 100}
+                onChange={(v) => handlePLockChange('volume', v)}
+                label="Vol"
+                size="sm"
+                variant={localPLocks.volume !== undefined ? 'secondary' : 'accent'}
+              />
+              {localPLocks.volume !== undefined && (
+                <button
+                  onClick={() => clearPLock('volume')}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
           
           {/* Micro-Timing Slider */}

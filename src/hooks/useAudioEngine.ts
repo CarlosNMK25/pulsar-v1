@@ -31,6 +31,7 @@ export interface PLocks {
   decay?: number;
   microTiming?: number; // -50 to +50 ms offset
   fmAmount?: number;    // 0-100 FM depth per step
+  volume?: number;      // 0-100 volume per step
   // Sample-specific P-Locks
   reverse?: boolean;    // Reverse playback per step
   ratchet?: number;     // 1=normal, 2-4 = retrig count
@@ -869,12 +870,20 @@ export const useAudioEngine = ({
                 ? sampleStep.sliceIndex // Fixed slice
                 : step % sliceCount; // Sequential
             
+            // Calculate final volume: velocity × pLock volume
+            const velocityMultiplier = sampleStep.velocity / 100; // 0-100 -> 0-1
+            const pLockVolume = sampleStep.pLocks?.volume !== undefined 
+              ? sampleStep.pLocks.volume / 100 
+              : 1.0;
+            const finalVolume = velocityMultiplier * pLockVolume;
+
             // Build options for trigger
             const triggerOptions = {
               reverse: sampleStep.pLocks?.reverse,
               pitch: sampleStep.pLocks?.pitch !== undefined 
                 ? 0.5 + (sampleStep.pLocks.pitch / 100) * 1.5 // Map 0-100 to 0.5-2.0
                 : undefined,
+              volume: finalVolume,
             };
             
             // Ratchet count (1 = normal, 2-4 = retrig)
@@ -887,7 +896,7 @@ export const useAudioEngine = ({
               if (params?.playbackMode === 'slice') {
                 sampleRef.current?.triggerSliceWithOptions(sliceIndex, triggerOptions);
               } else {
-                sampleRef.current?.trigger();
+                sampleRef.current?.trigger({ volume: finalVolume });
               }
             };
             
