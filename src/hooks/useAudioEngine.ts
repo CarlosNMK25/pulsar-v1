@@ -12,6 +12,8 @@ import { GlitchBus } from '@/audio/GlitchBus';
 import { TrackSendLevels, TrackRoutingState, FXOffsetsPerTrack, TrackName } from '@/hooks/useFXState';
 import { ModSendLevels, ModTarget, ModOffsetsPerTrack } from '@/hooks/useModulationState';
 import { ModEffect, modulationEngine } from '@/audio/ModulationEngine';
+import { SampleStep } from '@/hooks/useSampleState';
+
 // Conditional Trigger types (Elektron-style)
 export type ConditionType = 
   | '1:2' | '1:3' | '1:4'           // X of every N repetitions
@@ -45,14 +47,6 @@ export interface Step {
   pLocks?: PLocks;
   acid?: AcidModifiers;
   condition?: ConditionType;  // Conditional trigger
-}
-
-// Sample step type with slice support
-export interface SampleStep {
-  active: boolean;
-  velocity: number;
-  probability: number;
-  sliceIndex: number; // Which slice to trigger (-1 = sequential)
 }
 
 interface UseAudioEngineProps {
@@ -864,15 +858,26 @@ export const useAudioEngine = ({
           if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
             anyFiredThisStep = true;
             
-            if (params?.playbackMode === 'slice') {
-              // In slice mode, determine which slice to play
-              const sliceIndex = sampleStep.sliceIndex >= 0 
-                ? sampleStep.sliceIndex 
-                : step % (params?.sliceCount ?? 8);
-              sampleRef.current?.triggerSlice(sliceIndex);
+            // Use micro-timing from P-Locks if available
+            const triggerSample = () => {
+              if (params?.playbackMode === 'slice') {
+                // In slice mode, determine which slice to play
+                const sliceIndex = sampleStep.sliceIndex >= 0 
+                  ? sampleStep.sliceIndex 
+                  : step % (params?.sliceCount ?? 8);
+                sampleRef.current?.triggerSlice(sliceIndex);
+              } else {
+                // Full or Region mode: use normal trigger
+                sampleRef.current?.trigger();
+              }
+            };
+            
+            // Apply micro-timing offset if present
+            const microTiming = sampleStep.pLocks?.microTiming;
+            if (microTiming && microTiming !== 0) {
+              setTimeout(triggerSample, Math.max(0, microTiming));
             } else {
-              // Full or Region mode: use normal trigger
-              sampleRef.current?.trigger();
+              triggerSample();
             }
           }
         }
@@ -1327,6 +1332,11 @@ export const useAudioEngine = ({
     setVolumesState(prev => ({ ...prev, [channel]: value }));
   }, []);
 
+  // Preview a specific slice (for waveform click)
+  const handlePreviewSlice = useCallback((sliceIndex: number) => {
+    sampleRef.current?.triggerSlice(sliceIndex);
+  }, []);
+
   return {
     initAudio,
     isInitialized,
@@ -1350,6 +1360,7 @@ export const useAudioEngine = ({
     stopNote,
     triggerDrum,
     triggerSample,
+    handlePreviewSlice,
     volumes,
     setChannelVolume,
   };

@@ -123,6 +123,7 @@ const Index = () => {
     stopNote,
     triggerDrum,
     triggerSample,
+    handlePreviewSlice,
     volumes,
     setChannelVolume,
   } = useAudioEngine({
@@ -392,8 +393,11 @@ const Index = () => {
                 onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
                 onStepToggle={sampleState.toggleSampleStep}
                 onStepVelocity={sampleState.setSampleStepVelocity}
+                onStepSliceChange={sampleState.setSampleStepSlice}
+                onStepPLocks={sampleState.setSampleStepPLocks}
                 onPatternGenerate={sampleState.setSampleSteps}
                 onPatternLengthChange={sampleState.setSamplePatternLength}
+                onPreviewSlice={handlePreviewSlice}
               />
             </div>
           </CollapsibleSection>

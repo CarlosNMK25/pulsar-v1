@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Music, Upload, X, Play, Square } from 'lucide-react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
@@ -9,7 +9,7 @@ import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
 import { StepSequencer } from './StepSequencer';
 import { EuclideanControls } from './EuclideanControls';
-import { SampleStep } from '@/hooks/useSampleState';
+import { SampleStep, SamplePLocks } from '@/hooks/useSampleState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SampleModuleProps {
@@ -29,8 +29,11 @@ interface SampleModuleProps {
   onPlayToggle: () => void;
   onStepToggle: (index: number) => void;
   onStepVelocity: (index: number, velocity: number) => void;
+  onStepSliceChange?: (index: number, sliceIndex: number) => void;
+  onStepPLocks?: (index: number, pLocks: SamplePLocks | undefined) => void;
   onPatternGenerate: (steps: SampleStep[]) => void;
   onPatternLengthChange: (length: number) => void;
+  onPreviewSlice?: (sliceIndex: number) => void;
 }
 
 export const SampleModule = ({
@@ -49,11 +52,15 @@ export const SampleModule = ({
   onPlayToggle,
   onStepToggle,
   onStepVelocity,
+  onStepSliceChange,
+  onStepPLocks,
   onPatternGenerate,
   onPatternLengthChange,
+  onPreviewSlice,
 }: SampleModuleProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewingSlice, setPreviewingSlice] = useState<number | null>(null);
 
   // Draw waveform with slice visualization
   useEffect(() => {
@@ -128,6 +135,12 @@ export const SampleModule = ({
         const x = (i + 0.5) * sliceWidth;
         ctx.fillText(String(i + 1), x, 18);
       }
+      
+      // Highlight previewing slice
+      if (previewingSlice !== null) {
+        ctx.fillStyle = 'hsl(var(--chart-4) / 0.3)';
+        ctx.fillRect(previewingSlice * sliceWidth, 0, sliceWidth, height);
+      }
     } else if (params.playbackMode === 'region') {
       // Draw start point marker
       const startX = params.startPoint * width;
@@ -151,7 +164,7 @@ export const SampleModule = ({
       ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
     }
     // Full mode: no markers needed, entire waveform is active
-  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount]);
+  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     const validation = validateAudioFile(file);
@@ -190,6 +203,26 @@ export const SampleModule = ({
     e.preventDefault();
   }, []);
 
+  // Handle click on waveform to preview slice
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (params.playbackMode !== 'slice' || !buffer || !onPreviewSlice) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const sliceWidth = rect.width / params.sliceCount;
+    const sliceIndex = Math.floor(x / sliceWidth);
+    
+    // Trigger preview
+    onPreviewSlice(sliceIndex);
+    
+    // Visual feedback
+    setPreviewingSlice(sliceIndex);
+    setTimeout(() => setPreviewingSlice(null), 200);
+  }, [params.playbackMode, params.sliceCount, buffer, onPreviewSlice]);
+
   const updateParam = <K extends keyof SampleParams>(key: K, value: SampleParams[K]) => {
     onParamsChange({ ...params, [key]: value });
   };
@@ -199,6 +232,8 @@ export const SampleModule = ({
     active: s.active,
     velocity: s.velocity,
     probability: s.probability,
+    sliceIndex: s.sliceIndex,
+    pLocks: s.pLocks,
   }));
 
   return (
@@ -248,11 +283,19 @@ export const SampleModule = ({
 
         {/* Waveform display */}
         <div
-          className="waveform-container h-20 cursor-pointer"
+          className={cn(
+            "waveform-container h-20",
+            params.playbackMode === 'slice' && buffer ? "cursor-pointer" : "cursor-default"
+          )}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
-          <canvas ref={canvasRef} className="w-full h-full" />
+          <canvas 
+            ref={canvasRef} 
+            className="w-full h-full" 
+            onClick={handleCanvasClick}
+            title={params.playbackMode === 'slice' && buffer ? "Click to preview slice" : undefined}
+          />
         </div>
 
         {/* Playback Mode and Sync Mode Selectors */}
@@ -334,10 +377,13 @@ export const SampleModule = ({
               currentStep={currentStep}
               onStepToggle={onStepToggle}
               onStepVelocity={onStepVelocity}
+              onStepSliceChange={onStepSliceChange}
               patternLength={patternLength}
               onLengthChange={onPatternLengthChange}
               showControls={false}
               showLengthSelector={true}
+              showSliceSelector={params.playbackMode === 'slice'}
+              sliceCount={params.sliceCount}
             />
           </div>
         )}
