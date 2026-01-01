@@ -1,5 +1,6 @@
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { modulationEngine } from './ModulationEngine';
 import { WaveshaperEngine, DistortionCurve } from './WaveshaperEngine';
 
 interface DrumSound {
@@ -18,15 +19,18 @@ export class DrumEngine {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
+  private modulationSend: GainNode;
   private waveshaper: WaveshaperEngine;
   private preWaveshaperGain: GainNode;
   private sounds: Map<string, DrumSound> = new Map();
   private loadedSamples: Map<string, AudioBuffer> = new Map();
   private params: DrumParams = { decay: 50, pitch: 50, drive: 30, driveType: 'soft', mix: 75 };
   private fxConnected = false;
+  private modConnected = false;
   private muted = false;
   private fxBypassed = false;
   private savedFxLevels = { reverb: 0.4, delay: 0.3 };
+  private savedModLevel = 0;
 
   constructor() {
     const ctx = audioEngine.getContext();
@@ -56,6 +60,10 @@ export class DrumEngine {
     this.delaySend = ctx.createGain();
     this.delaySend.gain.value = 0.3;
 
+    // Modulation send node
+    this.modulationSend = ctx.createGain();
+    this.modulationSend.gain.value = 0;
+
     // Initialize drum sounds
     this.sounds.set('kick', this.createKick());
     this.sounds.set('snare', this.createSnare());
@@ -67,6 +75,18 @@ export class DrumEngine {
     this.reverbSend.connect(fxEngine.getReverbSend());
     this.delaySend.connect(fxEngine.getDelaySend());
     this.fxConnected = true;
+  }
+
+  connectModulation(): void {
+    if (this.modConnected) return;
+    this.modulationSend.connect(modulationEngine.getInput());
+    this.modConnected = true;
+  }
+
+  setModulationSend(level: number): void {
+    this.savedModLevel = level;
+    const ctx = audioEngine.getContext();
+    this.modulationSend.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
   }
 
   setParams(params: Partial<DrumParams>): void {
@@ -143,6 +163,7 @@ export class DrumEngine {
         // Connect to FX sends (kick gets less reverb/delay)
         gain.connect(this.reverbSend);
         gain.connect(this.delaySend);
+        gain.connect(this.modulationSend);
 
         // Play
         osc.start(now);
@@ -202,6 +223,7 @@ export class DrumEngine {
         // Connect to FX sends (snare gets more reverb)
         noiseGain.connect(this.reverbSend);
         noiseGain.connect(this.delaySend);
+        noiseGain.connect(this.modulationSend);
 
         // Play
         noise.start(now);
@@ -254,6 +276,7 @@ export class DrumEngine {
         
         // Connect to FX sends (hat gets subtle delay)
         gain.connect(this.delaySend);
+        gain.connect(this.modulationSend);
 
         // Play
         noise.start(now);
@@ -302,6 +325,7 @@ export class DrumEngine {
     gain.connect(this.preWaveshaperGain);
     gain.connect(this.reverbSend);
     gain.connect(this.delaySend);
+    gain.connect(this.modulationSend);
 
     source.start(now);
     source.onended = () => {
@@ -333,5 +357,6 @@ export class DrumEngine {
     this.outputGain.disconnect();
     this.reverbSend.disconnect();
     this.delaySend.disconnect();
+    this.modulationSend.disconnect();
   }
 }

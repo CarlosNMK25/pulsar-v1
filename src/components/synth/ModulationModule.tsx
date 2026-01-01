@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
+import { ModSendMatrix } from './ModSendMatrix';
 import { 
   ChorusParams, 
   FlangerParams, 
@@ -11,11 +12,12 @@ import {
   ModEffect,
   modulationEngine,
 } from '@/audio/ModulationEngine';
-import { ModRoutingMode, ModTarget, ModOffsetsPerTrack } from '@/hooks/useModulationState';
+import { ModTarget, ModOffsetsPerTrack, ModSendLevels } from '@/hooks/useModulationState';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { RotateCcw } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { RotateCcw, ChevronDown } from 'lucide-react';
 
 interface ModulationModuleProps {
   chorus: ChorusParams;
@@ -25,8 +27,7 @@ interface ModulationModuleProps {
   ringMod: RingModParams;
   autoPan: AutoPanParams;
   bypassed: Record<ModEffect, boolean>;
-  routingMode: ModRoutingMode;
-  targets: ModTarget[];
+  modSendLevels: ModSendLevels;
   modOffsetsPerTrack: ModOffsetsPerTrack;
   onChorusChange: (params: Partial<ChorusParams>) => void;
   onFlangerChange: (params: Partial<FlangerParams>) => void;
@@ -35,8 +36,7 @@ interface ModulationModuleProps {
   onRingModChange: (params: Partial<RingModParams>) => void;
   onAutoPanChange: (params: Partial<AutoPanParams>) => void;
   onBypassToggle: (effect: ModEffect) => void;
-  onRoutingModeChange: (mode: ModRoutingMode) => void;
-  onTargetToggle: (target: ModTarget) => void;
+  onModSendChange: (track: ModTarget, effect: ModEffect, value: number) => void;
   onModOffsetChange: (track: ModTarget, effect: ModEffect, param: string, value: number) => void;
   onResetTrackModOffsets: (track: ModTarget) => void;
 }
@@ -65,8 +65,7 @@ export function ModulationModule({
   ringMod,
   autoPan,
   bypassed,
-  routingMode,
-  targets,
+  modSendLevels,
   modOffsetsPerTrack,
   onChorusChange,
   onFlangerChange,
@@ -75,28 +74,14 @@ export function ModulationModule({
   onRingModChange,
   onAutoPanChange,
   onBypassToggle,
-  onRoutingModeChange,
-  onTargetToggle,
+  onModSendChange,
   onModOffsetChange,
   onResetTrackModOffsets,
 }: ModulationModuleProps) {
   const [muted, setMuted] = useState(false);
   const [activeTab, setActiveTab] = useState<ModEffect>('chorus');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedEditTrack, setSelectedEditTrack] = useState<ModTarget>('drums');
-
-  const isActive = routingMode === 'master' || targets.length > 0;
-  const showNoTargetWarning = routingMode === 'individual' && targets.length === 0;
-
-  // Determine which track is being edited (like FX module)
-  const editingTrack: ModTarget = useMemo(() => {
-    if (routingMode === 'master') return 'drums';
-    if (selectedEditTrack && targets.includes(selectedEditTrack)) {
-      return selectedEditTrack;
-    }
-    return targets[0] || 'drums';
-  }, [routingMode, targets, selectedEditTrack]);
-
-  const multipleTracksSelected = routingMode === 'individual' && targets.length > 1;
 
   // Check if any effect is active (not bypassed)
   const hasActiveEffect = Object.values(bypassed).some(b => !b);
@@ -106,22 +91,9 @@ export function ModulationModule({
     modulationEngine.setBypass(effect, !bypassed[effect]);
   };
 
-  // Handle track click - toggle AND select for editing
-  const handleTrackClick = (target: ModTarget) => {
-    const isCurrentlyActive = targets.includes(target);
-    onTargetToggle(target);
-    // If activating, auto-select for editing
-    if (!isCurrentlyActive) {
-      setSelectedEditTrack(target);
-    }
-  };
-
-  // Get current track's offsets for the active effect
-  const currentTrackOffsets = modOffsetsPerTrack[editingTrack][activeTab];
-
-  // Render offset knobs based on active effect
+  // Render offset knobs based on active effect for the selected track
   const renderTrackOffsets = () => {
-    const track = editingTrack;
+    const track = selectedEditTrack;
     const effect = activeTab;
 
     switch (effect) {
@@ -292,73 +264,12 @@ export function ModulationModule({
       onMuteToggle={() => setMuted(!muted)}
     >
       <div className="space-y-3">
-        {/* Routing Mode Selector */}
-        <div className="space-y-2">
-          <div className="flex gap-1">
-            <Button
-              variant={routingMode === 'master' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onRoutingModeChange('master')}
-              className={cn(
-                'flex-1 h-7 text-[10px] font-medium',
-                routingMode === 'master' && 'bg-primary text-primary-foreground'
-              )}
-            >
-              MASTER
-            </Button>
-            <Button
-              variant={routingMode === 'individual' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onRoutingModeChange('individual')}
-              className={cn(
-                'flex-1 h-7 text-[10px] font-medium',
-                routingMode === 'individual' && 'bg-primary text-primary-foreground'
-              )}
-            >
-              TRACKS
-            </Button>
-          </div>
-          
-          {/* Individual track selectors */}
-          {routingMode === 'individual' && (
-            <div className="flex flex-col gap-1">
-              <div className="flex gap-1">
-                {targetButtons.map(({ id, label }) => {
-                  const isActiveTarget = targets.includes(id);
-                  const isEditing = isActiveTarget && id === editingTrack;
-                  return (
-                    <Button
-                      key={id}
-                      variant={isActiveTarget ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleTrackClick(id)}
-                      className={cn(
-                        'flex-1 h-6 text-[10px] font-mono transition-all',
-                        isActiveTarget 
-                          ? 'bg-primary/80 text-primary-foreground border-primary' 
-                          : 'opacity-60 hover:opacity-100',
-                        isEditing && 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-background'
-                      )}
-                    >
-                      {label}
-                    </Button>
-                  );
-                })}
-              </div>
-              {multipleTracksSelected && (
-                <div className="text-[9px] text-yellow-400 text-center flex items-center justify-center gap-1">
-                  <span>Editing:</span>
-                  <span className="font-mono uppercase">{editingTrack}</span>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {showNoTargetWarning && (
-            <div className="text-[9px] text-muted-foreground/60 text-center italic">
-              Select a track
-            </div>
-          )}
+        {/* Send Matrix - always visible */}
+        <div className="p-2 bg-muted/20 rounded-md">
+          <ModSendMatrix 
+            modSendLevels={modSendLevels}
+            onModSendChange={onModSendChange}
+          />
         </div>
 
         {/* Effect Tabs */}
@@ -459,26 +370,6 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
-            {/* Track Offsets for Chorus */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
 
           {/* Flanger Tab */}
@@ -540,26 +431,6 @@ export function ModulationModule({
                 variant={muted || bypassed.flanger ? 'secondary' : 'accent'}
               />
             </div>
-            {/* Track Offsets for Flanger */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
 
           {/* Phaser Tab */}
@@ -632,26 +503,6 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
-            {/* Track Offsets for Phaser */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
 
           {/* Tremolo Tab */}
@@ -701,7 +552,7 @@ export function ModulationModule({
                         modulationEngine.setTremoloParams({ shape: s });
                       }}
                       className={cn(
-                        'px-1.5 h-5 text-[8px] rounded transition-colors',
+                        'w-6 h-5 text-[8px] rounded transition-colors',
                         tremolo.shape === s 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted hover:bg-muted/80 text-muted-foreground'
@@ -713,32 +564,12 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
-            {/* Track Offsets for Tremolo */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
 
           {/* Ring Mod Tab */}
           <TabsContent value="ringMod" className="mt-2 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">Ring Modulator</span>
+              <span className="text-[10px] text-muted-foreground">Ring Mod</span>
               <Button
                 variant={bypassed.ringMod ? 'outline' : 'default'}
                 size="sm"
@@ -748,7 +579,7 @@ export function ModulationModule({
                 {bypassed.ringMod ? 'OFF' : 'ON'}
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <Knob
                 value={ringMod.frequency * 100}
                 onChange={(v) => {
@@ -772,26 +603,6 @@ export function ModulationModule({
                 variant={muted || bypassed.ringMod ? 'secondary' : 'accent'}
               />
             </div>
-            {/* Track Offsets for RingMod */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
 
           {/* Auto-Pan Tab */}
@@ -841,7 +652,7 @@ export function ModulationModule({
                         modulationEngine.setAutoPanParams({ shape: s });
                       }}
                       className={cn(
-                        'px-2 h-5 text-[9px] rounded transition-colors',
+                        'w-8 h-5 text-[8px] rounded transition-colors',
                         autoPan.shape === s 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted hover:bg-muted/80 text-muted-foreground'
@@ -853,28 +664,61 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
-            {/* Track Offsets for AutoPan */}
-            {routingMode === 'individual' && targets.length > 0 && (
-              <div className="pt-2 border-t border-border/30 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
-                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onResetTrackModOffsets(editingTrack)}
-                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                    title={`Reset ${editingTrack} offsets`}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                  </Button>
-                </div>
-                {renderTrackOffsets()}
-              </div>
-            )}
           </TabsContent>
         </Tabs>
+
+        {/* Advanced Offsets - Collapsible */}
+        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full py-1.5 px-2 bg-muted/30 rounded text-[9px] text-muted-foreground hover:bg-muted/50 transition-colors">
+            <span className="uppercase tracking-wider">Advanced Offsets</span>
+            <ChevronDown className={cn(
+              "w-3 h-3 transition-transform",
+              advancedOpen && "rotate-180"
+            )} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 space-y-2">
+            <div className="text-[8px] text-muted-foreground/70 text-center italic">
+              Offsets apply when track is in solo mode
+            </div>
+            
+            {/* Track selector for offset editing */}
+            <div className="flex gap-1 justify-center">
+              {targetButtons.map(({ id, label }) => (
+                <Button
+                  key={id}
+                  variant={selectedEditTrack === id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedEditTrack(id)}
+                  className={cn(
+                    'h-6 px-3 text-[10px] font-mono',
+                    selectedEditTrack === id && 'ring-1 ring-yellow-400'
+                  )}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Offset knobs for selected track/effect */}
+            <div className="p-2 bg-muted/20 rounded-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                  {selectedEditTrack} - {activeTab}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onResetTrackModOffsets(selectedEditTrack)}
+                  className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                  title={`Reset ${selectedEditTrack} offsets`}
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                </Button>
+              </div>
+              {renderTrackOffsets()}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </ModuleCard>
   );

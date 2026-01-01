@@ -359,8 +359,7 @@ const Index = () => {
                   ringMod={modulationState.ringMod}
                   autoPan={modulationState.autoPan}
                   bypassed={modulationState.bypassed}
-                  routingMode={modulationState.routingMode}
-                  targets={modulationState.targets}
+                  modSendLevels={modulationState.modSendLevels}
                   modOffsetsPerTrack={modulationState.modOffsetsPerTrack}
                   onChorusChange={modulationState.updateChorusParams}
                   onFlangerChange={modulationState.updateFlangerParams}
@@ -369,8 +368,7 @@ const Index = () => {
                   onRingModChange={modulationState.updateRingModParams}
                   onAutoPanChange={modulationState.updateAutoPanParams}
                   onBypassToggle={modulationState.toggleBypass}
-                  onRoutingModeChange={modulationState.setRoutingMode}
-                  onTargetToggle={modulationState.toggleTarget}
+                  onModSendChange={modulationState.updateModSendLevel}
                   onModOffsetChange={modulationState.updateModOffset}
                   onResetTrackModOffsets={modulationState.resetTrackModOffsets}
                 />

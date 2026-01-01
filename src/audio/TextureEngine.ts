@@ -1,5 +1,6 @@
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { modulationEngine } from './ModulationEngine';
 
 export type TextureMode = 'noise' | 'granular' | 'drone';
 
@@ -7,14 +8,17 @@ export class TextureEngine {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
+  private modulationSend: GainNode;
   private filter: BiquadFilterNode;
   private lfo: OscillatorNode;
   private lfoGain: GainNode;
   private isPlaying = false;
   private fxConnected = false;
+  private modConnected = false;
   private muted = false;
   private fxBypassed = false;
   private savedFxLevels = { reverb: 0.5, delay: 0.3 };
+  private savedModLevel = 0;
 
   // Feedback routing
   private feedbackDelay: DelayNode;
@@ -55,6 +59,10 @@ export class TextureEngine {
     this.delaySend = ctx.createGain();
     this.delaySend.gain.value = 0.3;
 
+    // Modulation send node
+    this.modulationSend = ctx.createGain();
+    this.modulationSend.gain.value = 0;
+
     // Feedback delay for resonance
     this.feedbackDelay = ctx.createDelay(1);
     this.feedbackDelay.delayTime.value = 0.05;
@@ -76,6 +84,7 @@ export class TextureEngine {
     this.filter.connect(this.outputGain);
     this.filter.connect(this.reverbSend);
     this.filter.connect(this.delaySend);
+    this.filter.connect(this.modulationSend);
 
     // LFO for movement
     this.lfo = ctx.createOscillator();
@@ -136,6 +145,18 @@ export class TextureEngine {
     this.reverbSend.connect(fxEngine.getReverbSend());
     this.delaySend.connect(fxEngine.getDelaySend());
     this.fxConnected = true;
+  }
+
+  connectModulation(): void {
+    if (this.modConnected) return;
+    this.modulationSend.connect(modulationEngine.getInput());
+    this.modConnected = true;
+  }
+
+  setModulationSend(level: number): void {
+    this.savedModLevel = level;
+    const ctx = audioEngine.getContext();
+    this.modulationSend.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
   }
 
   setFXSend(reverb: number, delay: number): void {
