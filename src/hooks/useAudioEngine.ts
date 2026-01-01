@@ -650,7 +650,7 @@ export const useAudioEngine = ({
 
   // Sample engine: load buffer with auto-restart
   useEffect(() => {
-    if (!sampleRef.current) return;
+    if (!sampleRef.current || !isInitialized) return;
     
     const wasPlaying = sampleRef.current.getIsPlaying();
     
@@ -664,7 +664,7 @@ export const useAudioEngine = ({
     } else {
       sampleRef.current.clearSample();
     }
-  }, [sampleBuffer]);
+  }, [sampleBuffer, isInitialized]);
 
   // Sample engine: sync params
   useEffect(() => {

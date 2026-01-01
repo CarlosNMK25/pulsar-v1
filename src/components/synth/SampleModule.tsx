@@ -17,6 +17,7 @@ interface SampleModuleProps {
   muted: boolean;
   params: SampleParams;
   isPlaying: boolean;
+  onInitAudio?: () => void | Promise<void>;
   // Sequencer props
   steps: SampleStep[];
   currentStep: number;
@@ -38,6 +39,7 @@ export const SampleModule = ({
   muted,
   params,
   isPlaying,
+  onInitAudio,
   steps,
   currentStep,
   patternLength,
@@ -160,6 +162,7 @@ export const SampleModule = ({
     }
 
     try {
+      await onInitAudio?.();
       const audioBuffer = await decodeAudioFile(file);
       onLoadSample(audioBuffer, file.name);
       toast.success(`Loaded: ${file.name}`);
@@ -167,7 +170,7 @@ export const SampleModule = ({
       toast.error('Failed to decode audio file');
       console.error(error);
     }
-  }, [onLoadSample]);
+  }, [onInitAudio, onLoadSample]);
 
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
