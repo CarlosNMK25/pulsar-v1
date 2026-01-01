@@ -88,7 +88,7 @@ export function ModulationModule({
 
   const handleBypassClick = (effect: ModEffect) => {
     onBypassToggle(effect);
-    modulationEngine.setBypass(effect, !bypassed[effect]);
+    // Bypass sync is handled by useEffect in useAudioEngine
   };
 
   // Render offset knobs based on active effect for the selected track
