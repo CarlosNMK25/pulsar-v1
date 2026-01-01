@@ -60,7 +60,7 @@ export const Header = ({
             <Cpu className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="text-base font-display font-semibold tracking-tight hidden sm:inline">
-            PULSAR
+            idm_PULSAR
           </span>
         </div>
 
