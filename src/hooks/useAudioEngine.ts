@@ -1396,6 +1396,11 @@ export const useAudioEngine = ({
     sampleRef.current?.triggerSlice(sliceIndex);
   }, []);
 
+  // Preview at a specific position in the sample (0-1)
+  const handlePreviewPosition = useCallback((position: number) => {
+    sampleRef.current?.previewAtPosition(position, 500);
+  }, []);
+
   return {
     initAudio,
     isInitialized,
@@ -1421,6 +1426,7 @@ export const useAudioEngine = ({
     triggerDrum,
     triggerSample,
     handlePreviewSlice,
+    handlePreviewPosition,
     volumes,
     setChannelVolume,
   };

@@ -312,10 +312,60 @@ export class SampleEngine {
     this.triggerSliceWithOptions(sliceIndex, {});
   }
 
-  // Advanced trigger with per-step options (reverse, pitch, volume override)
+  // Custom slice markers for transient-based slicing
+  private customSliceMarkers: number[] | null = null;
+
+  setCustomSliceMarkers(markers: number[] | null): void {
+    this.customSliceMarkers = markers;
+  }
+
+  getCustomSliceMarkers(): number[] | null {
+    return this.customSliceMarkers;
+  }
+
+  // Preview audio at a specific position (0-1)
+  previewAtPosition(position: number, durationMs: number = 500): void {
+    if (!this.buffer) return;
+
+    const ctx = audioEngine.getContext();
+    const buffer = this.params.reverse ? this.reversedBuffer : this.buffer;
+    if (!buffer) return;
+
+    const startTime = Math.max(0, Math.min(1, position)) * buffer.duration;
+    const duration = durationMs / 1000;
+
+    const player = ctx.createBufferSource();
+    player.buffer = buffer;
+    player.playbackRate.value = this.params.pitch;
+
+    // Create preview gain with fade envelope
+    const previewGain = ctx.createGain();
+    const now = ctx.currentTime;
+    previewGain.gain.setValueAtTime(0, now);
+    previewGain.gain.linearRampToValueAtTime(this.params.volume, now + 0.01);
+    previewGain.gain.setValueAtTime(this.params.volume, now + duration - 0.05);
+    previewGain.gain.linearRampToValueAtTime(0, now + duration);
+
+    player.connect(previewGain);
+    previewGain.connect(this.outputGain);
+
+    player.start(0, startTime, duration);
+
+    player.onended = () => {
+      player.disconnect();
+      previewGain.disconnect();
+    };
+  }
+
+  // Advanced trigger with per-step options (reverse, pitch, volume override) and ADSR envelope
   triggerSliceWithOptions(
     sliceIndex: number, 
-    options: { reverse?: boolean; pitch?: number; volume?: number }
+    options: { 
+      reverse?: boolean; 
+      pitch?: number; 
+      volume?: number;
+      envelope?: { attack: number; decay: number; sustain: number; release: number };
+    }
   ): void {
     if (!this.buffer || !this.reversedBuffer) return;
 
@@ -326,12 +376,30 @@ export class SampleEngine {
     const buffer = useReverse ? this.reversedBuffer : this.buffer;
 
     const sliceCount = this.params.sliceCount;
-    const sliceDuration = buffer.duration / sliceCount;
-    const clampedIndex = Math.max(0, Math.min(sliceIndex, sliceCount - 1));
     
-    // For reversed buffer, invert the slice index to maintain musical order
-    const effectiveIndex = useReverse ? (sliceCount - 1 - clampedIndex) : clampedIndex;
-    const startTime = effectiveIndex * sliceDuration;
+    // Use custom slice markers if available
+    let sliceStart: number;
+    let sliceDuration: number;
+    
+    if (this.customSliceMarkers && this.customSliceMarkers.length > 0) {
+      const clampedIndex = Math.max(0, Math.min(sliceIndex, this.customSliceMarkers.length - 1));
+      sliceStart = this.customSliceMarkers[clampedIndex] * buffer.duration;
+      const nextMarker = this.customSliceMarkers[clampedIndex + 1] ?? 1;
+      sliceDuration = (nextMarker - this.customSliceMarkers[clampedIndex]) * buffer.duration;
+      
+      // For reversed buffer, adjust start position
+      if (useReverse) {
+        sliceStart = buffer.duration - sliceStart - sliceDuration;
+      }
+    } else {
+      // Uniform slicing
+      sliceDuration = buffer.duration / sliceCount;
+      const clampedIndex = Math.max(0, Math.min(sliceIndex, sliceCount - 1));
+      
+      // For reversed buffer, invert the slice index to maintain musical order
+      const effectiveIndex = useReverse ? (sliceCount - 1 - clampedIndex) : clampedIndex;
+      sliceStart = effectiveIndex * sliceDuration;
+    }
 
     const player = ctx.createBufferSource();
     player.buffer = buffer;
@@ -339,9 +407,30 @@ export class SampleEngine {
     // Use per-step pitch if provided, otherwise use global pitch
     player.playbackRate.value = options.pitch ?? this.params.pitch;
 
-    // Create a temporary gain node for per-trigger volume control
+    // Create a gain node for envelope and volume control
     const triggerGain = ctx.createGain();
-    triggerGain.gain.value = options.volume ?? 1.0;
+    const now = ctx.currentTime;
+    const baseVolume = options.volume ?? 1.0;
+
+    // Apply ADSR envelope if provided
+    if (options.envelope) {
+      const { attack, decay, sustain, release } = options.envelope;
+      const attackSec = attack / 1000;
+      const decaySec = decay / 1000;
+      const releaseSec = release / 1000;
+      const sustainLevel = sustain * baseVolume;
+      
+      triggerGain.gain.setValueAtTime(0, now);
+      triggerGain.gain.linearRampToValueAtTime(baseVolume, now + attackSec);
+      triggerGain.gain.linearRampToValueAtTime(sustainLevel, now + attackSec + decaySec);
+      
+      // Schedule release before slice ends
+      const releaseStart = Math.max(0, sliceDuration - releaseSec);
+      triggerGain.gain.setValueAtTime(sustainLevel, now + releaseStart);
+      triggerGain.gain.linearRampToValueAtTime(0, now + sliceDuration);
+    } else {
+      triggerGain.gain.value = baseVolume;
+    }
 
     // Connect: player -> triggerGain -> outputs
     player.connect(triggerGain);
@@ -350,7 +439,7 @@ export class SampleEngine {
     triggerGain.connect(this.delaySend);
     triggerGain.connect(this.modulationSend);
 
-    player.start(0, startTime, sliceDuration);
+    player.start(0, sliceStart, sliceDuration);
 
     player.onended = () => {
       player.disconnect();

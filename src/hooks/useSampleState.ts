@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
+import { GranularParams } from '@/audio/GranularEngine';
 
 // P-Locks for sample steps (micro-timing, pitch, volume, reverse, ratchet)
 export interface SamplePLocks {
@@ -19,6 +20,14 @@ export interface SampleStep {
   pLocks?: SamplePLocks;
 }
 
+// ADSR Envelope for slices
+export interface SliceEnvelope {
+  attack: number;   // 0-500ms
+  decay: number;    // 0-500ms
+  sustain: number;  // 0-1
+  release: number;  // 0-1000ms
+}
+
 export interface SampleState {
   sampleBuffer: AudioBuffer | null;
   sampleName: string;
@@ -26,7 +35,31 @@ export interface SampleState {
   sampleParams: SampleParams;
   sampleSteps: SampleStep[];
   sliceProgress: number; // 0-1 progress within active slice
+  // Granular synthesis state
+  granularEnabled: boolean;
+  granularParams: GranularParams;
+  // Custom slice markers (from transient detection)
+  customSliceMarkers: number[] | null;
+  // Slice envelope
+  sliceEnvelope: SliceEnvelope;
 }
+
+export const defaultGranularParams: GranularParams = {
+  grainSize: 100,
+  grainDensity: 10,
+  pitchScatter: 0,
+  positionScatter: 0,
+  timeStretch: 1.0,
+  pitchShift: 0,
+  windowType: 'hann',
+};
+
+export const defaultSliceEnvelope: SliceEnvelope = {
+  attack: 5,
+  decay: 50,
+  sustain: 0.8,
+  release: 100,
+};
 
 export const defaultSampleParams: SampleParams = {
   pitch: 1.0,
@@ -56,6 +89,16 @@ export const useSampleState = () => {
   const [sampleParams, setSampleParams] = useState<SampleParams>(defaultSampleParams);
   const [sampleSteps, setSampleSteps] = useState<SampleStep[]>(createDefaultSteps(16));
   const [sliceProgress, setSliceProgress] = useState<number>(0);
+  
+  // Granular synthesis state
+  const [granularEnabled, setGranularEnabled] = useState(false);
+  const [granularParams, setGranularParams] = useState<GranularParams>(defaultGranularParams);
+  
+  // Custom slice markers (from transient detection)
+  const [customSliceMarkers, setCustomSliceMarkers] = useState<number[] | null>(null);
+  
+  // Slice envelope
+  const [sliceEnvelope, setSliceEnvelope] = useState<SliceEnvelope>(defaultSliceEnvelope);
   
   // Animation refs for slice progress
   const sliceAnimationRef = useRef<number | null>(null);
@@ -113,6 +156,7 @@ export const useSampleState = () => {
   const clearSample = useCallback(() => {
     setSampleBuffer(null);
     setSampleName('');
+    setCustomSliceMarkers(null);
   }, []);
 
   // Step manipulation functions
@@ -158,6 +202,10 @@ export const useSampleState = () => {
     if (state.sampleMuted !== undefined) setSampleMuted(state.sampleMuted);
     if (state.sampleParams !== undefined) setSampleParams(state.sampleParams);
     if (state.sampleSteps !== undefined) setSampleSteps(state.sampleSteps);
+    if (state.granularEnabled !== undefined) setGranularEnabled(state.granularEnabled);
+    if (state.granularParams !== undefined) setGranularParams(state.granularParams);
+    if (state.customSliceMarkers !== undefined) setCustomSliceMarkers(state.customSliceMarkers);
+    if (state.sliceEnvelope !== undefined) setSliceEnvelope(state.sliceEnvelope);
   }, []);
 
   return {
@@ -182,6 +230,17 @@ export const useSampleState = () => {
     setSampleStepSlice,
     setSampleStepPLocks,
     setAllSampleState,
+    // Granular state
+    granularEnabled,
+    setGranularEnabled,
+    granularParams,
+    setGranularParams,
+    // Custom slices
+    customSliceMarkers,
+    setCustomSliceMarkers,
+    // Slice envelope
+    sliceEnvelope,
+    setSliceEnvelope,
   };
 };
 
