@@ -335,6 +335,34 @@ export const SampleModule = ({
           </div>
         )}
 
+        {/* Sync Mode Selector - gate with drums */}
+        {buffer && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Gate:</span>
+            <div className="flex gap-1 flex-1">
+              {([
+                { value: 'independent', label: 'Free' },
+                { value: 'gate-kick', label: 'Kick' },
+                { value: 'gate-snare', label: 'Snare' },
+                { value: 'gate-hat', label: 'Hat' },
+              ] as const).map((mode) => (
+                <button
+                  key={mode.value}
+                  onClick={() => updateParam("syncMode", mode.value)}
+                  className={cn(
+                    "flex-1 py-1 text-xs rounded border transition-colors",
+                    params.syncMode === mode.value
+                      ? "border-chart-5 bg-chart-5/20 text-chart-5"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground",
+                  )}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Step Sequencer - shown when sample is loaded */}
         {buffer && (
           <div className="space-y-2 pt-1 border-t border-border/50">

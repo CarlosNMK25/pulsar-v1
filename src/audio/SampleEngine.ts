@@ -248,7 +248,8 @@ export class SampleEngine {
     this.isPlaying = false;
   }
 
-  trigger(): void {
+  // Trigger with optional per-step volume
+  trigger(options?: { volume?: number }): void {
     // One-shot playback based on playbackMode
     if (!this.buffer) return;
 
@@ -283,10 +284,16 @@ export class SampleEngine {
         break;
     }
 
-    player.connect(this.outputGain);
-    player.connect(this.reverbSend);
-    player.connect(this.delaySend);
-    player.connect(this.modulationSend);
+    // Create a temporary gain node for per-trigger volume control
+    const triggerGain = ctx.createGain();
+    triggerGain.gain.value = options?.volume ?? 1.0;
+
+    // Connect: player -> triggerGain -> outputs
+    player.connect(triggerGain);
+    triggerGain.connect(this.outputGain);
+    triggerGain.connect(this.reverbSend);
+    triggerGain.connect(this.delaySend);
+    triggerGain.connect(this.modulationSend);
 
     if (duration !== undefined) {
       player.start(0, startTime, duration);
@@ -296,6 +303,7 @@ export class SampleEngine {
 
     player.onended = () => {
       player.disconnect();
+      triggerGain.disconnect();
     };
   }
 
@@ -304,10 +312,10 @@ export class SampleEngine {
     this.triggerSliceWithOptions(sliceIndex, {});
   }
 
-  // Advanced trigger with per-step options (reverse, pitch override)
+  // Advanced trigger with per-step options (reverse, pitch, volume override)
   triggerSliceWithOptions(
     sliceIndex: number, 
-    options: { reverse?: boolean; pitch?: number }
+    options: { reverse?: boolean; pitch?: number; volume?: number }
   ): void {
     if (!this.buffer || !this.reversedBuffer) return;
 
@@ -331,15 +339,22 @@ export class SampleEngine {
     // Use per-step pitch if provided, otherwise use global pitch
     player.playbackRate.value = options.pitch ?? this.params.pitch;
 
-    player.connect(this.outputGain);
-    player.connect(this.reverbSend);
-    player.connect(this.delaySend);
-    player.connect(this.modulationSend);
+    // Create a temporary gain node for per-trigger volume control
+    const triggerGain = ctx.createGain();
+    triggerGain.gain.value = options.volume ?? 1.0;
+
+    // Connect: player -> triggerGain -> outputs
+    player.connect(triggerGain);
+    triggerGain.connect(this.outputGain);
+    triggerGain.connect(this.reverbSend);
+    triggerGain.connect(this.delaySend);
+    triggerGain.connect(this.modulationSend);
 
     player.start(0, startTime, sliceDuration);
 
     player.onended = () => {
       player.disconnect();
+      triggerGain.disconnect();
     };
   }
 
