@@ -459,6 +459,26 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
+            {/* Track Offsets for Chorus */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
 
           {/* Flanger Tab */}
@@ -520,6 +540,26 @@ export function ModulationModule({
                 variant={muted || bypassed.flanger ? 'secondary' : 'accent'}
               />
             </div>
+            {/* Track Offsets for Flanger */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
 
           {/* Phaser Tab */}
@@ -592,6 +632,26 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
+            {/* Track Offsets for Phaser */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
 
           {/* Tremolo Tab */}
@@ -653,6 +713,26 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
+            {/* Track Offsets for Tremolo */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
 
           {/* Ring Mod Tab */}
@@ -692,6 +772,26 @@ export function ModulationModule({
                 variant={muted || bypassed.ringMod ? 'secondary' : 'accent'}
               />
             </div>
+            {/* Track Offsets for RingMod */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
 
           {/* Auto-Pan Tab */}
@@ -753,29 +853,28 @@ export function ModulationModule({
                 </div>
               </div>
             </div>
+            {/* Track Offsets for AutoPan */}
+            {routingMode === 'individual' && targets.length > 0 && (
+              <div className="pt-2 border-t border-border/30 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                    Offsets {multipleTracksSelected && <span className="text-yellow-400 font-mono">({editingTrack})</span>}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onResetTrackModOffsets(editingTrack)}
+                    className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                    title={`Reset ${editingTrack} offsets`}
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                  </Button>
+                </div>
+                {renderTrackOffsets()}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
-
-        {/* Track Offsets Section - Only shown in TRACKS mode */}
-        {routingMode === 'individual' && targets.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">
-                Track Offsets {multipleTracksSelected && `(${editingTrack})`}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onResetTrackModOffsets(editingTrack)}
-                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
-                title={`Reset ${editingTrack} offsets`}
-              >
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-            </div>
-            {renderTrackOffsets()}
-          </div>
-        )}
       </div>
     </ModuleCard>
   );
