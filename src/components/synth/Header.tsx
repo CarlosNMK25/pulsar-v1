@@ -34,7 +34,7 @@ export const Header = ({
   isInitialized = false,
 }: HeaderProps) => {
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
+    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/95 backdrop-blur-md">
       {/* Left section */}
       <div className="flex items-center gap-3">
         {/* Left panel toggle */}
