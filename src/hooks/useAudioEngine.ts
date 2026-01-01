@@ -744,8 +744,10 @@ export const useAudioEngine = ({
       };
 
       // Drums - use Web Audio time for precise scheduling with micro-timing
+      // Store fire results for reuse in sample sync gate
       const kick = kickSteps[step];
-      if (shouldStepFire(kick, 'kick', step)) {
+      const kickFired = shouldStepFire(kick, 'kick', step);
+      if (kickFired) {
         anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('kick', kick.velocity),
@@ -754,7 +756,8 @@ export const useAudioEngine = ({
       }
 
       const snare = snareSteps[step];
-      if (shouldStepFire(snare, 'snare', step)) {
+      const snareFired = shouldStepFire(snare, 'snare', step);
+      if (snareFired) {
         anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('snare', snare.velocity),
@@ -763,7 +766,8 @@ export const useAudioEngine = ({
       }
 
       const hat = hatSteps[step];
-      if (shouldStepFire(hat, 'hat', step)) {
+      const hatFired = shouldStepFire(hat, 'hat', step);
+      if (hatFired) {
         anyFiredThisStep = true;
         triggerWithMicroTiming(
           () => drumRef.current?.trigger('hat', hat.velocity),
@@ -840,20 +844,36 @@ export const useAudioEngine = ({
       // Sample trigger based on steps with slice mode support
       const sampleStep = sampleSteps[step];
       if (sampleStep && sampleStep.active && !sampleMutedRef.current) {
-        // Probability check
-        if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
-          anyFiredThisStep = true;
-          
-          const params = sampleRef.current?.getParams();
-          if (params?.playbackMode === 'slice') {
-            // In slice mode, determine which slice to play
-            const sliceIndex = sampleStep.sliceIndex >= 0 
-              ? sampleStep.sliceIndex 
-              : step % params.sliceCount; // Sequential: step maps to slice
-            sampleRef.current?.triggerSlice(sliceIndex);
-          } else {
-            // Full or Region mode: use normal trigger
-            sampleRef.current?.trigger();
+        const params = sampleRef.current?.getParams();
+        
+        // Gate: determine if sampler can sound based on sync mode
+        // If params not ready, gate open by default (fallback)
+        let gateOpen = true;
+        const syncMode = params?.syncMode ?? 'independent';
+        if (syncMode !== 'independent') {
+          switch (syncMode) {
+            case 'gate-kick': gateOpen = kickFired; break;
+            case 'gate-snare': gateOpen = snareFired; break;
+            case 'gate-hat': gateOpen = hatFired; break;
+          }
+        }
+        
+        // Only trigger if gate is open
+        if (gateOpen) {
+          // Probability check
+          if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
+            anyFiredThisStep = true;
+            
+            if (params?.playbackMode === 'slice') {
+              // In slice mode, determine which slice to play
+              const sliceIndex = sampleStep.sliceIndex >= 0 
+                ? sampleStep.sliceIndex 
+                : step % (params?.sliceCount ?? 8);
+              sampleRef.current?.triggerSlice(sliceIndex);
+            } else {
+              // Full or Region mode: use normal trigger
+              sampleRef.current?.trigger();
+            }
           }
         }
       }

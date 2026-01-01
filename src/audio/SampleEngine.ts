@@ -5,6 +5,7 @@ import { fxEngine } from './FXEngine';
 import { modulationEngine } from './ModulationEngine';
 
 export type PlaybackMode = 'full' | 'region' | 'slice';
+export type SampleSyncMode = 'independent' | 'gate-kick' | 'gate-snare' | 'gate-hat';
 
 export interface SampleParams {
   pitch: number;      // 0.5 - 2.0 playback rate
@@ -15,6 +16,7 @@ export interface SampleParams {
   loop: boolean;
   playbackMode: PlaybackMode;
   sliceCount: number; // 4, 8, 16, 32
+  syncMode: SampleSyncMode;
 }
 
 export class SampleEngine {
@@ -42,6 +44,7 @@ export class SampleEngine {
     loop: true,
     playbackMode: 'region',
     sliceCount: 8,
+    syncMode: 'independent',
   };
 
   constructor() {
