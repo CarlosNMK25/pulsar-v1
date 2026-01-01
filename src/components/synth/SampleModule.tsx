@@ -65,10 +65,22 @@ export const SampleModule = ({
   const [previewingSlice, setPreviewingSlice] = useState<number | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
-  // Observe canvas size changes
+  // Observe canvas size changes - with reliable initial measurement
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const measureCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setCanvasDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+
+    // Initial measurement after browser paint
+    requestAnimationFrame(() => {
+      measureCanvas();
+    });
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -82,7 +94,7 @@ export const SampleModule = ({
 
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, []);
+  }, [buffer]);
 
   // Handle click on waveform to preview slice
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
