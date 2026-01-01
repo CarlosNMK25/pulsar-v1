@@ -133,12 +133,13 @@ export class DrumEngine {
         const now = ctx.currentTime;
         const vel = velocity / 127;
         const decayMult = 0.3 + decay * 0.7; // Range 0.3-1.0
+        const pitchMod = 0.5 + (this.params.pitch / 100); // Range 0.5-1.5
 
         // Oscillator for body
         const osc = ctx.createOscillator();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(150 * vel + 50, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1 * decayMult);
+        osc.frequency.setValueAtTime((150 * vel + 50) * pitchMod, now);
+        osc.frequency.exponentialRampToValueAtTime(40 * pitchMod, now + 0.1 * decayMult);
 
         // Gain envelope
         const gain = ctx.createGain();
@@ -148,7 +149,7 @@ export class DrumEngine {
         // Click transient
         const click = ctx.createOscillator();
         click.type = 'square';
-        click.frequency.value = 200;
+        click.frequency.value = 200 * pitchMod;
         
         const clickGain = ctx.createGain();
         clickGain.gain.setValueAtTime(vel * 0.3, now);
@@ -181,6 +182,7 @@ export class DrumEngine {
         const now = ctx.currentTime;
         const vel = velocity / 127;
         const decayMult = 0.4 + decay * 0.6; // Range 0.4-1.0
+        const pitchMod = 0.5 + (this.params.pitch / 100); // Range 0.5-1.5
 
         // Noise for snare body
         const bufferSize = ctx.sampleRate * 0.3;
@@ -193,21 +195,21 @@ export class DrumEngine {
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
 
-        // Noise filter
+        // Noise filter - apply pitch modifier
         const filter = ctx.createBiquadFilter();
         filter.type = 'highpass';
-        filter.frequency.value = 2000;
+        filter.frequency.value = 2000 * pitchMod;
 
         // Noise envelope
         const noiseGain = ctx.createGain();
         noiseGain.gain.setValueAtTime(vel * 0.5, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15 * decayMult);
 
-        // Tone oscillator
+        // Tone oscillator - apply pitch modifier
         const osc = ctx.createOscillator();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+        osc.frequency.setValueAtTime(200 * pitchMod, now);
+        osc.frequency.exponentialRampToValueAtTime(100 * pitchMod, now + 0.05);
 
         const oscGain = ctx.createGain();
         oscGain.gain.setValueAtTime(vel * 0.4, now);
@@ -240,6 +242,7 @@ export class DrumEngine {
         const now = ctx.currentTime;
         const vel = velocity / 127;
         const decayMult = 0.3 + decay * 0.7; // Range 0.3-1.0
+        const pitchMod = 0.5 + (this.params.pitch / 100); // Range 0.5-1.5
 
         // Noise
         const bufferSize = ctx.sampleRate * 0.15;
@@ -252,16 +255,16 @@ export class DrumEngine {
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
 
-        // Bandpass filter for metallic character
+        // Bandpass filter for metallic character - apply pitch modifier
         const bandpass = ctx.createBiquadFilter();
         bandpass.type = 'bandpass';
-        bandpass.frequency.value = 8000;
+        bandpass.frequency.value = 8000 * pitchMod;
         bandpass.Q.value = 1;
 
-        // Highpass for clarity
+        // Highpass for clarity - apply pitch modifier
         const highpass = ctx.createBiquadFilter();
         highpass.type = 'highpass';
-        highpass.frequency.value = 5000;
+        highpass.frequency.value = 5000 * pitchMod;
 
         // Envelope
         const gain = ctx.createGain();
