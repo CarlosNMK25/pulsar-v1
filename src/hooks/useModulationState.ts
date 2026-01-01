@@ -13,6 +13,16 @@ import {
 export type ModRoutingMode = 'master' | 'individual';
 export type ModTarget = 'drums' | 'synth' | 'texture' | 'sample';
 
+// Send levels per track per effect (0-1)
+export type ModSendLevels = Record<ModTarget, Record<ModEffect, number>>;
+
+const defaultModSendLevels: ModSendLevels = {
+  drums: { chorus: 0, flanger: 0, phaser: 0, tremolo: 0, ringMod: 0, autoPan: 0 },
+  synth: { chorus: 0, flanger: 0, phaser: 0, tremolo: 0, ringMod: 0, autoPan: 0 },
+  texture: { chorus: 0, flanger: 0, phaser: 0, tremolo: 0, ringMod: 0, autoPan: 0 },
+  sample: { chorus: 0, flanger: 0, phaser: 0, tremolo: 0, ringMod: 0, autoPan: 0 },
+};
+
 // Offset types for each effect (relative -0.5 to +0.5, 0 = neutral)
 export interface ChorusOffsets {
   rate: number;
@@ -88,8 +98,7 @@ export interface ModulationState {
   ringMod: RingModParams;
   autoPan: AutoPanParams;
   bypassed: Record<ModEffect, boolean>;
-  routingMode: ModRoutingMode;
-  targets: ModTarget[];
+  modSendLevels: ModSendLevels;
   modOffsetsPerTrack: ModOffsetsPerTrack;
 }
 
@@ -110,8 +119,9 @@ export const useModulationState = () => {
   const [ringMod, setRingMod] = useState<RingModParams>(defaultModulationParams.ringMod);
   const [autoPan, setAutoPan] = useState<AutoPanParams>(defaultModulationParams.autoPan);
   const [bypassed, setBypassed] = useState<Record<ModEffect, boolean>>(defaultBypassed);
-  const [routingMode, setRoutingMode] = useState<ModRoutingMode>('master');
-  const [targets, setTargets] = useState<ModTarget[]>([]);
+  const [modSendLevels, setModSendLevels] = useState<ModSendLevels>(
+    JSON.parse(JSON.stringify(defaultModSendLevels))
+  );
   const [modOffsetsPerTrack, setModOffsetsPerTrack] = useState<ModOffsetsPerTrack>(
     JSON.parse(JSON.stringify(defaultModOffsetsPerTrack))
   );
@@ -148,13 +158,19 @@ export const useModulationState = () => {
     setBypassed(prev => ({ ...prev, [effect]: value }));
   }, []);
 
-  const toggleTarget = useCallback((target: ModTarget) => {
-    setTargets(prev => {
-      if (prev.includes(target)) {
-        return prev.filter(t => t !== target);
-      }
-      return [...prev, target];
-    });
+  // Update a single send level (track + effect)
+  const updateModSendLevel = useCallback((
+    track: ModTarget,
+    effect: ModEffect,
+    value: number
+  ) => {
+    setModSendLevels(prev => ({
+      ...prev,
+      [track]: {
+        ...prev[track],
+        [effect]: value,
+      },
+    }));
   }, []);
 
   // Update a specific offset for a track/effect/param
@@ -193,8 +209,7 @@ export const useModulationState = () => {
     if (state.ringMod !== undefined) setRingMod(state.ringMod);
     if (state.autoPan !== undefined) setAutoPan(state.autoPan);
     if (state.bypassed !== undefined) setBypassed(state.bypassed);
-    if (state.routingMode !== undefined) setRoutingMode(state.routingMode);
-    if (state.targets !== undefined) setTargets(state.targets);
+    if (state.modSendLevels !== undefined) setModSendLevels(state.modSendLevels);
     if (state.modOffsetsPerTrack !== undefined) setModOffsetsPerTrack(state.modOffsetsPerTrack);
   }, []);
 
@@ -207,8 +222,7 @@ export const useModulationState = () => {
     ringMod,
     autoPan,
     bypassed,
-    routingMode,
-    targets,
+    modSendLevels,
     modOffsetsPerTrack,
     // Setters
     setChorus,
@@ -218,8 +232,7 @@ export const useModulationState = () => {
     setRingMod,
     setAutoPan,
     setBypassed,
-    setRoutingMode,
-    setTargets,
+    setModSendLevels,
     setModOffsetsPerTrack,
     // Updaters
     updateChorusParams,
@@ -230,7 +243,7 @@ export const useModulationState = () => {
     updateAutoPanParams,
     toggleBypass,
     setEffectBypassed,
-    toggleTarget,
+    updateModSendLevel,
     updateModOffset,
     resetTrackModOffsets,
     setAllModulationState,

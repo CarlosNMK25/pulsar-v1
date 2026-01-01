@@ -2,6 +2,7 @@
 
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
+import { modulationEngine } from './ModulationEngine';
 
 export interface SampleParams {
   pitch: number;      // 0.5 - 2.0 playback rate
@@ -16,14 +17,17 @@ export class SampleEngine {
   private outputGain: GainNode;
   private reverbSend: GainNode;
   private delaySend: GainNode;
+  private modulationSend: GainNode;
   private player: AudioBufferSourceNode | null = null;
   private buffer: AudioBuffer | null = null;
   private reversedBuffer: AudioBuffer | null = null;
   private isPlaying = false;
   private fxConnected = false;
+  private modConnected = false;
   private muted = false;
   private fxBypassed = false;
   private savedFxLevels = { reverb: 0.35, delay: 0.3 };
+  private savedModLevel = 0;
 
   private params: SampleParams = {
     pitch: 1.0,
@@ -47,6 +51,10 @@ export class SampleEngine {
 
     this.delaySend = ctx.createGain();
     this.delaySend.gain.value = 0.3;
+
+    // Modulation send node
+    this.modulationSend = ctx.createGain();
+    this.modulationSend.gain.value = 0;
   }
 
   connectFX(): void {
@@ -54,6 +62,18 @@ export class SampleEngine {
     this.reverbSend.connect(fxEngine.getReverbSend());
     this.delaySend.connect(fxEngine.getDelaySend());
     this.fxConnected = true;
+  }
+
+  connectModulation(): void {
+    if (this.modConnected) return;
+    this.modulationSend.connect(modulationEngine.getInput());
+    this.modConnected = true;
+  }
+
+  setModulationSend(level: number): void {
+    this.savedModLevel = level;
+    const ctx = audioEngine.getContext();
+    this.modulationSend.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
   }
 
   setFXSend(reverb: number, delay: number): void {
@@ -168,6 +188,7 @@ export class SampleEngine {
     this.player.connect(this.outputGain);
     this.player.connect(this.reverbSend);
     this.player.connect(this.delaySend);
+    this.player.connect(this.modulationSend);
 
     this.player.start(0, startTime);
     this.isPlaying = true;
@@ -211,6 +232,7 @@ export class SampleEngine {
     player.connect(this.outputGain);
     player.connect(this.reverbSend);
     player.connect(this.delaySend);
+    player.connect(this.modulationSend);
 
     player.start(0, startTime, duration);
 
@@ -233,5 +255,6 @@ export class SampleEngine {
     this.outputGain.disconnect();
     this.reverbSend.disconnect();
     this.delaySend.disconnect();
+    this.modulationSend.disconnect();
   }
 }
