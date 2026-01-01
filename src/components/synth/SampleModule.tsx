@@ -192,13 +192,22 @@ export const SampleModule = ({
           const sliceX = activeSlice * sliceWidth;
           const progressWidth = sliceWidth * sliceProgress;
           
-          // Progress fill (semi-transparent green)
-          ctx.fillStyle = "rgba(34, 197, 94, 0.6)";
-          ctx.fillRect(sliceX, height - 12, progressWidth, 10);
+          // Progress bar dimensions - larger for visibility
+          const barHeight = 24;
+          const barY = height - barHeight - 4;
+          
+          // Progress fill - cyan for contrast with green slice
+          ctx.fillStyle = "rgba(0, 255, 255, 0.7)";
+          ctx.fillRect(sliceX, barY, progressWidth, barHeight);
+          
+          // Border around full progress bar area
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(sliceX + 1, barY, sliceWidth - 2, barHeight);
           
           // Playhead line (white vertical line at progress position)
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+          ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.moveTo(sliceX + progressWidth, 0);
           ctx.lineTo(sliceX + progressWidth, height);
