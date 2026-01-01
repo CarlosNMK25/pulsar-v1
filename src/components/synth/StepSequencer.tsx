@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { EuclideanControls } from './EuclideanControls';
 import { PatternLengthSelector } from './PatternLengthSelector';
 import { PLockEditor } from './PLockEditor';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { PLocks, AcidModifiers, ConditionType } from '@/hooks/useAudioEngine';
 
 export interface Step {
@@ -12,6 +13,7 @@ export interface Step {
   pLocks?: PLocks;
   acid?: AcidModifiers;
   condition?: ConditionType;
+  sliceIndex?: number; // For sample steps: which slice to trigger (-1 = sequential)
 }
 
 interface StepSequencerProps {
@@ -22,6 +24,7 @@ interface StepSequencerProps {
   onStepPLocks?: (index: number, pLocks: PLocks | undefined) => void;
   onStepAcid?: (index: number, acid: AcidModifiers | undefined) => void;
   onStepCondition?: (index: number, condition: ConditionType) => void;
+  onStepSliceChange?: (index: number, sliceIndex: number) => void;
   onPatternGenerate?: (steps: Step[]) => void;
   onLengthChange?: (length: number) => void;
   patternLength?: number;
@@ -30,6 +33,8 @@ interface StepSequencerProps {
   showPLocks?: boolean;
   showAcid?: boolean;
   showConditions?: boolean;
+  showSliceSelector?: boolean;
+  sliceCount?: number;
   label?: string;
   variant?: 'primary' | 'secondary' | 'muted';
   swing?: number;
@@ -43,6 +48,7 @@ export const StepSequencer = ({
   onStepPLocks,
   onStepAcid,
   onStepCondition,
+  onStepSliceChange,
   onPatternGenerate,
   onLengthChange,
   patternLength,
@@ -51,12 +57,15 @@ export const StepSequencer = ({
   showPLocks = false,
   showAcid = false,
   showConditions = false,
+  showSliceSelector = false,
+  sliceCount = 8,
   label,
   variant = 'primary',
   swing = 0,
   humanize = 0,
 }: StepSequencerProps) => {
   const [editingStep, setEditingStep] = useState<number | null>(null);
+  const [sliceEditingStep, setSliceEditingStep] = useState<number | null>(null);
   
   // Use patternLength if provided, otherwise use steps.length
   const displayLength = patternLength ?? steps.length;
@@ -67,14 +76,19 @@ export const StepSequencer = ({
   const currentGroup = Math.floor(currentStep / 4);
 
   const handleContextMenu = (e: React.MouseEvent, index: number) => {
-    if (!showPLocks && !showAcid && !showConditions) return;
+    if (!showPLocks && !showAcid && !showConditions && !showSliceSelector) return;
     e.preventDefault();
-    setEditingStep(index);
+    if (showSliceSelector && onStepSliceChange) {
+      setSliceEditingStep(index);
+    } else {
+      setEditingStep(index);
+    }
   };
 
   const hasPLocks = (step: Step) => step.pLocks && Object.keys(step.pLocks).length > 0;
   const hasAcid = (step: Step) => step.acid && Object.values(step.acid).some(v => v);
   const hasCondition = (step: Step) => step.condition !== null && step.condition !== undefined;
+  const hasSlice = (step: Step) => step.sliceIndex !== undefined && step.sliceIndex >= 0;
 
   // Get condition display color
   const getConditionColor = (condition: ConditionType) => {
@@ -143,6 +157,16 @@ export const StepSequencer = ({
                 opacity: step.active ? 0.5 + (step.velocity / 127) * 0.5 : 1,
               }}
             >
+              {/* Slice index indicator - top center */}
+              {step.active && hasSlice(step) && (
+                <div 
+                  className="absolute top-0 left-1/2 -translate-x-1/2 px-0.5 text-[8px] font-mono leading-none font-bold text-chart-4"
+                  title={`Slice: ${(step.sliceIndex ?? 0) + 1}`}
+                >
+                  {(step.sliceIndex ?? 0) + 1}
+                </div>
+              )}
+              
               {/* Condition indicator - top left */}
               {step.active && hasCondition(step) && (
                 <div 
@@ -241,6 +265,59 @@ export const StepSequencer = ({
             </button>
           );
 
+          // Wrap with slice selector popover if enabled
+          if (showSliceSelector && onStepSliceChange) {
+            return (
+              <Popover 
+                key={index}
+                open={sliceEditingStep === index} 
+                onOpenChange={(open) => setSliceEditingStep(open ? index : null)}
+              >
+                <PopoverTrigger asChild>
+                  {stepButton}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="center">
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">Slice for Step {index + 1}</div>
+                    <div className="grid grid-cols-4 gap-1">
+                      <button
+                        onClick={() => {
+                          onStepSliceChange(index, -1);
+                          setSliceEditingStep(null);
+                        }}
+                        className={cn(
+                          'px-2 py-1 text-xs rounded border transition-colors col-span-4',
+                          step.sliceIndex === -1 || step.sliceIndex === undefined
+                            ? 'border-primary bg-primary/20 text-primary'
+                            : 'border-border text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        Sequential
+                      </button>
+                      {Array.from({ length: sliceCount }).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            onStepSliceChange(index, i);
+                            setSliceEditingStep(null);
+                          }}
+                          className={cn(
+                            'px-2 py-1 text-xs rounded border transition-colors',
+                            step.sliceIndex === i
+                              ? 'border-chart-4 bg-chart-4/20 text-chart-4'
+                              : 'border-border text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            );
+          }
+
           // Wrap with PLockEditor if editing is enabled
           if ((showPLocks || showAcid || showConditions) && onStepPLocks) {
             return (
@@ -267,9 +344,9 @@ export const StepSequencer = ({
       </div>
       
       {/* Right-click hint */}
-      {(showPLocks || showAcid || showConditions) && (
+      {(showPLocks || showAcid || showConditions || showSliceSelector) && (
         <div className="text-[10px] text-muted-foreground/50 text-right">
-          Right-click step for P-Locks{showConditions && ' & Conditions'}
+          {showSliceSelector ? 'Right-click step for slice selection' : `Right-click step for P-Locks${showConditions ? ' & Conditions' : ''}`}
         </div>
       )}
     </div>

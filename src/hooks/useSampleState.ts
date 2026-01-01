@@ -1,12 +1,20 @@
 import { useState, useCallback } from 'react';
 import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
 
+// P-Locks for sample steps (micro-timing, pitch, volume)
+export interface SamplePLocks {
+  microTiming?: number; // -50 to +50 ms offset
+  pitch?: number;       // Pitch override per step
+  volume?: number;      // Volume override per step
+}
+
 // Step type for sample sequencer
 export interface SampleStep {
   active: boolean;
   velocity: number;
   probability: number;
   sliceIndex: number; // Which slice this step triggers (-1 = sequential)
+  pLocks?: SamplePLocks;
 }
 
 export interface SampleState {
@@ -35,6 +43,7 @@ const createDefaultSteps = (length: number): SampleStep[] =>
     velocity: 100, 
     probability: 100,
     sliceIndex: -1, // -1 means sequential (step 0 -> slice 0, step 1 -> slice 1, etc.)
+    pLocks: undefined,
   }));
 
 export const useSampleState = () => {
@@ -75,6 +84,20 @@ export const useSampleState = () => {
     });
   }, []);
 
+  // Set slice index for a specific step
+  const setSampleStepSlice = useCallback((index: number, sliceIndex: number) => {
+    setSampleSteps(prev => prev.map((step, i) =>
+      i === index ? { ...step, sliceIndex } : step
+    ));
+  }, []);
+
+  // Set P-Locks for a specific step
+  const setSampleStepPLocks = useCallback((index: number, pLocks: SamplePLocks | undefined) => {
+    setSampleSteps(prev => prev.map((step, i) =>
+      i === index ? { ...step, pLocks } : step
+    ));
+  }, []);
+
   // Batch setter for scene loading
   const setAllSampleState = useCallback((state: Partial<SampleState>) => {
     if (state.sampleBuffer !== undefined) setSampleBuffer(state.sampleBuffer);
@@ -100,6 +123,8 @@ export const useSampleState = () => {
     toggleSampleStep,
     setSampleStepVelocity,
     setSamplePatternLength,
+    setSampleStepSlice,
+    setSampleStepPLocks,
     setAllSampleState,
   };
 };
