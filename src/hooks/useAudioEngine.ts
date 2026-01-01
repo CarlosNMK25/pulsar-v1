@@ -141,6 +141,8 @@ interface UseAudioEngineProps {
   // NEW: FX routing mode and targets
   fxRoutingMode: 'master' | 'individual';
   fxTargets: ('drums' | 'synth' | 'texture' | 'sample' | 'glitch')[];
+  // Slice progress callback
+  onSliceStart?: (durationMs: number) => void;
 }
 
 // Evaluate conditional trigger
@@ -215,6 +217,7 @@ export const useAudioEngine = ({
   tremoloParams,
   ringModParams,
   autoPanParams,
+  onSliceStart,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -261,10 +264,12 @@ export const useAudioEngine = ({
   // Auto-fill config ref for scheduler callback
   const autoFillConfigRef = useRef(autoFillConfig);
   const onAutoFillTriggerRef = useRef(onAutoFillTrigger);
+  const onSliceStartRef = useRef(onSliceStart);
   useEffect(() => {
     autoFillConfigRef.current = autoFillConfig;
     onAutoFillTriggerRef.current = onAutoFillTrigger;
-  }, [autoFillConfig, onAutoFillTrigger]);
+    onSliceStartRef.current = onSliceStart;
+  }, [autoFillConfig, onAutoFillTrigger, onSliceStart]);
 
   // Initialize audio engine
   const initAudio = useCallback(async () => {
@@ -903,10 +908,13 @@ export const useAudioEngine = ({
                 if (activeSliceTimeoutRef.current) {
                   clearTimeout(activeSliceTimeoutRef.current);
                 }
+                // Start slice progress animation
+                const sliceDurationMs = stepDurationMs * 0.8;
+                onSliceStartRef.current?.(sliceDurationMs);
                 // Clear active slice after step duration
                 activeSliceTimeoutRef.current = setTimeout(() => {
                   setActiveSlice(null);
-                }, stepDurationMs * 0.8);
+                }, sliceDurationMs);
               } else {
                 sampleRef.current?.trigger({ volume: finalVolume });
               }
