@@ -171,6 +171,7 @@ const Index = () => {
     tremoloParams: modulationState.tremolo,
     ringModParams: modulationState.ringMod,
     autoPanParams: modulationState.autoPan,
+    onSliceStart: sampleState.startSliceProgress,
   });
 
   const handlePlayPause = useCallback(async () => {
@@ -382,6 +383,7 @@ const Index = () => {
                 params={sampleState.sampleParams}
                 isPlaying={sampleIsPlaying}
                 activeSlice={activeSlice}
+                sliceProgress={sampleState.sliceProgress}
                 steps={sampleState.sampleSteps}
                 currentStep={currentStep}
                 patternLength={sampleState.sampleSteps.length}

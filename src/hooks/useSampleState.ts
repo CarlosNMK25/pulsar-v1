@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
 
 // P-Locks for sample steps (micro-timing, pitch, volume, reverse, ratchet)
@@ -25,6 +25,7 @@ export interface SampleState {
   sampleMuted: boolean;
   sampleParams: SampleParams;
   sampleSteps: SampleStep[];
+  sliceProgress: number; // 0-1 progress within active slice
 }
 
 export const defaultSampleParams: SampleParams = {
@@ -54,6 +55,56 @@ export const useSampleState = () => {
   const [sampleMuted, setSampleMuted] = useState(false);
   const [sampleParams, setSampleParams] = useState<SampleParams>(defaultSampleParams);
   const [sampleSteps, setSampleSteps] = useState<SampleStep[]>(createDefaultSteps(16));
+  const [sliceProgress, setSliceProgress] = useState<number>(0);
+  
+  // Animation refs for slice progress
+  const sliceAnimationRef = useRef<number | null>(null);
+  const sliceStartTimeRef = useRef<number>(0);
+  const sliceDurationRef = useRef<number>(0);
+  
+  // Start slice progress animation
+  const startSliceProgress = useCallback((durationMs: number) => {
+    // Cancel any existing animation
+    if (sliceAnimationRef.current) {
+      cancelAnimationFrame(sliceAnimationRef.current);
+    }
+    
+    sliceStartTimeRef.current = performance.now();
+    sliceDurationRef.current = durationMs;
+    setSliceProgress(0);
+    
+    const animate = () => {
+      const elapsed = performance.now() - sliceStartTimeRef.current;
+      const progress = Math.min(elapsed / sliceDurationRef.current, 1);
+      setSliceProgress(progress);
+      
+      if (progress < 1) {
+        sliceAnimationRef.current = requestAnimationFrame(animate);
+      } else {
+        sliceAnimationRef.current = null;
+      }
+    };
+    
+    sliceAnimationRef.current = requestAnimationFrame(animate);
+  }, []);
+  
+  // Stop slice progress animation
+  const stopSliceProgress = useCallback(() => {
+    if (sliceAnimationRef.current) {
+      cancelAnimationFrame(sliceAnimationRef.current);
+      sliceAnimationRef.current = null;
+    }
+    setSliceProgress(0);
+  }, []);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (sliceAnimationRef.current) {
+        cancelAnimationFrame(sliceAnimationRef.current);
+      }
+    };
+  }, []);
 
   const toggleSampleMute = useCallback(() => {
     setSampleMuted(prev => !prev);
@@ -120,6 +171,9 @@ export const useSampleState = () => {
     setSampleParams,
     sampleSteps,
     setSampleSteps,
+    sliceProgress,
+    startSliceProgress,
+    stopSliceProgress,
     toggleSampleMute,
     clearSample,
     toggleSampleStep,

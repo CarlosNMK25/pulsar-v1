@@ -19,6 +19,7 @@ interface SampleModuleProps {
   params: SampleParams;
   isPlaying: boolean;
   activeSlice: number | null;
+  sliceProgress: number; // 0-1 progress within active slice
   // Sequencer props
   steps: SampleStep[];
   currentStep: number;
@@ -44,6 +45,7 @@ export const SampleModule = ({
   params,
   isPlaying,
   activeSlice,
+  sliceProgress,
   steps,
   currentStep,
   patternLength,
@@ -184,6 +186,24 @@ export const SampleModule = ({
         ctx.strokeStyle = "hsl(142, 76%, 45%)";
         ctx.lineWidth = 3;
         ctx.strokeRect(activeSlice * sliceWidth + 1, 1, sliceWidth - 2, height - 2);
+        
+        // Draw progress bar inside active slice
+        if (sliceProgress > 0) {
+          const sliceX = activeSlice * sliceWidth;
+          const progressWidth = sliceWidth * sliceProgress;
+          
+          // Progress fill (semi-transparent green)
+          ctx.fillStyle = "rgba(34, 197, 94, 0.6)";
+          ctx.fillRect(sliceX, height - 12, progressWidth, 10);
+          
+          // Playhead line (white vertical line at progress position)
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(sliceX + progressWidth, 0);
+          ctx.lineTo(sliceX + progressWidth, height);
+          ctx.stroke();
+        }
       }
       
       // Highlight previewing slice (click preview)
@@ -245,7 +265,7 @@ export const SampleModule = ({
       ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
     }
     // Full mode: no markers needed, entire waveform is active
-  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice, activeSlice, canvasDimensions]);
+  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice, activeSlice, sliceProgress, canvasDimensions]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
