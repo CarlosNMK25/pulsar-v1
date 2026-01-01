@@ -106,6 +106,7 @@ const Index = () => {
     isInitialized, 
     analyserData, 
     currentStep,
+    activeSlice,
     audioState,
     handleMacroChange: audioMacroChange,
     triggerGlitch,
@@ -380,6 +381,7 @@ const Index = () => {
                 muted={sampleState.sampleMuted}
                 params={sampleState.sampleParams}
                 isPlaying={sampleIsPlaying}
+                activeSlice={activeSlice}
                 steps={sampleState.sampleSteps}
                 currentStep={currentStep}
                 patternLength={sampleState.sampleSteps.length}

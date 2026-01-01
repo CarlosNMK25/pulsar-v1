@@ -18,6 +18,7 @@ interface SampleModuleProps {
   muted: boolean;
   params: SampleParams;
   isPlaying: boolean;
+  activeSlice: number | null;
   // Sequencer props
   steps: SampleStep[];
   currentStep: number;
@@ -42,6 +43,7 @@ export const SampleModule = ({
   muted,
   params,
   isPlaying,
+  activeSlice,
   steps,
   currentStep,
   patternLength,
@@ -133,6 +135,24 @@ export const SampleModule = ({
     if (params.playbackMode === "slice") {
       // Draw slice dividers
       const sliceWidth = width / params.sliceCount;
+      
+      // Highlight active slice (playing) with stronger highlight
+      if (activeSlice !== null && activeSlice >= 0 && activeSlice < params.sliceCount) {
+        ctx.fillStyle = "hsl(var(--chart-2) / 0.4)";
+        ctx.fillRect(activeSlice * sliceWidth, 0, sliceWidth, height);
+        
+        // Draw glow border for active slice
+        ctx.strokeStyle = "hsl(var(--chart-2))";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(activeSlice * sliceWidth + 1, 1, sliceWidth - 2, height - 2);
+      }
+      
+      // Highlight previewing slice (click preview)
+      if (previewingSlice !== null && previewingSlice !== activeSlice) {
+        ctx.fillStyle = "hsl(var(--primary) / 0.3)";
+        ctx.fillRect(previewingSlice * sliceWidth, 0, sliceWidth, height);
+      }
+      
       ctx.strokeStyle = "hsl(var(--chart-4) / 0.6)";
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
@@ -153,13 +173,15 @@ export const SampleModule = ({
       ctx.textAlign = "center";
       for (let i = 0; i < params.sliceCount; i++) {
         const x = (i + 0.5) * sliceWidth;
+        // Highlight number if active
+        if (i === activeSlice) {
+          ctx.fillStyle = "hsl(var(--chart-2))";
+          ctx.font = "bold 18px sans-serif";
+        } else {
+          ctx.fillStyle = "hsl(var(--chart-4) / 0.8)";
+          ctx.font = "16px sans-serif";
+        }
         ctx.fillText(String(i + 1), x, 18);
-      }
-      
-      // Highlight previewing slice
-      if (previewingSlice !== null) {
-        ctx.fillStyle = "hsl(var(--primary) / 0.3)";
-        ctx.fillRect(previewingSlice * sliceWidth, 0, sliceWidth, height);
       }
     } else if (params.playbackMode === "region") {
       // Draw start point marker
@@ -184,7 +206,7 @@ export const SampleModule = ({
       ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
     }
     // Full mode: no markers needed, entire waveform is active
-  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice]);
+  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice, activeSlice]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
