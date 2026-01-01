@@ -4,6 +4,7 @@ import { SynthVoice, WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
 import { SampleEngine, SampleParams, PlaybackMode } from '@/audio/SampleEngine';
+import { GranularEngine, GranularParams } from '@/audio/GranularEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
@@ -143,6 +144,9 @@ interface UseAudioEngineProps {
   fxTargets: ('drums' | 'synth' | 'texture' | 'sample' | 'glitch')[];
   // Slice progress callback
   onSliceStart?: (durationMs: number) => void;
+  // Granular synthesis
+  granularEnabled: boolean;
+  granularParams: GranularParams;
 }
 
 // Evaluate conditional trigger
@@ -218,6 +222,8 @@ export const useAudioEngine = ({
   ringModParams,
   autoPanParams,
   onSliceStart,
+  granularEnabled,
+  granularParams,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -229,7 +235,12 @@ export const useAudioEngine = ({
   const drumRef = useRef<DrumEngine | null>(null);
   const textureRef = useRef<TextureEngine | null>(null);
   const sampleRef = useRef<SampleEngine | null>(null);
+  const granularRef = useRef<GranularEngine | null>(null);
   const animationFrameRef = useRef<number>();
+  
+  // Granular refs for callback access
+  const granularEnabledRef = useRef<boolean>(granularEnabled);
+  const granularParamsRef = useRef<GranularParams>(granularParams);
   
   // Track-specific glitch buses
   const drumsGlitchRef = useRef<GlitchBus | null>(null);
@@ -283,6 +294,7 @@ export const useAudioEngine = ({
       drumRef.current = new DrumEngine();
       textureRef.current = new TextureEngine();
       sampleRef.current = new SampleEngine();
+      granularRef.current = new GranularEngine();
       
       // Initialize FX engine (singleton, auto-init on first access)
       fxEngine.getReverbSend();
@@ -442,6 +454,28 @@ export const useAudioEngine = ({
     if (!textureRef.current) return;
     textureRef.current.setMode(textureMode);
   }, [textureMode]);
+
+  // Sync granular buffer with sample buffer
+  useEffect(() => {
+    if (!granularRef.current || !sampleBuffer) return;
+    granularRef.current.loadBuffer(sampleBuffer);
+  }, [sampleBuffer]);
+
+  // Sync granular params
+  useEffect(() => {
+    if (!granularRef.current) return;
+    granularRef.current.setParams(granularParams);
+    granularParamsRef.current = granularParams;
+  }, [granularParams]);
+
+  // Sync granular enabled state
+  useEffect(() => {
+    granularEnabledRef.current = granularEnabled;
+    // Stop granular if disabled
+    if (!granularEnabled && granularRef.current) {
+      granularRef.current.stop();
+    }
+  }, [granularEnabled]);
 
   // Update FX parameters
   useEffect(() => {
@@ -900,7 +934,26 @@ export const useAudioEngine = ({
             
             // Trigger function for single hit with active slice visualization
             const triggerOnce = () => {
-              if (params?.playbackMode === 'slice') {
+              // Check if granular mode is enabled
+              if (granularEnabledRef.current && granularRef.current) {
+                // Granular mode: set position and start if not playing
+                const slicePosition = sliceIndex / sliceCount;
+                if (!granularRef.current.isPlaying()) {
+                  granularRef.current.start(slicePosition);
+                } else {
+                  granularRef.current.setPosition(slicePosition);
+                }
+                // Update active slice for visualization
+                setActiveSlice(sliceIndex);
+                if (activeSliceTimeoutRef.current) {
+                  clearTimeout(activeSliceTimeoutRef.current);
+                }
+                const sliceDurationMs = stepDurationMs * 0.8;
+                onSliceStartRef.current?.(sliceDurationMs);
+                activeSliceTimeoutRef.current = setTimeout(() => {
+                  setActiveSlice(null);
+                }, sliceDurationMs);
+              } else if (params?.playbackMode === 'slice') {
                 sampleRef.current?.triggerSliceWithOptions(sliceIndex, triggerOptions);
                 // Update active slice for visualization
                 setActiveSlice(sliceIndex);
@@ -994,6 +1047,7 @@ export const useAudioEngine = ({
     } else {
       scheduler.stop();
       synthRef.current?.allNotesOff();
+      granularRef.current?.stop();
       setCurrentStep(0);
     }
   }, [isPlaying, isInitialized]);
@@ -1031,6 +1085,7 @@ export const useAudioEngine = ({
       drumRef.current?.disconnect();
       textureRef.current?.disconnect();
       sampleRef.current?.disconnect();
+      granularRef.current?.disconnect();
       drumsGlitchRef.current?.disconnect();
       synthGlitchRef.current?.disconnect();
       textureGlitchRef.current?.disconnect();

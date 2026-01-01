@@ -28,7 +28,7 @@ export class GranularEngine {
   private reverbSend: GainNode;
   private delaySend: GainNode;
   private buffer: AudioBuffer | null = null;
-  private isPlaying = false;
+  private isRunning = false;
   private schedulerInterval: number | null = null;
   private params: GranularParams = { ...defaultGranularParams };
   private position = 0; // Current playback position (0-1)
@@ -105,7 +105,7 @@ export class GranularEngine {
   }
   
   private scheduleGrain(): void {
-    if (!this.buffer || !this.isPlaying) return;
+    if (!this.buffer || !this.isRunning) return;
     
     const ctx = audioEngine.getContext();
     const now = ctx.currentTime;
@@ -162,9 +162,9 @@ export class GranularEngine {
   }
   
   start(startPosition: number = 0): void {
-    if (this.isPlaying || !this.buffer) return;
+    if (this.isRunning || !this.buffer) return;
     
-    this.isPlaying = true;
+    this.isRunning = true;
     this.position = startPosition;
     
     // Calculate interval from grain density
@@ -176,9 +176,9 @@ export class GranularEngine {
   }
   
   stop(): void {
-    if (!this.isPlaying) return;
+    if (!this.isRunning) return;
     
-    this.isPlaying = false;
+    this.isRunning = false;
     
     if (this.schedulerInterval !== null) {
       clearInterval(this.schedulerInterval);
@@ -192,6 +192,10 @@ export class GranularEngine {
   
   getPosition(): number {
     return this.position;
+  }
+  
+  isPlaying(): boolean {
+    return this.isRunning;
   }
   
   setVolume(value: number): void {

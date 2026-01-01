@@ -173,6 +173,8 @@ const Index = () => {
     ringModParams: modulationState.ringMod,
     autoPanParams: modulationState.autoPan,
     onSliceStart: sampleState.startSliceProgress,
+    granularEnabled: sampleState.granularEnabled,
+    granularParams: sampleState.granularParams,
   });
 
   const handlePlayPause = useCallback(async () => {
