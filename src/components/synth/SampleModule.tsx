@@ -65,13 +65,16 @@ export const SampleModule = ({
   const [previewingSlice, setPreviewingSlice] = useState<number | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
 
-  // Observe canvas size changes - with reliable initial measurement
+  // Observe container size changes - observe parent for reliable dimensions
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    
+    const container = canvas.parentElement;
+    if (!container) return;
 
-    const measureCanvas = () => {
-      const rect = canvas.getBoundingClientRect();
+    const measureContainer = () => {
+      const rect = container.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         setCanvasDimensions({ width: rect.width, height: rect.height });
       }
@@ -79,7 +82,7 @@ export const SampleModule = ({
 
     // Initial measurement after browser paint
     requestAnimationFrame(() => {
-      measureCanvas();
+      measureContainer();
     });
 
     const observer = new ResizeObserver((entries) => {
@@ -92,7 +95,7 @@ export const SampleModule = ({
       }
     });
 
-    observer.observe(canvas);
+    observer.observe(container);
     return () => observer.disconnect();
   }, [buffer]);
 
@@ -132,12 +135,12 @@ export const SampleModule = ({
     canvas.height = canvasDimensions.height * 2;
 
     const { width, height } = canvas;
-    ctx.fillStyle = "hsl(var(--muted) / 0.3)";
+    ctx.fillStyle = "rgba(30, 35, 45, 0.5)";
     ctx.fillRect(0, 0, width, height);
 
     if (!buffer) {
       // No sample loaded - show placeholder
-      ctx.fillStyle = "hsl(var(--muted-foreground) / 0.3)";
+      ctx.fillStyle = "rgba(120, 130, 150, 0.6)";
       ctx.font = "24px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("Drop WAV here", width / 2, height / 2 + 8);
@@ -149,7 +152,7 @@ export const SampleModule = ({
     const step = Math.ceil(data.length / width);
     const amp = height / 2;
 
-    ctx.strokeStyle = "hsl(var(--primary))";
+    ctx.strokeStyle = "hsl(180, 100%, 50%)";
     ctx.lineWidth = 1;
     ctx.beginPath();
 
@@ -174,22 +177,22 @@ export const SampleModule = ({
       
       // Highlight active slice (playing) with stronger highlight
       if (activeSlice !== null && activeSlice >= 0 && activeSlice < params.sliceCount) {
-        ctx.fillStyle = "hsl(var(--chart-2) / 0.4)";
+        ctx.fillStyle = "rgba(34, 197, 94, 0.4)";
         ctx.fillRect(activeSlice * sliceWidth, 0, sliceWidth, height);
         
         // Draw glow border for active slice
-        ctx.strokeStyle = "hsl(var(--chart-2))";
+        ctx.strokeStyle = "hsl(142, 76%, 45%)";
         ctx.lineWidth = 3;
         ctx.strokeRect(activeSlice * sliceWidth + 1, 1, sliceWidth - 2, height - 2);
       }
       
       // Highlight previewing slice (click preview)
       if (previewingSlice !== null && previewingSlice !== activeSlice) {
-        ctx.fillStyle = "hsl(var(--primary) / 0.3)";
+        ctx.fillStyle = "rgba(0, 255, 255, 0.3)";
         ctx.fillRect(previewingSlice * sliceWidth, 0, sliceWidth, height);
       }
       
-      ctx.strokeStyle = "hsl(var(--chart-4) / 0.6)";
+      ctx.strokeStyle = "rgba(251, 191, 36, 0.6)";
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 4]);
 
@@ -204,17 +207,17 @@ export const SampleModule = ({
       ctx.setLineDash([]);
 
       // Draw slice numbers
-      ctx.fillStyle = "hsl(var(--chart-4) / 0.8)";
+      ctx.fillStyle = "rgba(251, 191, 36, 0.8)";
       ctx.font = "16px sans-serif";
       ctx.textAlign = "center";
       for (let i = 0; i < params.sliceCount; i++) {
         const x = (i + 0.5) * sliceWidth;
         // Highlight number if active
         if (i === activeSlice) {
-          ctx.fillStyle = "hsl(var(--chart-2))";
+          ctx.fillStyle = "hsl(142, 76%, 45%)";
           ctx.font = "bold 18px sans-serif";
         } else {
-          ctx.fillStyle = "hsl(var(--chart-4) / 0.8)";
+          ctx.fillStyle = "rgba(251, 191, 36, 0.8)";
           ctx.font = "16px sans-serif";
         }
         ctx.fillText(String(i + 1), x, 18);
@@ -222,7 +225,7 @@ export const SampleModule = ({
     } else if (params.playbackMode === "region") {
       // Draw start point marker
       const startX = params.startPoint * width;
-      ctx.strokeStyle = "hsl(var(--destructive))";
+      ctx.strokeStyle = "hsl(0, 85%, 55%)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(startX, 0);
@@ -231,14 +234,14 @@ export const SampleModule = ({
 
       // Draw loop end marker
       const endX = (params.startPoint + params.loopLength) * width;
-      ctx.strokeStyle = "hsl(var(--chart-2))";
+      ctx.strokeStyle = "hsl(142, 76%, 45%)";
       ctx.beginPath();
       ctx.moveTo(Math.min(endX, width), 0);
       ctx.lineTo(Math.min(endX, width), height);
       ctx.stroke();
 
       // Shade active region
-      ctx.fillStyle = "hsl(var(--primary) / 0.1)";
+      ctx.fillStyle = "rgba(0, 255, 255, 0.1)";
       ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
     }
     // Full mode: no markers needed, entire waveform is active
