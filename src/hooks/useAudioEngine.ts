@@ -506,6 +506,16 @@ export const useAudioEngine = ({
     sampleGlitchRef.current?.setBypass(trackRouting.sample.glitchBypass);
   }, [trackRouting, isInitialized]);
 
+  // Sync modulation bypass states to ModulationEngine
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const effects: ModEffect[] = ['chorus', 'flanger', 'phaser', 'tremolo', 'ringMod', 'autoPan'];
+    effects.forEach(effect => {
+      modulationEngine.setBypass(effect, modulationBypassed[effect]);
+    });
+  }, [modulationBypassed, isInitialized]);
+
   // Sync modulation send levels to engines
   useEffect(() => {
     if (!isInitialized) return;
