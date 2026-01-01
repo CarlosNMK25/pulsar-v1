@@ -1,8 +1,10 @@
-// Sample Engine - Loop player with pitch, start/loop points, reverse
+// Sample Engine - Loop player with pitch, start/loop points, reverse, playback modes
 
 import { audioEngine } from './AudioEngine';
 import { fxEngine } from './FXEngine';
 import { modulationEngine } from './ModulationEngine';
+
+export type PlaybackMode = 'full' | 'region' | 'slice';
 
 export interface SampleParams {
   pitch: number;      // 0.5 - 2.0 playback rate
@@ -11,6 +13,8 @@ export interface SampleParams {
   reverse: boolean;
   volume: number;     // 0-1
   loop: boolean;
+  playbackMode: PlaybackMode;
+  sliceCount: number; // 4, 8, 16, 32
 }
 
 export class SampleEngine {
@@ -36,6 +40,8 @@ export class SampleEngine {
     reverse: false,
     volume: 0.75,
     loop: true,
+    playbackMode: 'region',
+    sliceCount: 8,
   };
 
   constructor() {
@@ -215,7 +221,7 @@ export class SampleEngine {
   }
 
   trigger(): void {
-    // One-shot playback
+    // One-shot playback based on playbackMode
     if (!this.buffer) return;
 
     const ctx = audioEngine.getContext();
@@ -226,19 +232,76 @@ export class SampleEngine {
     player.buffer = buffer;
     player.playbackRate.value = this.params.pitch;
 
-    const startTime = this.params.startPoint * buffer.duration;
-    const duration = this.params.loopLength * buffer.duration;
+    let startTime: number;
+    let duration: number | undefined;
+
+    switch (this.params.playbackMode) {
+      case 'full':
+        // Play entire sample
+        startTime = 0;
+        duration = undefined; // Play to end
+        break;
+      case 'slice':
+        // In slice mode, trigger() plays slice 0 by default
+        // Use triggerSlice() for specific slices
+        startTime = 0;
+        duration = buffer.duration / this.params.sliceCount;
+        break;
+      case 'region':
+      default:
+        // Play defined region (original behavior)
+        startTime = this.params.startPoint * buffer.duration;
+        duration = this.params.loopLength * buffer.duration;
+        break;
+    }
 
     player.connect(this.outputGain);
     player.connect(this.reverbSend);
     player.connect(this.delaySend);
     player.connect(this.modulationSend);
 
-    player.start(0, startTime, duration);
+    if (duration !== undefined) {
+      player.start(0, startTime, duration);
+    } else {
+      player.start(0, startTime);
+    }
 
     player.onended = () => {
       player.disconnect();
     };
+  }
+
+  triggerSlice(sliceIndex: number): void {
+    // Play a specific slice
+    if (!this.buffer) return;
+
+    const ctx = audioEngine.getContext();
+    const buffer = this.params.reverse ? this.reversedBuffer : this.buffer;
+    if (!buffer) return;
+
+    const sliceCount = this.params.sliceCount;
+    const sliceDuration = buffer.duration / sliceCount;
+    const clampedIndex = Math.max(0, Math.min(sliceIndex, sliceCount - 1));
+    const startTime = clampedIndex * sliceDuration;
+
+    const player = ctx.createBufferSource();
+    player.buffer = buffer;
+    player.playbackRate.value = this.params.pitch;
+
+    player.connect(this.outputGain);
+    player.connect(this.reverbSend);
+    player.connect(this.delaySend);
+    player.connect(this.modulationSend);
+
+    player.start(0, startTime, sliceDuration);
+
+    player.onended = () => {
+      player.disconnect();
+    };
+  }
+
+  getParams(): SampleParams {
+    return { ...this.params };
   }
 
   getIsPlaying(): boolean {

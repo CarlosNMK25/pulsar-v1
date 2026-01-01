@@ -3,7 +3,7 @@ import { audioEngine, GlitchTarget } from '@/audio/AudioEngine';
 import { SynthVoice, WaveformType, LfoSyncDivision } from '@/audio/SynthVoice';
 import { DrumEngine } from '@/audio/DrumEngine';
 import { TextureEngine, TextureMode } from '@/audio/TextureEngine';
-import { SampleEngine, SampleParams } from '@/audio/SampleEngine';
+import { SampleEngine, SampleParams, PlaybackMode } from '@/audio/SampleEngine';
 import { scheduler, StepCallback } from '@/audio/Scheduler';
 import { fxEngine, SyncDivision } from '@/audio/FXEngine';
 import { macroEngine } from '@/audio/MacroEngine';
@@ -47,11 +47,12 @@ export interface Step {
   condition?: ConditionType;  // Conditional trigger
 }
 
-// Sample step type (simpler than synth steps)
+// Sample step type with slice support
 export interface SampleStep {
   active: boolean;
   velocity: number;
   probability: number;
+  sliceIndex: number; // Which slice to trigger (-1 = sequential)
 }
 
 interface UseAudioEngineProps {
@@ -828,13 +829,24 @@ export const useAudioEngine = ({
         triggerWithMicroTiming(synthTrigger, synth.pLocks?.microTiming);
       }
 
-      // Sample trigger based on steps
+      // Sample trigger based on steps with slice mode support
       const sampleStep = sampleSteps[step];
       if (sampleStep && sampleStep.active && !sampleMutedRef.current) {
         // Probability check
         if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
           anyFiredThisStep = true;
-          sampleRef.current?.trigger();
+          
+          const params = sampleRef.current?.getParams();
+          if (params?.playbackMode === 'slice') {
+            // In slice mode, determine which slice to play
+            const sliceIndex = sampleStep.sliceIndex >= 0 
+              ? sampleStep.sliceIndex 
+              : step % params.sliceCount; // Sequential: step maps to slice
+            sampleRef.current?.triggerSlice(sliceIndex);
+          } else {
+            // Full or Region mode: use normal trigger
+            sampleRef.current?.trigger();
+          }
         }
       }
 
