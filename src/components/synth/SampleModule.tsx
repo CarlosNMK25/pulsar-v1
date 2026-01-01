@@ -4,7 +4,7 @@ import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SampleParams } from '@/audio/SampleEngine';
+import { SampleParams, PlaybackMode } from '@/audio/SampleEngine';
 import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
 import { StepSequencer } from './StepSequencer';
@@ -54,7 +54,7 @@ export const SampleModule = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Draw waveform
+  // Draw waveform with slice visualization
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -101,27 +101,56 @@ export const SampleModule = ({
 
     ctx.stroke();
 
-    // Draw start point marker
-    const startX = params.startPoint * width;
-    ctx.strokeStyle = 'hsl(var(--destructive))';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(startX, 0);
-    ctx.lineTo(startX, height);
-    ctx.stroke();
+    // Draw based on playback mode
+    if (params.playbackMode === 'slice') {
+      // Draw slice dividers
+      const sliceWidth = width / params.sliceCount;
+      ctx.strokeStyle = 'hsl(var(--chart-4) / 0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      
+      for (let i = 1; i < params.sliceCount; i++) {
+        const x = i * sliceWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      
+      ctx.setLineDash([]);
+      
+      // Draw slice numbers
+      ctx.fillStyle = 'hsl(var(--chart-4) / 0.8)';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      for (let i = 0; i < params.sliceCount; i++) {
+        const x = (i + 0.5) * sliceWidth;
+        ctx.fillText(String(i + 1), x, 18);
+      }
+    } else if (params.playbackMode === 'region') {
+      // Draw start point marker
+      const startX = params.startPoint * width;
+      ctx.strokeStyle = 'hsl(var(--destructive))';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(startX, 0);
+      ctx.lineTo(startX, height);
+      ctx.stroke();
 
-    // Draw loop end marker
-    const endX = (params.startPoint + params.loopLength) * width;
-    ctx.strokeStyle = 'hsl(var(--chart-2))';
-    ctx.beginPath();
-    ctx.moveTo(Math.min(endX, width), 0);
-    ctx.lineTo(Math.min(endX, width), height);
-    ctx.stroke();
+      // Draw loop end marker
+      const endX = (params.startPoint + params.loopLength) * width;
+      ctx.strokeStyle = 'hsl(var(--chart-2))';
+      ctx.beginPath();
+      ctx.moveTo(Math.min(endX, width), 0);
+      ctx.lineTo(Math.min(endX, width), height);
+      ctx.stroke();
 
-    // Shade active region
-    ctx.fillStyle = 'hsl(var(--primary) / 0.1)';
-    ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
-  }, [buffer, params.startPoint, params.loopLength]);
+      // Shade active region
+      ctx.fillStyle = 'hsl(var(--primary) / 0.1)';
+      ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
+    }
+    // Full mode: no markers needed, entire waveform is active
+  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     const validation = validateAudioFile(file);
@@ -160,7 +189,7 @@ export const SampleModule = ({
     e.preventDefault();
   }, []);
 
-  const updateParam = (key: keyof SampleParams, value: number | boolean) => {
+  const updateParam = <K extends keyof SampleParams>(key: K, value: SampleParams[K]) => {
     onParamsChange({ ...params, [key]: value });
   };
 
@@ -218,12 +247,58 @@ export const SampleModule = ({
 
         {/* Waveform display */}
         <div
-          className="waveform-container h-16 cursor-pointer"
+          className="waveform-container h-20 cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
           <canvas ref={canvasRef} className="w-full h-full" />
         </div>
+
+        {/* Playback Mode Selector */}
+        {buffer && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Mode:</span>
+            <div className="flex gap-1 flex-1">
+              {(['full', 'region', 'slice'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => updateParam('playbackMode', mode)}
+                  className={cn(
+                    'flex-1 py-1 text-xs uppercase tracking-wider rounded border transition-colors',
+                    params.playbackMode === mode
+                      ? 'border-primary bg-primary/20 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  )}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Slice Count Selector - only in slice mode */}
+        {buffer && params.playbackMode === 'slice' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Slices:</span>
+            <div className="flex gap-1 flex-1">
+              {[4, 8, 16, 32].map((count) => (
+                <button
+                  key={count}
+                  onClick={() => updateParam('sliceCount', count)}
+                  className={cn(
+                    'flex-1 py-1 text-xs rounded border transition-colors',
+                    params.sliceCount === count
+                      ? 'border-chart-4 bg-chart-4/20 text-chart-4'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  )}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Step Sequencer - shown when sample is loaded */}
         {buffer && (
@@ -247,26 +322,33 @@ export const SampleModule = ({
           </div>
         )}
 
-        {/* Parameters */}
-        <div className="grid grid-cols-4 gap-3 pt-2">
+        {/* Parameters - show Start/Length only in region mode */}
+        <div className={cn(
+          "grid gap-3 pt-2",
+          params.playbackMode === 'region' ? 'grid-cols-4' : 'grid-cols-2'
+        )}>
           <Knob
             value={(params.pitch - 0.5) / 1.5 * 100}
             onChange={(v) => updateParam('pitch', 0.5 + (v / 100) * 1.5)}
             label="Pitch"
             size="sm"
           />
-          <Knob
-            value={params.startPoint * 100}
-            onChange={(v) => updateParam('startPoint', v / 100)}
-            label="Start"
-            size="sm"
-          />
-          <Knob
-            value={params.loopLength * 100}
-            onChange={(v) => updateParam('loopLength', Math.max(0.01, v / 100))}
-            label="Length"
-            size="sm"
-          />
+          {params.playbackMode === 'region' && (
+            <>
+              <Knob
+                value={params.startPoint * 100}
+                onChange={(v) => updateParam('startPoint', v / 100)}
+                label="Start"
+                size="sm"
+              />
+              <Knob
+                value={params.loopLength * 100}
+                onChange={(v) => updateParam('loopLength', Math.max(0.01, v / 100))}
+                label="Length"
+                size="sm"
+              />
+            </>
+          )}
           <Knob
             value={params.volume * 100}
             onChange={(v) => updateParam('volume', v / 100)}

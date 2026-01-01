@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
-import { SampleParams } from '@/audio/SampleEngine';
+import { SampleParams, PlaybackMode } from '@/audio/SampleEngine';
 
 // Step type for sample sequencer
 export interface SampleStep {
   active: boolean;
   velocity: number;
   probability: number;
+  sliceIndex: number; // Which slice this step triggers (-1 = sequential)
 }
 
 export interface SampleState {
@@ -23,10 +24,17 @@ export const defaultSampleParams: SampleParams = {
   reverse: false,
   volume: 0.75,
   loop: true,
+  playbackMode: 'region',
+  sliceCount: 8,
 };
 
 const createDefaultSteps = (length: number): SampleStep[] =>
-  Array(length).fill(null).map(() => ({ active: false, velocity: 100, probability: 100 }));
+  Array(length).fill(null).map((_, i) => ({ 
+    active: false, 
+    velocity: 100, 
+    probability: 100,
+    sliceIndex: -1, // -1 means sequential (step 0 -> slice 0, step 1 -> slice 1, etc.)
+  }));
 
 export const useSampleState = () => {
   const [sampleBuffer, setSampleBuffer] = useState<AudioBuffer | null>(null);
