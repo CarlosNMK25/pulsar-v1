@@ -126,6 +126,7 @@ const Index = () => {
     triggerDrum,
     triggerSample,
     handlePreviewSlice,
+    handlePreviewPosition,
     volumes,
     setChannelVolume,
   } = useAudioEngine({
@@ -387,6 +388,10 @@ const Index = () => {
                 steps={sampleState.sampleSteps}
                 currentStep={currentStep}
                 patternLength={sampleState.sampleSteps.length}
+                granularEnabled={sampleState.granularEnabled}
+                granularParams={sampleState.granularParams}
+                customSliceMarkers={sampleState.customSliceMarkers}
+                sliceEnvelope={sampleState.sliceEnvelope}
                 onLoadSample={async (buffer, name) => {
                   if (!isInitialized) {
                     await initAudio();
@@ -405,6 +410,11 @@ const Index = () => {
                 onPatternGenerate={sampleState.setSampleSteps}
                 onPatternLengthChange={sampleState.setSamplePatternLength}
                 onPreviewSlice={handlePreviewSlice}
+                onGranularEnabledChange={sampleState.setGranularEnabled}
+                onGranularParamsChange={(params) => sampleState.setGranularParams(prev => ({ ...prev, ...params }))}
+                onCustomSliceMarkersChange={sampleState.setCustomSliceMarkers}
+                onSliceEnvelopeChange={sampleState.setSliceEnvelope}
+                onPreviewPosition={handlePreviewPosition}
               />
             </div>
           </CollapsibleSection>

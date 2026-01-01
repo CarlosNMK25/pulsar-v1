@@ -12,6 +12,8 @@ import { EuclideanControls } from "./EuclideanControls";
 import { SampleStep, SamplePLocks } from "@/hooks/useSampleState";
 import type { PLocks } from "@/hooks/useAudioEngine";
 import { SampleProModal } from "./SampleProModal";
+import { GranularParams } from "@/audio/GranularEngine";
+import { SliceEnvelope } from "@/hooks/useSampleState";
 
 interface SampleModuleProps {
   buffer: AudioBuffer | null;
@@ -25,6 +27,14 @@ interface SampleModuleProps {
   steps: SampleStep[];
   currentStep: number;
   patternLength: number;
+  // Granular state
+  granularEnabled: boolean;
+  granularParams: GranularParams;
+  // Custom slice markers
+  customSliceMarkers: number[] | null;
+  // Slice envelope
+  sliceEnvelope: SliceEnvelope;
+  // Callbacks
   onLoadSample: (buffer: AudioBuffer, name: string) => void;
   onClearSample: () => void;
   onParamsChange: (params: SampleParams) => void;
@@ -37,6 +47,15 @@ interface SampleModuleProps {
   onPatternGenerate: (steps: SampleStep[]) => void;
   onPatternLengthChange: (length: number) => void;
   onPreviewSlice: (sliceIndex: number) => void;
+  // Granular callbacks
+  onGranularEnabledChange: (enabled: boolean) => void;
+  onGranularParamsChange: (params: Partial<GranularParams>) => void;
+  // Custom slice markers callback
+  onCustomSliceMarkersChange: (markers: number[] | null) => void;
+  // Slice envelope callback
+  onSliceEnvelopeChange: (envelope: SliceEnvelope) => void;
+  // Preview position callback
+  onPreviewPosition: (position: number) => void;
 }
 
 export const SampleModule = ({
@@ -50,6 +69,10 @@ export const SampleModule = ({
   steps,
   currentStep,
   patternLength,
+  granularEnabled,
+  granularParams,
+  customSliceMarkers,
+  sliceEnvelope,
   onLoadSample,
   onClearSample,
   onParamsChange,
@@ -62,6 +85,11 @@ export const SampleModule = ({
   onPatternGenerate,
   onPatternLengthChange,
   onPreviewSlice,
+  onGranularEnabledChange,
+  onGranularParamsChange,
+  onCustomSliceMarkersChange,
+  onSliceEnvelopeChange,
+  onPreviewPosition,
 }: SampleModuleProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -562,6 +590,15 @@ export const SampleModule = ({
           params={params}
           onLoadSample={onLoadSample}
           onParamsChange={onParamsChange}
+          granularEnabled={granularEnabled}
+          granularParams={granularParams}
+          onGranularEnabledChange={onGranularEnabledChange}
+          onGranularParamsChange={onGranularParamsChange}
+          customSliceMarkers={customSliceMarkers}
+          onCustomSliceMarkersChange={onCustomSliceMarkersChange}
+          sliceEnvelope={sliceEnvelope}
+          onSliceEnvelopeChange={onSliceEnvelopeChange}
+          onPreviewPosition={onPreviewPosition}
         />
       </div>
     </ModuleCard>

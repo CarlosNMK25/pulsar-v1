@@ -8,11 +8,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SampleParams } from '@/audio/SampleEngine';
 import { GranularParams } from '@/audio/GranularEngine';
+import { SliceEnvelope } from '@/hooks/useSampleState';
 import { WaveformEditor } from './sample-pro/WaveformEditor';
 import { TransientDetector } from './sample-pro/TransientDetector';
 import { GranularControls } from './sample-pro/GranularControls';
 import { RecordingPanel } from './sample-pro/RecordingPanel';
 import { ProcessingTools } from './sample-pro/ProcessingTools';
+import { EnvelopeEditor } from './sample-pro/EnvelopeEditor';
 import { AudioWaveform, Zap, Waves, Mic, Wrench } from 'lucide-react';
 
 interface SampleProModalProps {
@@ -23,6 +25,19 @@ interface SampleProModalProps {
   params: SampleParams;
   onLoadSample: (buffer: AudioBuffer, name: string) => void;
   onParamsChange: (params: SampleParams) => void;
+  // Granular state (global)
+  granularEnabled: boolean;
+  granularParams: GranularParams;
+  onGranularEnabledChange: (enabled: boolean) => void;
+  onGranularParamsChange: (params: Partial<GranularParams>) => void;
+  // Custom slice markers
+  customSliceMarkers: number[] | null;
+  onCustomSliceMarkersChange: (markers: number[] | null) => void;
+  // Slice envelope
+  sliceEnvelope: SliceEnvelope;
+  onSliceEnvelopeChange: (envelope: SliceEnvelope) => void;
+  // Preview callback
+  onPreviewPosition: (position: number) => void;
 }
 
 export const SampleProModal = ({
@@ -33,29 +48,32 @@ export const SampleProModal = ({
   params,
   onLoadSample,
   onParamsChange,
+  granularEnabled,
+  granularParams,
+  onGranularEnabledChange,
+  onGranularParamsChange,
+  customSliceMarkers,
+  onCustomSliceMarkersChange,
+  sliceEnvelope,
+  onSliceEnvelopeChange,
+  onPreviewPosition,
 }: SampleProModalProps) => {
-  const [sliceMarkers, setSliceMarkers] = useState<number[]>([]);
   const [transientPositions, setTransientPositions] = useState<number[]>([]);
   const [showTransients, setShowTransients] = useState(false);
-  const [granularEnabled, setGranularEnabled] = useState(false);
-  const [granularParams, setGranularParams] = useState<GranularParams>({
-    grainSize: 100,
-    grainDensity: 10,
-    pitchScatter: 0,
-    positionScatter: 0,
-    timeStretch: 1.0,
-    pitchShift: 0,
-    windowType: 'hann',
-  });
+  
+  // Local slice markers for editing (synced from global on open)
+  const [localSliceMarkers, setLocalSliceMarkers] = useState<number[]>(
+    customSliceMarkers || []
+  );
 
-  // Generate initial slice markers from params
+  // Generate initial slice markers from params if needed
   useState(() => {
-    if (params.playbackMode === 'slice') {
+    if (params.playbackMode === 'slice' && !customSliceMarkers) {
       const markers: number[] = [];
       for (let i = 0; i < params.sliceCount; i++) {
         markers.push(i / params.sliceCount);
       }
-      setSliceMarkers(markers);
+      setLocalSliceMarkers(markers);
     }
   });
 
@@ -65,10 +83,12 @@ export const SampleProModal = ({
   }, []);
 
   const handleApplySlices = useCallback((markers: number[]) => {
-    setSliceMarkers(markers);
+    setLocalSliceMarkers(markers);
+    // Persist to global state
+    onCustomSliceMarkersChange(markers);
     // Update the slice count in params
     onParamsChange({ ...params, sliceCount: markers.length, playbackMode: 'slice' });
-  }, [params, onParamsChange]);
+  }, [params, onParamsChange, onCustomSliceMarkersChange]);
 
   const handleBufferProcessed = useCallback((newBuffer: AudioBuffer, suffix: string) => {
     const newName = sampleName.replace(/\.[^.]+$/, '') + `-${suffix}.wav`;
@@ -80,9 +100,9 @@ export const SampleProModal = ({
   }, [onLoadSample]);
 
   const handlePositionClick = useCallback((position: number) => {
-    // Preview at this position
-    console.log('Preview at position:', position);
-  }, []);
+    // Preview at this position using the real audio engine
+    onPreviewPosition(position);
+  }, [onPreviewPosition]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,11 +141,18 @@ export const SampleProModal = ({
           <TabsContent value="waveform" className="space-y-4 mt-4">
             <WaveformEditor
               buffer={buffer}
-              sliceMarkers={sliceMarkers}
+              sliceMarkers={localSliceMarkers}
               transientPositions={transientPositions}
               showTransients={showTransients}
-              onSliceMarkersChange={setSliceMarkers}
+              onSliceMarkersChange={(markers) => {
+                setLocalSliceMarkers(markers);
+                onCustomSliceMarkersChange(markers);
+              }}
               onPositionClick={handlePositionClick}
+            />
+            <EnvelopeEditor
+              envelope={sliceEnvelope}
+              onChange={onSliceEnvelopeChange}
             />
             <div className="text-xs text-muted-foreground">
               Drag markers to adjust slice points. Click to preview position.
@@ -136,10 +163,13 @@ export const SampleProModal = ({
           <TabsContent value="transients" className="space-y-4 mt-4">
             <WaveformEditor
               buffer={buffer}
-              sliceMarkers={sliceMarkers}
+              sliceMarkers={localSliceMarkers}
               transientPositions={transientPositions}
               showTransients={showTransients}
-              onSliceMarkersChange={setSliceMarkers}
+              onSliceMarkersChange={(markers) => {
+                setLocalSliceMarkers(markers);
+                onCustomSliceMarkersChange(markers);
+              }}
               onPositionClick={handlePositionClick}
             />
             <TransientDetector
@@ -153,8 +183,8 @@ export const SampleProModal = ({
             <GranularControls
               params={granularParams}
               enabled={granularEnabled}
-              onParamsChange={(p) => setGranularParams({ ...granularParams, ...p })}
-              onEnabledChange={setGranularEnabled}
+              onParamsChange={onGranularParamsChange}
+              onEnabledChange={onGranularEnabledChange}
             />
             <div className="text-xs text-muted-foreground">
               Granular synthesis breaks the sample into tiny grains for time-stretching,
