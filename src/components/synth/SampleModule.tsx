@@ -63,6 +63,26 @@ export const SampleModule = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewingSlice, setPreviewingSlice] = useState<number | null>(null);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+
+  // Observe canvas size changes
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setCanvasDimensions({ width, height });
+        }
+      }
+    });
+
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   // Handle click on waveform to preview slice
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -89,11 +109,15 @@ export const SampleModule = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Guard: don't draw if dimensions aren't ready
+    if (canvasDimensions.width === 0 || canvasDimensions.height === 0) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth * 2;
-    canvas.height = canvas.offsetHeight * 2;
+    // Set canvas dimensions for retina displays
+    canvas.width = canvasDimensions.width * 2;
+    canvas.height = canvasDimensions.height * 2;
 
     const { width, height } = canvas;
     ctx.fillStyle = "hsl(var(--muted) / 0.3)";
@@ -206,7 +230,7 @@ export const SampleModule = ({
       ctx.fillRect(startX, 0, Math.min(endX, width) - startX, height);
     }
     // Full mode: no markers needed, entire waveform is active
-  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice, activeSlice]);
+  }, [buffer, params.startPoint, params.loopLength, params.playbackMode, params.sliceCount, previewingSlice, activeSlice, canvasDimensions]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
