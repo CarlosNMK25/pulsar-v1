@@ -175,6 +175,7 @@ const Index = () => {
     onSliceStart: sampleState.startSliceProgress,
     granularEnabled: sampleState.granularEnabled,
     granularParams: sampleState.granularParams,
+    sliceEnvelope: sampleState.sliceEnvelope,
   });
 
   const handlePlayPause = useCallback(async () => {
