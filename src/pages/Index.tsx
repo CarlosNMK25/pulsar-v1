@@ -379,7 +379,10 @@ const Index = () => {
                 steps={sampleState.sampleSteps}
                 currentStep={currentStep}
                 patternLength={sampleState.sampleSteps.length}
-                onLoadSample={(buffer, name) => {
+                onLoadSample={async (buffer, name) => {
+                  if (!isInitialized) {
+                    await initAudio();
+                  }
                   sampleState.setSampleBuffer(buffer);
                   sampleState.setSampleName(name);
                 }}
