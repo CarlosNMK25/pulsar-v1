@@ -217,21 +217,44 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header with panel toggles and status */}
-      <Header 
-        projectName="Untitled Session"
-        onToggleLeftPanel={uiLayout.toggleLeftPanel}
-        onToggleRightPanel={uiLayout.toggleRightPanel}
-        onToggleDock={uiLayout.cycleDockState}
-        leftPanelOpen={uiLayout.leftPanelOpen}
-        rightPanelOpen={uiLayout.rightPanelOpen}
-        dockState={uiLayout.dockState}
-        currentStep={currentStep}
-        activeSceneName={sceneManager.scenes.find(s => s.id === sceneManager.activeScene)?.name}
-        morphTargetName={sceneManager.morphTargetScene ? sceneManager.scenes.find(s => s.id === sceneManager.morphTargetScene)?.name : undefined}
-        audioState={audioState}
-        isInitialized={isInitialized}
-      />
+      {/* Sticky top zone: Header + Transport */}
+      <div className="sticky top-0 z-50">
+        <Header 
+          projectName="Untitled Session"
+          onToggleLeftPanel={uiLayout.toggleLeftPanel}
+          onToggleRightPanel={uiLayout.toggleRightPanel}
+          onToggleDock={uiLayout.cycleDockState}
+          leftPanelOpen={uiLayout.leftPanelOpen}
+          rightPanelOpen={uiLayout.rightPanelOpen}
+          dockState={uiLayout.dockState}
+          currentStep={currentStep}
+          activeSceneName={sceneManager.scenes.find(s => s.id === sceneManager.activeScene)?.name}
+          morphTargetName={sceneManager.morphTargetScene ? sceneManager.scenes.find(s => s.id === sceneManager.morphTargetScene)?.name : undefined}
+          audioState={audioState}
+          isInitialized={isInitialized}
+        />
+        <div className="border-b border-border bg-card/95 backdrop-blur-md px-6 py-3 shadow-sm">
+          <TransportControls
+            isPlaying={isPlaying}
+            bpm={bpm}
+            swing={swing}
+            humanize={humanize}
+            isRecording={isRecording}
+            recordingTime={recordingTime}
+            fillActive={fillActive}
+            onPlayPause={handlePlayPause}
+            onStop={handleStop}
+            onBpmChange={setBpm}
+            onSwingChange={setSwing}
+            onHumanizeChange={setHumanize}
+            onRecordStart={startRecording}
+            onRecordStop={stopRecording}
+            onFillActivate={setFillActive}
+            autoFillConfig={autoFillConfig}
+            onAutoFillConfigChange={setAutoFillConfig}
+          />
+        </div>
+      </div>
 
       {/* Main content */}
       <main 
@@ -239,29 +262,62 @@ const Index = () => {
         style={{ paddingBottom: dockHeight + 24 }}
       >
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Transport & Waveform */}
-          <div className="space-y-4">
-            <TransportControls
-              isPlaying={isPlaying}
-              bpm={bpm}
-              swing={swing}
-              humanize={humanize}
-              isRecording={isRecording}
-              recordingTime={recordingTime}
-              fillActive={fillActive}
-              onPlayPause={handlePlayPause}
-              onStop={handleStop}
-              onBpmChange={setBpm}
-              onSwingChange={setSwing}
-              onHumanizeChange={setHumanize}
-              onRecordStart={startRecording}
-              onRecordStop={stopRecording}
-              onFillActivate={setFillActive}
-              autoFillConfig={autoFillConfig}
-              onAutoFillConfigChange={setAutoFillConfig}
-            />
-            <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
-          </div>
+          {/* Waveform Display */}
+          <GlitchWaveformDisplay isPlaying={isPlaying} analyserData={analyserData} />
+
+          {/* CONTROL - Performance (moved to top) */}
+          <CollapsibleSection
+            title="Control"
+            isOpen={uiLayout.controlOpen}
+            onToggle={uiLayout.toggleControl}
+            moduleCount={3}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="module">
+                  <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
+                </div>
+                <div className="module">
+                  <SceneSlots
+                    scenes={sceneManager.scenes}
+                    activeScene={sceneManager.activeScene}
+                    morphTargetScene={sceneManager.morphTargetScene}
+                    savedSceneIds={sceneManager.savedSceneIds}
+                    hasClipboard={sceneManager.hasClipboard}
+                    clipboardName={sceneManager.clipboardName}
+                    onSceneSelect={sceneManager.handleSceneSelect}
+                    onSceneSave={sceneManager.handleSceneSave}
+                    onMorphTargetSet={sceneManager.handleMorphTargetSet}
+                    onSceneCopy={sceneManager.handleSceneCopy}
+                    onScenePaste={sceneManager.handleScenePaste}
+                    onSceneRename={sceneManager.handleSceneRename}
+                    onLoadPreset={sceneManager.handleLoadPreset}
+                    onExportScene={sceneManager.handleExportScene}
+                    onExportAll={sceneManager.handleExportAll}
+                    onImportScene={sceneManager.handleImportScene}
+                    onImportAll={sceneManager.handleImportAll}
+                  />
+                </div>
+              </div>
+              {/* Pattern Chain */}
+              <div className="module">
+                <PatternChain
+                  config={patternChain.config}
+                  currentChainIndex={patternChain.currentChainIndex}
+                  isChainActive={patternChain.isChainActive}
+                  scenes={sceneManager.scenes}
+                  savedSceneIds={sceneManager.savedSceneIds}
+                  activeScene={sceneManager.activeScene}
+                  onAddToChain={patternChain.addToChain}
+                  onRemoveFromChain={patternChain.removeFromChain}
+                  onBarsPerPatternChange={patternChain.setBarsPerPattern}
+                  onLoopChainChange={patternChain.setLoopChain}
+                  onToggleEnabled={patternChain.toggleChainEnabled}
+                  onClearChain={patternChain.clearChain}
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
 
           {/* GENERADORES - Sound Sources */}
           <CollapsibleSection
@@ -498,59 +554,6 @@ const Index = () => {
             </div>
           </CollapsibleSection>
 
-          {/* CONTROL - Performance */}
-          <CollapsibleSection
-            title="Control"
-            isOpen={uiLayout.controlOpen}
-            onToggle={uiLayout.toggleControl}
-            moduleCount={3}
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="module">
-                  <MacroKnobs macros={sceneManager.macros} onMacroChange={handleMacroChange} />
-                </div>
-                <div className="module">
-                  <SceneSlots
-                    scenes={sceneManager.scenes}
-                    activeScene={sceneManager.activeScene}
-                    morphTargetScene={sceneManager.morphTargetScene}
-                    savedSceneIds={sceneManager.savedSceneIds}
-                    hasClipboard={sceneManager.hasClipboard}
-                    clipboardName={sceneManager.clipboardName}
-                    onSceneSelect={sceneManager.handleSceneSelect}
-                    onSceneSave={sceneManager.handleSceneSave}
-                    onMorphTargetSet={sceneManager.handleMorphTargetSet}
-                    onSceneCopy={sceneManager.handleSceneCopy}
-                    onScenePaste={sceneManager.handleScenePaste}
-                    onSceneRename={sceneManager.handleSceneRename}
-                    onLoadPreset={sceneManager.handleLoadPreset}
-                    onExportScene={sceneManager.handleExportScene}
-                    onExportAll={sceneManager.handleExportAll}
-                    onImportScene={sceneManager.handleImportScene}
-                    onImportAll={sceneManager.handleImportAll}
-                  />
-                </div>
-              </div>
-              {/* Pattern Chain */}
-              <div className="module">
-                <PatternChain
-                  config={patternChain.config}
-                  currentChainIndex={patternChain.currentChainIndex}
-                  isChainActive={patternChain.isChainActive}
-                  scenes={sceneManager.scenes}
-                  savedSceneIds={sceneManager.savedSceneIds}
-                  activeScene={sceneManager.activeScene}
-                  onAddToChain={patternChain.addToChain}
-                  onRemoveFromChain={patternChain.removeFromChain}
-                  onBarsPerPatternChange={patternChain.setBarsPerPattern}
-                  onLoopChainChange={patternChain.setLoopChain}
-                  onToggleEnabled={patternChain.toggleChainEnabled}
-                  onClearChain={patternChain.clearChain}
-                />
-              </div>
-            </div>
-          </CollapsibleSection>
         </div>
       </main>
 
