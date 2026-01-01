@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { Music, Upload, X, Play, Square } from "lucide-react";
+import { Music, Upload, X, Play, Square, Sparkles } from "lucide-react";
 import { ModuleCard } from "./ModuleCard";
 import { Knob } from "./Knob";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { StepSequencer } from "./StepSequencer";
 import { EuclideanControls } from "./EuclideanControls";
 import { SampleStep, SamplePLocks } from "@/hooks/useSampleState";
 import type { PLocks } from "@/hooks/useAudioEngine";
+import { SampleProModal } from "./SampleProModal";
 
 interface SampleModuleProps {
   buffer: AudioBuffer | null;
@@ -66,6 +67,7 @@ export const SampleModule = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewingSlice, setPreviewingSlice] = useState<number | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [proModalOpen, setProModalOpen] = useState(false);
 
   // Observe container size changes - observe parent for reliable dimensions
   useEffect(() => {
@@ -354,6 +356,14 @@ export const SampleModule = ({
               <Button variant={isPlaying ? "default" : "outline"} size="sm" onClick={onPlayToggle}>
                 {isPlaying ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setProModalOpen(true)}
+                className="text-chart-5 border-chart-5/50 hover:bg-chart-5/10"
+              >
+                <Sparkles className="w-3 h-3" />
+              </Button>
               <Button variant="ghost" size="sm" onClick={onClearSample}>
                 <X className="w-3 h-3" />
               </Button>
@@ -541,6 +551,17 @@ export const SampleModule = ({
           accept=".wav,.mp3,.ogg,.flac"
           className="hidden"
           onChange={handleFileInputChange}
+        />
+
+        {/* PRO Modal */}
+        <SampleProModal
+          open={proModalOpen}
+          onOpenChange={setProModalOpen}
+          buffer={buffer}
+          sampleName={sampleName}
+          params={params}
+          onLoadSample={onLoadSample}
+          onParamsChange={onParamsChange}
         />
       </div>
     </ModuleCard>
