@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shuffle, Target, Trash2, RotateCcw, RotateCw, Dna } from 'lucide-react';
+import { Shuffle, Target, Trash2, RotateCcw, RotateCw, Dna, FlipVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -13,6 +13,7 @@ import {
   generateRandom, 
   mutatePattern,
   shiftPattern,
+  invertPattern,
   euclideanPresets, 
   EuclideanPresetName 
 } from '@/audio/EuclideanGenerator';
@@ -41,12 +42,16 @@ export const EuclideanControls = ({
   const [rotation, setRotation] = useState(0);
   const [randomDensity, setRandomDensity] = useState(0.5);
   const [mutationRate, setMutationRate] = useState(0.2);
+  const [velocityMode, setVelocityMode] = useState<'fixed' | 'random'>('random');
+
+  const generateVelocity = () => 
+    velocityMode === 'fixed' ? 100 : 80 + Math.random() * 40;
 
   const applyEuclidean = () => {
     const { steps } = generateEuclidean(pulses, patternLength, rotation);
     const newSteps: Step[] = steps.map((active) => ({
       active,
-      velocity: 80 + Math.random() * 40,
+      velocity: generateVelocity(),
       probability: 100,
     }));
     onPatternGenerate(newSteps);
@@ -60,7 +65,7 @@ export const EuclideanControls = ({
     const { steps } = generateEuclidean(adaptedPulses, patternLength, preset.rotation);
     const newSteps: Step[] = steps.map((active) => ({
       active,
-      velocity: 80 + Math.random() * 40,
+      velocity: generateVelocity(),
       probability: 100,
     }));
     onPatternGenerate(newSteps);
@@ -71,7 +76,7 @@ export const EuclideanControls = ({
     const steps = generateRandom(patternLength, randomDensity);
     const newSteps: Step[] = steps.map((active) => ({
       active,
-      velocity: 80 + Math.random() * 40,
+      velocity: generateVelocity(),
       probability: 100,
     }));
     onPatternGenerate(newSteps);
@@ -93,7 +98,7 @@ export const EuclideanControls = ({
     const mutated = mutatePattern(boolPattern, mutationRate);
     const newSteps: Step[] = mutated.map((active, i) => ({
       active,
-      velocity: currentSteps[i]?.velocity ?? 80 + Math.random() * 40,
+      velocity: currentSteps[i]?.velocity ?? generateVelocity(),
       probability: currentSteps[i]?.probability ?? 100,
     }));
     onPatternGenerate(newSteps);
@@ -106,7 +111,20 @@ export const EuclideanControls = ({
     const shifted = shiftPattern(boolPattern, direction === 'left' ? -1 : 1);
     const newSteps: Step[] = shifted.map((active, i) => ({
       active,
-      velocity: currentSteps[i]?.velocity ?? 80 + Math.random() * 40,
+      velocity: currentSteps[i]?.velocity ?? generateVelocity(),
+      probability: currentSteps[i]?.probability ?? 100,
+    }));
+    onPatternGenerate(newSteps);
+  };
+
+  const applyInvert = () => {
+    if (!currentSteps || currentSteps.length === 0) return;
+    
+    const boolPattern = currentSteps.map(s => s.active);
+    const inverted = invertPattern(boolPattern);
+    const newSteps: Step[] = inverted.map((active, i) => ({
+      active,
+      velocity: currentSteps[i]?.velocity ?? generateVelocity(),
       probability: currentSteps[i]?.probability ?? 100,
     }));
     onPatternGenerate(newSteps);
@@ -120,6 +138,22 @@ export const EuclideanControls = ({
 
   return (
     <div className="flex items-center gap-1">
+      {/* Velocity Mode Toggle */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'h-6 px-1.5 font-mono text-xs',
+          velocityMode === 'fixed' 
+            ? 'bg-primary/20 text-primary' 
+            : variantColors[variant]
+        )}
+        onClick={() => setVelocityMode(m => m === 'fixed' ? 'random' : 'fixed')}
+        title={velocityMode === 'fixed' ? 'Velocity: Fixed (100)' : 'Velocity: Random (80-120)'}
+      >
+        {velocityMode === 'fixed' ? 'F' : 'V'}
+      </Button>
+
       {/* Euclidean Generator */}
       <Popover open={euclideanOpen} onOpenChange={setEuclideanOpen}>
         <PopoverTrigger asChild>
@@ -302,6 +336,18 @@ export const EuclideanControls = ({
         disabled={!currentSteps || currentSteps.length === 0}
       >
         <RotateCw className="w-3 h-3" />
+      </Button>
+
+      {/* Invert Pattern */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn('h-6 px-1.5', variantColors[variant])}
+        onClick={applyInvert}
+        title="Invert Pattern"
+        disabled={!currentSteps || currentSteps.length === 0}
+      >
+        <FlipVertical className="w-3 h-3" />
       </Button>
 
       {/* Clear */}
