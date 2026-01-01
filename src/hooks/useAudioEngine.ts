@@ -648,11 +648,19 @@ export const useAudioEngine = ({
     }
   }, [isPlaying, textureMuted]);
 
-  // Sample engine: load buffer
+  // Sample engine: load buffer with auto-restart
   useEffect(() => {
     if (!sampleRef.current) return;
+    
+    const wasPlaying = sampleRef.current.getIsPlaying();
+    
     if (sampleBuffer) {
+      // loadSample now stops current playback internally
       sampleRef.current.loadSample(sampleBuffer);
+      // Restart if was playing
+      if (wasPlaying) {
+        sampleRef.current.start();
+      }
     } else {
       sampleRef.current.clearSample();
     }
