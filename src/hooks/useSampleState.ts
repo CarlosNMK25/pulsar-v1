@@ -1,11 +1,19 @@
 import { useState, useCallback } from 'react';
 import { SampleParams } from '@/audio/SampleEngine';
 
+// Step type for sample sequencer
+export interface SampleStep {
+  active: boolean;
+  velocity: number;
+  probability: number;
+}
+
 export interface SampleState {
   sampleBuffer: AudioBuffer | null;
   sampleName: string;
   sampleMuted: boolean;
   sampleParams: SampleParams;
+  sampleSteps: SampleStep[];
 }
 
 export const defaultSampleParams: SampleParams = {
@@ -17,11 +25,15 @@ export const defaultSampleParams: SampleParams = {
   loop: true,
 };
 
+const createDefaultSteps = (length: number): SampleStep[] =>
+  Array(length).fill(null).map(() => ({ active: false, velocity: 100, probability: 100 }));
+
 export const useSampleState = () => {
   const [sampleBuffer, setSampleBuffer] = useState<AudioBuffer | null>(null);
   const [sampleName, setSampleName] = useState<string>('');
   const [sampleMuted, setSampleMuted] = useState(false);
   const [sampleParams, setSampleParams] = useState<SampleParams>(defaultSampleParams);
+  const [sampleSteps, setSampleSteps] = useState<SampleStep[]>(createDefaultSteps(16));
 
   const toggleSampleMute = useCallback(() => {
     setSampleMuted(prev => !prev);
@@ -32,12 +44,35 @@ export const useSampleState = () => {
     setSampleName('');
   }, []);
 
+  // Step manipulation functions
+  const toggleSampleStep = useCallback((index: number) => {
+    setSampleSteps(prev => prev.map((step, i) =>
+      i === index ? { ...step, active: !step.active } : step
+    ));
+  }, []);
+
+  const setSampleStepVelocity = useCallback((index: number, velocity: number) => {
+    setSampleSteps(prev => prev.map((step, i) =>
+      i === index ? { ...step, velocity } : step
+    ));
+  }, []);
+
+  const setSamplePatternLength = useCallback((length: number) => {
+    setSampleSteps(prev => {
+      if (length > prev.length) {
+        return [...prev, ...createDefaultSteps(length - prev.length)];
+      }
+      return prev.slice(0, length);
+    });
+  }, []);
+
   // Batch setter for scene loading
   const setAllSampleState = useCallback((state: Partial<SampleState>) => {
     if (state.sampleBuffer !== undefined) setSampleBuffer(state.sampleBuffer);
     if (state.sampleName !== undefined) setSampleName(state.sampleName);
     if (state.sampleMuted !== undefined) setSampleMuted(state.sampleMuted);
     if (state.sampleParams !== undefined) setSampleParams(state.sampleParams);
+    if (state.sampleSteps !== undefined) setSampleSteps(state.sampleSteps);
   }, []);
 
   return {
@@ -49,8 +84,13 @@ export const useSampleState = () => {
     setSampleMuted,
     sampleParams,
     setSampleParams,
+    sampleSteps,
+    setSampleSteps,
     toggleSampleMute,
     clearSample,
+    toggleSampleStep,
+    setSampleStepVelocity,
+    setSamplePatternLength,
     setAllSampleState,
   };
 };

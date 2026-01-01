@@ -152,6 +152,7 @@ const Index = () => {
     sampleParams: sampleState.sampleParams,
     sampleMuted: sampleState.sampleMuted,
     sampleIsPlaying,
+    sampleSteps: sampleState.sampleSteps,
     fillActive,
     autoFillConfig,
     onAutoFillTrigger: setFillActive,
@@ -319,6 +320,9 @@ const Index = () => {
                 muted={sampleState.sampleMuted}
                 params={sampleState.sampleParams}
                 isPlaying={sampleIsPlaying}
+                steps={sampleState.sampleSteps}
+                currentStep={currentStep}
+                patternLength={sampleState.sampleSteps.length}
                 onLoadSample={(buffer, name) => {
                   sampleState.setSampleBuffer(buffer);
                   sampleState.setSampleName(name);
@@ -327,6 +331,10 @@ const Index = () => {
                 onParamsChange={sampleState.setSampleParams}
                 onMuteToggle={sampleState.toggleSampleMute}
                 onPlayToggle={() => setSampleIsPlaying(prev => !prev)}
+                onStepToggle={sampleState.toggleSampleStep}
+                onStepVelocity={sampleState.setSampleStepVelocity}
+                onPatternGenerate={sampleState.setSampleSteps}
+                onPatternLengthChange={sampleState.setSamplePatternLength}
               />
             </div>
           </CollapsibleSection>

@@ -47,6 +47,13 @@ export interface Step {
   condition?: ConditionType;  // Conditional trigger
 }
 
+// Sample step type (simpler than synth steps)
+export interface SampleStep {
+  active: boolean;
+  velocity: number;
+  probability: number;
+}
+
 interface UseAudioEngineProps {
   isPlaying: boolean;
   bpm: number;
@@ -56,6 +63,7 @@ interface UseAudioEngineProps {
   snareSteps: Step[];
   hatSteps: Step[];
   synthSteps: Step[];
+  sampleSteps: SampleStep[];
   synthParams: {
     waveform: WaveformType;
     cutoff: number;
@@ -175,6 +183,7 @@ export const useAudioEngine = ({
   snareSteps,
   hatSteps,
   synthSteps,
+  sampleSteps,
   synthParams,
   synthMuted,
   drumParams,
@@ -226,20 +235,27 @@ export const useAudioEngine = ({
   const fxGlitchRef = useRef<GlitchBus | null>(null);
   
   // Store step data in refs for scheduler callback access
-  const stepsRef = useRef({ kickSteps, snareSteps, hatSteps, synthSteps });
+  const stepsRef = useRef({ kickSteps, snareSteps, hatSteps, synthSteps, sampleSteps });
   useEffect(() => {
-    stepsRef.current = { kickSteps, snareSteps, hatSteps, synthSteps };
-  }, [kickSteps, snareSteps, hatSteps, synthSteps]);
+    stepsRef.current = { kickSteps, snareSteps, hatSteps, synthSteps, sampleSteps };
+  }, [kickSteps, snareSteps, hatSteps, synthSteps, sampleSteps]);
 
   // Conditional trigger tracking
   const stepRepetitionCount = useRef<Map<string, number>>(new Map());
   const previousStepFired = useRef<boolean>(false);
   const fillActiveRef = useRef<boolean>(false);
+  const sampleMutedRef = useRef<boolean>(false);
   
   // Keep fillActive ref in sync
   useEffect(() => {
     fillActiveRef.current = fillActive;
   }, [fillActive]);
+
+  // Keep sampleMuted ref in sync
+  useEffect(() => {
+    sampleMutedRef.current = sampleMuted;
+  }, [sampleMuted]);
+
 
   // Auto-fill config ref for scheduler callback
   const autoFillConfigRef = useRef(autoFillConfig);
@@ -669,7 +685,7 @@ export const useAudioEngine = ({
     if (!isInitialized) return;
 
     const stepCallback: StepCallback = (step, time) => {
-      const { kickSteps, snareSteps, hatSteps, synthSteps } = stepsRef.current;
+      const { kickSteps, snareSteps, hatSteps, synthSteps, sampleSteps } = stepsRef.current;
       
       // Update UI step indicator
       setCurrentStep(step);
@@ -810,6 +826,16 @@ export const useAudioEngine = ({
         };
         
         triggerWithMicroTiming(synthTrigger, synth.pLocks?.microTiming);
+      }
+
+      // Sample trigger based on steps
+      const sampleStep = sampleSteps[step];
+      if (sampleStep && sampleStep.active && !sampleMutedRef.current) {
+        // Probability check
+        if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
+          anyFiredThisStep = true;
+          sampleRef.current?.trigger();
+        }
       }
 
       // Update previousStepFired for next step's PRE condition

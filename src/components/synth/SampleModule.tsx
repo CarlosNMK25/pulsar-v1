@@ -7,6 +7,9 @@ import { cn } from '@/lib/utils';
 import { SampleParams } from '@/audio/SampleEngine';
 import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
+import { StepSequencer } from './StepSequencer';
+import { EuclideanControls } from './EuclideanControls';
+import { SampleStep } from '@/hooks/useSampleState';
 
 interface SampleModuleProps {
   buffer: AudioBuffer | null;
@@ -14,11 +17,19 @@ interface SampleModuleProps {
   muted: boolean;
   params: SampleParams;
   isPlaying: boolean;
+  // Sequencer props
+  steps: SampleStep[];
+  currentStep: number;
+  patternLength: number;
   onLoadSample: (buffer: AudioBuffer, name: string) => void;
   onClearSample: () => void;
   onParamsChange: (params: SampleParams) => void;
   onMuteToggle: () => void;
   onPlayToggle: () => void;
+  onStepToggle: (index: number) => void;
+  onStepVelocity: (index: number, velocity: number) => void;
+  onPatternGenerate: (steps: SampleStep[]) => void;
+  onPatternLengthChange: (length: number) => void;
 }
 
 export const SampleModule = ({
@@ -27,11 +38,18 @@ export const SampleModule = ({
   muted,
   params,
   isPlaying,
+  steps,
+  currentStep,
+  patternLength,
   onLoadSample,
   onClearSample,
   onParamsChange,
   onMuteToggle,
   onPlayToggle,
+  onStepToggle,
+  onStepVelocity,
+  onPatternGenerate,
+  onPatternLengthChange,
 }: SampleModuleProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +164,13 @@ export const SampleModule = ({
     onParamsChange({ ...params, [key]: value });
   };
 
+  // Adapt steps to Step interface expected by StepSequencer
+  const adaptedSteps = steps.map(s => ({
+    active: s.active,
+    velocity: s.velocity,
+    probability: s.probability,
+  }));
+
   return (
     <ModuleCard
       title="Sample"
@@ -199,6 +224,28 @@ export const SampleModule = ({
         >
           <canvas ref={canvasRef} className="w-full h-full" />
         </div>
+
+        {/* Step Sequencer - shown when sample is loaded */}
+        {buffer && (
+          <div className="space-y-2 pt-1 border-t border-border/50">
+            <EuclideanControls
+              onPatternGenerate={onPatternGenerate}
+              currentSteps={adaptedSteps}
+              patternLength={patternLength}
+              variant="secondary"
+            />
+            <StepSequencer
+              steps={adaptedSteps}
+              currentStep={currentStep}
+              onStepToggle={onStepToggle}
+              onStepVelocity={onStepVelocity}
+              patternLength={patternLength}
+              onLengthChange={onPatternLengthChange}
+              showControls={false}
+              showLengthSelector={true}
+            />
+          </div>
+        )}
 
         {/* Parameters */}
         <div className="grid grid-cols-4 gap-3 pt-2">
