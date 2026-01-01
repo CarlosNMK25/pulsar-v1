@@ -157,6 +157,16 @@ const Index = () => {
     onAutoFillTrigger: setFillActive,
     fxRoutingMode: fxState.fxRoutingMode,
     fxTargets: fxState.fxTargets,
+    // Modulation state
+    modSendLevels: modulationState.modSendLevels,
+    modulationBypassed: modulationState.bypassed,
+    modOffsetsPerTrack: modulationState.modOffsetsPerTrack,
+    chorusParams: modulationState.chorus,
+    flangerParams: modulationState.flanger,
+    phaserParams: modulationState.phaser,
+    tremoloParams: modulationState.tremolo,
+    ringModParams: modulationState.ringMod,
+    autoPanParams: modulationState.autoPan,
   });
 
   const handlePlayPause = useCallback(async () => {

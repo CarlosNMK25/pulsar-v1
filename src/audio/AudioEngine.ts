@@ -59,16 +59,17 @@ class AudioEngine {
     const modInput = modulationEngine.getInput();
     const modOutput = modulationEngine.getOutput();
 
-    // Connect track buses to modulation input (audio flows through modulation)
-    this.drumsGlitchBus.connect(modInput);
-    this.synthGlitchBus.connect(modInput);
-    this.textureGlitchBus.connect(modInput);
-    this.sampleGlitchBus.connect(modInput);
+    // Connect track buses DIRECTLY to master (dry path - bypasses modulation)
+    // Modulation is handled via separate modulationSend in each engine (parallel wet path)
+    this.drumsGlitchBus.connect(this.masterGain);
+    this.synthGlitchBus.connect(this.masterGain);
+    this.textureGlitchBus.connect(this.masterGain);
+    this.sampleGlitchBus.connect(this.masterGain);
 
-    // FX bus bypasses modulation (reverb/delay returns go direct to master)
+    // FX bus also goes direct to master
     this.fxGlitchBus.connect(this.masterGain);
 
-    // Connect modulation output to master gain
+    // Connect modulation output to master gain (wet path from modulationSends)
     modOutput.connect(this.masterGain);
 
     // Limiter to prevent clipping
@@ -130,14 +131,13 @@ class AudioEngine {
     if (!this.masterGain) return;
     
     const trackBus = this.getTrackBus(track);
-    const modInput = modulationEngine.getInput();
     
-    // Disconnect track bus from modulation input
-    trackBus.disconnect(modInput);
+    // Disconnect track bus from master (dry path)
+    trackBus.disconnect(this.masterGain);
     
-    // Insert: trackBus -> glitchInput ... glitchOutput -> modInput
+    // Insert: trackBus -> glitchInput ... glitchOutput -> masterGain
     trackBus.connect(glitchInput);
-    glitchOutput.connect(modInput);
+    glitchOutput.connect(this.masterGain);
     
     console.log(`[AudioEngine] Track glitch inserted for ${track}`);
   }
