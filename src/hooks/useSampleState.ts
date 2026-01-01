@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { SampleParams, PlaybackMode } from '@/audio/SampleEngine';
+import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
 
 // Step type for sample sequencer
 export interface SampleStep {
@@ -26,6 +26,7 @@ export const defaultSampleParams: SampleParams = {
   loop: true,
   playbackMode: 'region',
   sliceCount: 8,
+  syncMode: 'independent',
 };
 
 const createDefaultSteps = (length: number): SampleStep[] =>

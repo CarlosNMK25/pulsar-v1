@@ -4,12 +4,13 @@ import { ModuleCard } from './ModuleCard';
 import { Knob } from './Knob';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SampleParams, PlaybackMode } from '@/audio/SampleEngine';
+import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
 import { decodeAudioFile, validateAudioFile } from '@/utils/audioDecoder';
 import { toast } from 'sonner';
 import { StepSequencer } from './StepSequencer';
 import { EuclideanControls } from './EuclideanControls';
 import { SampleStep } from '@/hooks/useSampleState';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SampleModuleProps {
   buffer: AudioBuffer | null;
@@ -254,25 +255,44 @@ export const SampleModule = ({
           <canvas ref={canvasRef} className="w-full h-full" />
         </div>
 
-        {/* Playback Mode Selector */}
+        {/* Playback Mode and Sync Mode Selectors */}
         {buffer && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Mode:</span>
-            <div className="flex gap-1 flex-1">
-              {(['full', 'region', 'slice'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => updateParam('playbackMode', mode)}
-                  className={cn(
-                    'flex-1 py-1 text-xs uppercase tracking-wider rounded border transition-colors',
-                    params.playbackMode === mode
-                      ? 'border-primary bg-primary/20 text-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-                  )}
-                >
-                  {mode}
-                </button>
-              ))}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <span className="text-xs text-muted-foreground">Mode:</span>
+              <div className="flex gap-1 flex-1">
+                {(['full', 'region', 'slice'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => updateParam('playbackMode', mode)}
+                    className={cn(
+                      'flex-1 py-1 text-xs uppercase tracking-wider rounded border transition-colors',
+                      params.playbackMode === mode
+                        ? 'border-primary bg-primary/20 text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Sync:</span>
+              <Select 
+                value={params.syncMode ?? 'independent'} 
+                onValueChange={(mode: SampleSyncMode) => updateParam('syncMode', mode)}
+              >
+                <SelectTrigger className="w-16 h-6 text-xs px-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="independent">Free</SelectItem>
+                  <SelectItem value="gate-kick">Kick</SelectItem>
+                  <SelectItem value="gate-snare">Snare</SelectItem>
+                  <SelectItem value="gate-hat">Hat</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
