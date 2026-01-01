@@ -356,6 +356,8 @@ export const SampleModule = ({
               showControls={false}
               showLengthSelector={true}
               showPLocks={true}
+              showReverse={true}
+              showRatchet={true}
               showSliceSelector={params.playbackMode === 'slice'}
               sliceCount={params.sliceCount}
             />

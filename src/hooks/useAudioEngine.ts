@@ -31,6 +31,9 @@ export interface PLocks {
   decay?: number;
   microTiming?: number; // -50 to +50 ms offset
   fmAmount?: number;    // 0-100 FM depth per step
+  // Sample-specific P-Locks
+  reverse?: boolean;    // Reverse playback per step
+  ratchet?: number;     // 1=normal, 2-4 = retrig count
 }
 
 // Acid 303 step modifiers
@@ -858,26 +861,53 @@ export const useAudioEngine = ({
           if (sampleStep.probability >= 100 || Math.random() * 100 <= sampleStep.probability) {
             anyFiredThisStep = true;
             
-            // Use micro-timing from P-Locks if available
-            const triggerSample = () => {
+            // Determine slice index: -2 = random, -1 = sequential, >=0 = fixed
+            const sliceCount = params?.sliceCount ?? 8;
+            const sliceIndex = sampleStep.sliceIndex === -2
+              ? Math.floor(Math.random() * sliceCount) // Random slice
+              : sampleStep.sliceIndex >= 0 
+                ? sampleStep.sliceIndex // Fixed slice
+                : step % sliceCount; // Sequential
+            
+            // Build options for trigger
+            const triggerOptions = {
+              reverse: sampleStep.pLocks?.reverse,
+              pitch: sampleStep.pLocks?.pitch !== undefined 
+                ? 0.5 + (sampleStep.pLocks.pitch / 100) * 1.5 // Map 0-100 to 0.5-2.0
+                : undefined,
+            };
+            
+            // Ratchet count (1 = normal, 2-4 = retrig)
+            const ratchetCount = sampleStep.pLocks?.ratchet ?? 1;
+            const stepDurationMs = (60000 / scheduler.getBpm()) / 4;
+            const ratchetInterval = stepDurationMs / ratchetCount;
+            
+            // Trigger function for single hit
+            const triggerOnce = () => {
               if (params?.playbackMode === 'slice') {
-                // In slice mode, determine which slice to play
-                const sliceIndex = sampleStep.sliceIndex >= 0 
-                  ? sampleStep.sliceIndex 
-                  : step % (params?.sliceCount ?? 8);
-                sampleRef.current?.triggerSlice(sliceIndex);
+                sampleRef.current?.triggerSliceWithOptions(sliceIndex, triggerOptions);
               } else {
-                // Full or Region mode: use normal trigger
                 sampleRef.current?.trigger();
+              }
+            };
+            
+            // Schedule all ratchet hits
+            const scheduleTriggers = () => {
+              for (let i = 0; i < ratchetCount; i++) {
+                if (i === 0) {
+                  triggerOnce();
+                } else {
+                  setTimeout(triggerOnce, i * ratchetInterval);
+                }
               }
             };
             
             // Apply micro-timing offset if present
             const microTiming = sampleStep.pLocks?.microTiming;
             if (microTiming && microTiming !== 0) {
-              setTimeout(triggerSample, Math.max(0, microTiming));
+              setTimeout(scheduleTriggers, Math.max(0, microTiming));
             } else {
-              triggerSample();
+              scheduleTriggers();
             }
           }
         }

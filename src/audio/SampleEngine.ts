@@ -300,21 +300,36 @@ export class SampleEngine {
   }
 
   triggerSlice(sliceIndex: number): void {
-    // Play a specific slice
-    if (!this.buffer) return;
+    // Play a specific slice using default params
+    this.triggerSliceWithOptions(sliceIndex, {});
+  }
+
+  // Advanced trigger with per-step options (reverse, pitch override)
+  triggerSliceWithOptions(
+    sliceIndex: number, 
+    options: { reverse?: boolean; pitch?: number }
+  ): void {
+    if (!this.buffer || !this.reversedBuffer) return;
 
     const ctx = audioEngine.getContext();
-    const buffer = this.params.reverse ? this.reversedBuffer : this.buffer;
-    if (!buffer) return;
+    
+    // Use per-step reverse if provided, otherwise use global reverse
+    const useReverse = options.reverse ?? this.params.reverse;
+    const buffer = useReverse ? this.reversedBuffer : this.buffer;
 
     const sliceCount = this.params.sliceCount;
     const sliceDuration = buffer.duration / sliceCount;
     const clampedIndex = Math.max(0, Math.min(sliceIndex, sliceCount - 1));
-    const startTime = clampedIndex * sliceDuration;
+    
+    // For reversed buffer, invert the slice index to maintain musical order
+    const effectiveIndex = useReverse ? (sliceCount - 1 - clampedIndex) : clampedIndex;
+    const startTime = effectiveIndex * sliceDuration;
 
     const player = ctx.createBufferSource();
     player.buffer = buffer;
-    player.playbackRate.value = this.params.pitch;
+    
+    // Use per-step pitch if provided, otherwise use global pitch
+    player.playbackRate.value = options.pitch ?? this.params.pitch;
 
     player.connect(this.outputGain);
     player.connect(this.reverbSend);

@@ -34,6 +34,8 @@ interface StepSequencerProps {
   showAcid?: boolean;
   showConditions?: boolean;
   showSliceSelector?: boolean;
+  showReverse?: boolean;
+  showRatchet?: boolean;
   sliceCount?: number;
   label?: string;
   variant?: 'primary' | 'secondary' | 'muted';
@@ -58,6 +60,8 @@ export const StepSequencer = ({
   showAcid = false,
   showConditions = false,
   showSliceSelector = false,
+  showReverse = false,
+  showRatchet = false,
   sliceCount = 8,
   label,
   variant = 'primary',
@@ -88,7 +92,7 @@ export const StepSequencer = ({
   const hasPLocks = (step: Step) => step.pLocks && Object.keys(step.pLocks).length > 0;
   const hasAcid = (step: Step) => step.acid && Object.values(step.acid).some(v => v);
   const hasCondition = (step: Step) => step.condition !== null && step.condition !== undefined;
-  const hasSlice = (step: Step) => step.sliceIndex !== undefined && step.sliceIndex >= 0;
+  const hasSlice = (step: Step) => step.sliceIndex !== undefined && step.sliceIndex >= -2 && step.sliceIndex !== -1;
 
   // Get condition display color
   const getConditionColor = (condition: ConditionType) => {
@@ -160,10 +164,23 @@ export const StepSequencer = ({
               {/* Slice index indicator - top center */}
               {step.active && hasSlice(step) && (
                 <div 
-                  className="absolute top-0 left-1/2 -translate-x-1/2 px-0.5 text-[8px] font-mono leading-none font-bold text-chart-4"
-                  title={`Slice: ${(step.sliceIndex ?? 0) + 1}`}
+                  className={cn(
+                    "absolute top-0 left-1/2 -translate-x-1/2 px-0.5 text-[8px] font-mono leading-none font-bold",
+                    step.sliceIndex === -2 ? "text-secondary" : "text-chart-4"
+                  )}
+                  title={step.sliceIndex === -2 ? 'Random slice' : `Slice: ${(step.sliceIndex ?? 0) + 1}`}
                 >
-                  {(step.sliceIndex ?? 0) + 1}
+                  {step.sliceIndex === -2 ? '?' : (step.sliceIndex ?? 0) + 1}
+                </div>
+              )}
+              
+              {/* Ratchet indicator - bottom right */}
+              {step.active && step.pLocks?.ratchet && step.pLocks.ratchet > 1 && (
+                <div 
+                  className="absolute bottom-0 right-0 px-0.5 text-[7px] font-mono leading-none font-bold text-orange-400"
+                  title={`Ratchet: ${step.pLocks.ratchet}x`}
+                >
+                  {step.pLocks.ratchet}×
                 </div>
               )}
               
@@ -286,13 +303,27 @@ export const StepSequencer = ({
                           setSliceEditingStep(null);
                         }}
                         className={cn(
-                          'px-2 py-1 text-xs rounded border transition-colors col-span-4',
+                          'px-2 py-1 text-xs rounded border transition-colors col-span-2',
                           step.sliceIndex === -1 || step.sliceIndex === undefined
                             ? 'border-primary bg-primary/20 text-primary'
                             : 'border-border text-muted-foreground hover:text-foreground'
                         )}
                       >
                         Sequential
+                      </button>
+                      <button
+                        onClick={() => {
+                          onStepSliceChange(index, -2);
+                          setSliceEditingStep(null);
+                        }}
+                        className={cn(
+                          'px-2 py-1 text-xs rounded border transition-colors col-span-2',
+                          step.sliceIndex === -2
+                            ? 'border-secondary bg-secondary/20 text-secondary'
+                            : 'border-border text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        🎲 Random
                       </button>
                       {Array.from({ length: sliceCount }).map((_, i) => (
                         <button
@@ -332,6 +363,8 @@ export const StepSequencer = ({
                 onConditionChange={onStepCondition ? (cond) => onStepCondition(index, cond) : undefined}
                 showAcid={showAcid}
                 showConditions={showConditions}
+                showReverse={showReverse}
+                showRatchet={showRatchet}
                 trigger={stepButton}
                 open={editingStep === index}
                 onOpenChange={(open) => setEditingStep(open ? index : null)}
