@@ -103,6 +103,10 @@ export class SampleEngine {
   }
 
   loadSample(buffer: AudioBuffer): void {
+    // Stop any current playback first to reset state
+    if (this.isPlaying) {
+      this.stop();
+    }
     this.buffer = buffer;
     this.reversedBuffer = this.createReversedBuffer(buffer);
   }
@@ -180,14 +184,35 @@ export class SampleEngine {
     this.player.playbackRate.value = this.params.pitch;
     this.player.loop = this.params.loop;
 
-    // Calculate loop points
-    const duration = buffer.duration;
-    const startTime = this.params.startPoint * duration;
-    const loopEnd = startTime + (this.params.loopLength * duration);
+    // Calculate points based on playback mode
+    let startTime: number;
+    let loopStart: number;
+    let loopEnd: number;
+
+    switch (this.params.playbackMode) {
+      case 'full':
+        startTime = 0;
+        loopStart = 0;
+        loopEnd = buffer.duration;
+        break;
+      case 'slice':
+        // In continuous play, loop the first slice
+        const sliceDuration = buffer.duration / this.params.sliceCount;
+        startTime = 0;
+        loopStart = 0;
+        loopEnd = sliceDuration;
+        break;
+      case 'region':
+      default:
+        startTime = this.params.startPoint * buffer.duration;
+        loopStart = startTime;
+        loopEnd = startTime + (this.params.loopLength * buffer.duration);
+        break;
+    }
 
     if (this.params.loop) {
-      this.player.loopStart = startTime;
-      this.player.loopEnd = Math.min(loopEnd, duration);
+      this.player.loopStart = loopStart;
+      this.player.loopEnd = Math.min(loopEnd, buffer.duration);
     }
 
     // Connect to outputs
