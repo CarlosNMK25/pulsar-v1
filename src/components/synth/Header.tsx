@@ -1,4 +1,4 @@
-import { Settings, Save, FolderOpen, Cpu, PanelLeft, PanelRight, ChevronDown, Volume2, Undo2, Redo2 } from 'lucide-react';
+import { Settings, Save, FolderOpen, Cpu, PanelLeft, PanelRight, ChevronDown, Menu, Undo2, Redo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DockState } from '@/hooks/useUILayout';
 
@@ -7,9 +7,11 @@ interface HeaderProps {
   // Panel toggles
   onToggleLeftPanel?: () => void;
   onToggleRightPanel?: () => void;
+  onToggleSidePanel?: () => void;
   onToggleDock?: () => void;
   leftPanelOpen?: boolean;
   rightPanelOpen?: boolean;
+  sidePanelOpen?: boolean;
   dockState?: DockState;
   // Status info (moved from status bar)
   currentStep?: number;
@@ -23,9 +25,11 @@ export const Header = ({
   projectName,
   onToggleLeftPanel,
   onToggleRightPanel,
+  onToggleSidePanel,
   onToggleDock,
   leftPanelOpen = false,
   rightPanelOpen = false,
+  sidePanelOpen = false,
   dockState = 'hidden',
   currentStep = 0,
   activeSceneName,
@@ -37,6 +41,23 @@ export const Header = ({
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/95 backdrop-blur-md">
       {/* Left section */}
       <div className="flex items-center gap-3">
+        {/* Side panel toggle (hamburger) */}
+        {onToggleSidePanel && (
+          <button
+            onClick={onToggleSidePanel}
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-md',
+              'text-muted-foreground hover:text-foreground',
+              'border border-transparent hover:border-border hover:bg-muted/50',
+              'transition-colors',
+              sidePanelOpen && 'bg-primary/20 text-primary border-primary/50'
+            )}
+            title="Browser Panel"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Left panel toggle */}
         {onToggleLeftPanel && (
           <button

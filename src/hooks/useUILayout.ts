@@ -6,6 +6,7 @@ export interface UILayoutState {
   // Panels
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
+  sidePanelOpen: boolean;
   dockState: DockState;
   
   // Collapsible sections
@@ -15,6 +16,9 @@ export interface UILayoutState {
   
   // Dock tab
   activeDockTab: string;
+  
+  // Side panel tab
+  sidePanelTab: string;
 }
 
 const STORAGE_KEY = 'pulsar_ui_layout';
@@ -22,11 +26,13 @@ const STORAGE_KEY = 'pulsar_ui_layout';
 const defaultState: UILayoutState = {
   leftPanelOpen: false,
   rightPanelOpen: false,
+  sidePanelOpen: false,
   dockState: 'hidden',
   generatorsOpen: true,
   processingOpen: true,
   controlOpen: true,
   activeDockTab: 'mixer',
+  sidePanelTab: 'presets',
 };
 
 export const useUILayout = () => {
@@ -58,6 +64,14 @@ export const useUILayout = () => {
 
   const toggleRightPanel = useCallback(() => {
     setState(prev => ({ ...prev, rightPanelOpen: !prev.rightPanelOpen }));
+  }, []);
+
+  const toggleSidePanel = useCallback(() => {
+    setState(prev => ({ ...prev, sidePanelOpen: !prev.sidePanelOpen }));
+  }, []);
+
+  const setSidePanelOpen = useCallback((open: boolean) => {
+    setState(prev => ({ ...prev, sidePanelOpen: open }));
   }, []);
 
   // Dock state cycling: hidden -> mini -> expanded -> hidden
@@ -92,15 +106,23 @@ export const useUILayout = () => {
     setState(prev => ({ ...prev, activeDockTab: tab }));
   }, []);
 
+  // Side panel tab
+  const setSidePanelTab = useCallback((tab: string) => {
+    setState(prev => ({ ...prev, sidePanelTab: tab }));
+  }, []);
+
   return {
     ...state,
     toggleLeftPanel,
     toggleRightPanel,
+    toggleSidePanel,
+    setSidePanelOpen,
     cycleDockState,
     setDockState,
     toggleGenerators,
     toggleProcessing,
     toggleControl,
     setActiveDockTab,
+    setSidePanelTab,
   };
 };
