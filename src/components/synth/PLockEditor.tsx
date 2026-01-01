@@ -20,6 +20,8 @@ interface PLockEditorProps {
   onConditionChange?: (condition: ConditionType) => void;
   showAcid?: boolean;
   showConditions?: boolean;
+  showReverse?: boolean;
+  showRatchet?: boolean;
   trigger: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +41,8 @@ export const PLockEditor = ({
   onConditionChange,
   showAcid = false,
   showConditions = false,
+  showReverse = false,
+  showRatchet = false,
   trigger,
   open,
   onOpenChange,
@@ -245,6 +249,56 @@ export const PLockEditor = ({
               />
             </div>
           </div>
+
+          {/* Reverse & Ratchet (Sample-specific) */}
+          {(showReverse || showRatchet) && (
+            <div className="pt-2 border-t border-border">
+              <span className="text-xs text-muted-foreground mb-2 block">Sample Options</span>
+              <div className="flex gap-2">
+                {showReverse && (
+                  <button
+                    onClick={() => {
+                      const updated = { ...localPLocks, reverse: !localPLocks.reverse };
+                      if (!updated.reverse) delete updated.reverse;
+                      setLocalPLocks(updated);
+                      onPLocksChange(Object.keys(updated).length > 0 ? updated : undefined);
+                    }}
+                    className={cn(
+                      'flex-1 py-1.5 text-xs rounded border transition-colors',
+                      localPLocks.reverse
+                        ? 'border-destructive bg-destructive/20 text-destructive'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    ⟲ Reverse
+                  </button>
+                )}
+                {showRatchet && (
+                  <div className="flex-1 flex gap-1">
+                    {[1, 2, 3, 4].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => {
+                          const updated = { ...localPLocks, ratchet: count === 1 ? undefined : count };
+                          if (count === 1) delete updated.ratchet;
+                          setLocalPLocks(updated);
+                          onPLocksChange(Object.keys(updated).length > 0 ? updated : undefined);
+                        }}
+                        className={cn(
+                          'flex-1 py-1.5 text-xs rounded border transition-colors',
+                          (localPLocks.ratchet ?? 1) === count
+                            ? 'border-orange-400 bg-orange-400/20 text-orange-400'
+                            : 'border-border text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        {count}×
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Acid 303 Toggles */}
           {showAcid && (

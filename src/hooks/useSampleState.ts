@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
 import { SampleParams, PlaybackMode, SampleSyncMode } from '@/audio/SampleEngine';
 
-// P-Locks for sample steps (micro-timing, pitch, volume)
+// P-Locks for sample steps (micro-timing, pitch, volume, reverse, ratchet)
 export interface SamplePLocks {
   microTiming?: number; // -50 to +50 ms offset
   pitch?: number;       // Pitch override per step
   volume?: number;      // Volume override per step
+  reverse?: boolean;    // Reverse playback per step
+  ratchet?: number;     // 1=normal, 2=double, 3=triple, 4=quad retrig
 }
 
 // Step type for sample sequencer
