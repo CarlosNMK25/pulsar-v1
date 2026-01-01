@@ -13,7 +13,7 @@ import { GlitchBus } from '@/audio/GlitchBus';
 import { TrackSendLevels, TrackRoutingState, FXOffsetsPerTrack, TrackName } from '@/hooks/useFXState';
 import { ModSendLevels, ModTarget, ModOffsetsPerTrack } from '@/hooks/useModulationState';
 import { ModEffect, modulationEngine } from '@/audio/ModulationEngine';
-import { SampleStep } from '@/hooks/useSampleState';
+import { SampleStep, SliceEnvelope } from '@/hooks/useSampleState';
 
 // Conditional Trigger types (Elektron-style)
 export type ConditionType = 
@@ -147,6 +147,8 @@ interface UseAudioEngineProps {
   // Granular synthesis
   granularEnabled: boolean;
   granularParams: GranularParams;
+  // Slice envelope ADSR
+  sliceEnvelope: SliceEnvelope;
 }
 
 // Evaluate conditional trigger
@@ -224,6 +226,7 @@ export const useAudioEngine = ({
   onSliceStart,
   granularEnabled,
   granularParams,
+  sliceEnvelope,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -241,6 +244,9 @@ export const useAudioEngine = ({
   // Granular refs for callback access
   const granularEnabledRef = useRef<boolean>(granularEnabled);
   const granularParamsRef = useRef<GranularParams>(granularParams);
+  
+  // Slice envelope ref for callback access
+  const sliceEnvelopeRef = useRef<SliceEnvelope>(sliceEnvelope);
   
   // Track-specific glitch buses
   const drumsGlitchRef = useRef<GlitchBus | null>(null);
@@ -476,6 +482,11 @@ export const useAudioEngine = ({
       granularRef.current.stop();
     }
   }, [granularEnabled]);
+
+  // Sync slice envelope ref
+  useEffect(() => {
+    sliceEnvelopeRef.current = sliceEnvelope;
+  }, [sliceEnvelope]);
 
   // Update FX parameters
   useEffect(() => {
@@ -925,6 +936,7 @@ export const useAudioEngine = ({
                 ? 0.5 + (sampleStep.pLocks.pitch / 100) * 1.5 // Map 0-100 to 0.5-2.0
                 : undefined,
               volume: finalVolume,
+              envelope: sliceEnvelopeRef.current,
             };
             
             // Ratchet count (1 = normal, 2-4 = retrig)
