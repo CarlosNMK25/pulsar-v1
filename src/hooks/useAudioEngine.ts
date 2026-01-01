@@ -10,6 +10,8 @@ import { macroEngine } from '@/audio/MacroEngine';
 import { glitchEngine } from '@/audio/GlitchEngine';
 import { GlitchBus } from '@/audio/GlitchBus';
 import { TrackSendLevels, TrackRoutingState, FXOffsetsPerTrack, TrackName } from '@/hooks/useFXState';
+import { ModSendLevels, ModTarget, ModOffsetsPerTrack } from '@/hooks/useModulationState';
+import { ModEffect, modulationEngine } from '@/audio/ModulationEngine';
 // Conditional Trigger types (Elektron-style)
 export type ConditionType = 
   | '1:2' | '1:3' | '1:4'           // X of every N repetitions
@@ -117,6 +119,17 @@ interface UseAudioEngineProps {
     duration: number;   // Fill lasts N bars (1, 2)
     probability: number; // 0-100
   };
+  // Modulation state
+  modSendLevels: ModSendLevels;
+  modulationBypassed: Record<ModEffect, boolean>;
+  modOffsetsPerTrack: ModOffsetsPerTrack;
+  // Modulation params (for offset application in solo mode)
+  chorusParams: { rate: number; depth: number; mix: number };
+  flangerParams: { rate: number; depth: number; feedback: number; mix: number };
+  phaserParams: { rate: number; depth: number; stages: 2 | 4 | 6 | 8; mix: number };
+  tremoloParams: { rate: number; depth: number };
+  ringModParams: { frequency: number; mix: number };
+  autoPanParams: { rate: number; depth: number };
   onAutoFillTrigger?: (active: boolean) => void;  // Callback to sync UI
   // NEW: FX routing mode and targets
   fxRoutingMode: 'master' | 'individual';
@@ -185,6 +198,15 @@ export const useAudioEngine = ({
   onAutoFillTrigger,
   fxRoutingMode,
   fxTargets,
+  modSendLevels,
+  modulationBypassed,
+  modOffsetsPerTrack,
+  chorusParams,
+  flangerParams,
+  phaserParams,
+  tremoloParams,
+  ringModParams,
+  autoPanParams,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -272,6 +294,12 @@ export const useAudioEngine = ({
       drumRef.current.connectFX();
       textureRef.current.connectFX();
       sampleRef.current.connectFX();
+      
+      // Connect instruments to modulation sends
+      synthRef.current.connectModulation();
+      drumRef.current.connectModulation();
+      textureRef.current.connectModulation();
+      sampleRef.current.connectModulation();
       
       // Setup macro engine callback - actually update parameters
       macroEngine.setParamUpdateCallback((engineId, paramId, value) => {
@@ -478,7 +506,111 @@ export const useAudioEngine = ({
     sampleGlitchRef.current?.setBypass(trackRouting.sample.glitchBypass);
   }, [trackRouting, isInitialized]);
 
-  // Handle texture mute and playback
+  // Sync modulation send levels to engines
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const tracks: ModTarget[] = ['drums', 'synth', 'texture', 'sample'];
+    
+    tracks.forEach(track => {
+      const levels = modSendLevels[track];
+      // Calculate max level from active (non-bypassed) effects
+      const activeEffects = Object.entries(levels)
+        .filter(([effect]) => !modulationBypassed[effect as ModEffect])
+        .map(([_, value]) => value);
+      
+      const sendLevel = activeEffects.length > 0 ? Math.max(...activeEffects) : 0;
+      
+      switch (track) {
+        case 'drums':
+          drumRef.current?.setModulationSend(sendLevel);
+          break;
+        case 'synth':
+          synthRef.current?.setModulationSend(sendLevel);
+          break;
+        case 'texture':
+          textureRef.current?.setModulationSend(sendLevel);
+          break;
+        case 'sample':
+          sampleRef.current?.setModulationSend(sendLevel);
+          break;
+      }
+    });
+  }, [modSendLevels, modulationBypassed, isInitialized]);
+
+  // Sync modulation params to engine (with offset support for solo mode)
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    // Detect solo mode: exactly one track unmuted
+    const unmutedTracks: ModTarget[] = [];
+    if (!drumMuted) unmutedTracks.push('drums');
+    if (!synthMuted) unmutedTracks.push('synth');
+    if (!textureMuted) unmutedTracks.push('texture');
+    if (!sampleMuted) unmutedTracks.push('sample');
+    
+    const isSoloMode = unmutedTracks.length === 1;
+    const soloTrack = isSoloMode ? unmutedTracks[0] : null;
+    
+    // Helper to apply offset: base + offset * range
+    const applyOffset = (base: number, offset: number, min: number, max: number): number => {
+      const range = max - min;
+      return Math.max(min, Math.min(max, base + offset * range));
+    };
+    
+    if (soloTrack) {
+      // Solo mode - apply track-specific offsets
+      const offsets = modOffsetsPerTrack[soloTrack];
+      
+      modulationEngine.setChorusParams({
+        rate: applyOffset(chorusParams.rate, offsets.chorus.rate, 0.1, 5),
+        depth: applyOffset(chorusParams.depth, offsets.chorus.depth, 0, 1),
+        mix: applyOffset(chorusParams.mix, offsets.chorus.mix, 0, 1),
+      });
+      
+      modulationEngine.setFlangerParams({
+        rate: applyOffset(flangerParams.rate, offsets.flanger.rate, 0.1, 5),
+        depth: applyOffset(flangerParams.depth, offsets.flanger.depth, 0, 1),
+        feedback: applyOffset(flangerParams.feedback, offsets.flanger.feedback, 0, 0.95),
+        mix: applyOffset(flangerParams.mix, offsets.flanger.mix, 0, 1),
+      });
+      
+      modulationEngine.setPhaserParams({
+        rate: applyOffset(phaserParams.rate, offsets.phaser.rate, 0.1, 5),
+        depth: applyOffset(phaserParams.depth, offsets.phaser.depth, 0, 1),
+        stages: phaserParams.stages as 2 | 4 | 6 | 8,
+        mix: applyOffset(phaserParams.mix, offsets.phaser.mix, 0, 1),
+      });
+      
+      modulationEngine.setTremoloParams({
+        rate: applyOffset(tremoloParams.rate, offsets.tremolo.rate, 0.1, 20),
+        depth: applyOffset(tremoloParams.depth, offsets.tremolo.depth, 0, 1),
+      });
+      
+      modulationEngine.setRingModParams({
+        frequency: applyOffset(ringModParams.frequency, offsets.ringMod.frequency, 20, 2000),
+        mix: applyOffset(ringModParams.mix, offsets.ringMod.mix, 0, 1),
+      });
+      
+      modulationEngine.setAutoPanParams({
+        rate: applyOffset(autoPanParams.rate, offsets.autoPan.rate, 0.1, 10),
+        depth: applyOffset(autoPanParams.depth, offsets.autoPan.depth, 0, 1),
+      });
+    } else {
+      // Multiple tracks or none - use global params without offsets
+      modulationEngine.setChorusParams(chorusParams);
+      modulationEngine.setFlangerParams(flangerParams);
+      modulationEngine.setPhaserParams(phaserParams);
+      modulationEngine.setTremoloParams(tremoloParams);
+      modulationEngine.setRingModParams(ringModParams);
+      modulationEngine.setAutoPanParams(autoPanParams);
+    }
+  }, [
+    drumMuted, synthMuted, textureMuted, sampleMuted,
+    modOffsetsPerTrack,
+    chorusParams, flangerParams, phaserParams, tremoloParams, ringModParams, autoPanParams,
+    isInitialized
+  ]);
   useEffect(() => {
     if (!textureRef.current) return;
 
