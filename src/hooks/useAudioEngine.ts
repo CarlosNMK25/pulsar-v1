@@ -219,6 +219,8 @@ export const useAudioEngine = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
   const [currentStep, setCurrentStep] = useState(0);
+  const [activeSlice, setActiveSlice] = useState<number | null>(null);
+  const activeSliceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const synthRef = useRef<SynthVoice | null>(null);
   const drumRef = useRef<DrumEngine | null>(null);
@@ -891,10 +893,20 @@ export const useAudioEngine = ({
             const stepDurationMs = (60000 / scheduler.getBpm()) / 4;
             const ratchetInterval = stepDurationMs / ratchetCount;
             
-            // Trigger function for single hit
+            // Trigger function for single hit with active slice visualization
             const triggerOnce = () => {
               if (params?.playbackMode === 'slice') {
                 sampleRef.current?.triggerSliceWithOptions(sliceIndex, triggerOptions);
+                // Update active slice for visualization
+                setActiveSlice(sliceIndex);
+                // Clear the timeout if exists
+                if (activeSliceTimeoutRef.current) {
+                  clearTimeout(activeSliceTimeoutRef.current);
+                }
+                // Clear active slice after step duration
+                activeSliceTimeoutRef.current = setTimeout(() => {
+                  setActiveSlice(null);
+                }, stepDurationMs * 0.8);
               } else {
                 sampleRef.current?.trigger({ volume: finalVolume });
               }
@@ -1381,6 +1393,7 @@ export const useAudioEngine = ({
     isInitialized,
     analyserData,
     currentStep,
+    activeSlice,
     audioState: audioEngine.state,
     handleMacroChange,
     triggerGlitch,
