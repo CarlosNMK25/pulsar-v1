@@ -16,6 +16,7 @@ import { CollapsibleSection } from '@/components/synth/CollapsibleSection';
 import { BottomDock } from '@/components/synth/BottomDock';
 import { PerformancePanel } from '@/components/synth/panels/PerformancePanel';
 import { SettingsPanel } from '@/components/synth/panels/SettingsPanel';
+import { SidePanel } from '@/components/synth/panels/SidePanel';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useDrumState } from '@/hooks/useDrumState';
@@ -224,9 +225,11 @@ const Index = () => {
           projectName="Untitled Session"
           onToggleLeftPanel={uiLayout.toggleLeftPanel}
           onToggleRightPanel={uiLayout.toggleRightPanel}
+          onToggleSidePanel={uiLayout.toggleSidePanel}
           onToggleDock={uiLayout.cycleDockState}
           leftPanelOpen={uiLayout.leftPanelOpen}
           rightPanelOpen={uiLayout.rightPanelOpen}
+          sidePanelOpen={uiLayout.sidePanelOpen}
           dockState={uiLayout.dockState}
           currentStep={currentStep}
           activeSceneName={sceneManager.scenes.find(s => s.id === sceneManager.activeScene)?.name}
@@ -644,6 +647,16 @@ const Index = () => {
         open={uiLayout.rightPanelOpen}
         onOpenChange={(open) => !open && uiLayout.toggleRightPanel()}
         projectName="Untitled Session"
+        bpm={bpm}
+      />
+
+      {/* Side Panel (Left - Browser) */}
+      <SidePanel
+        open={uiLayout.sidePanelOpen}
+        onOpenChange={uiLayout.setSidePanelOpen}
+        activeTab={uiLayout.sidePanelTab}
+        onTabChange={uiLayout.setSidePanelTab}
+        sceneManager={sceneManager}
         bpm={bpm}
       />
     </div>
