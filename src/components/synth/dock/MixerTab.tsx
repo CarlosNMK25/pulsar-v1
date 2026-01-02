@@ -6,6 +6,7 @@ import { SendMatrix } from '../SendMatrix';
 import { Knob } from '../Knob';
 import { useState, useEffect, useRef } from 'react';
 import { audioEngine } from '@/audio/AudioEngine';
+import { useTrackLevels } from '@/hooks/useTrackLevels';
 
 interface MixerTabProps {
   drumMuted?: boolean;
@@ -31,6 +32,52 @@ interface MixerTabProps {
   isPlaying?: boolean;
 }
 
+// VU Meter component with LED-style segments
+const VUMeter = ({ level, isPlaying }: { level: number; isPlaying: boolean }) => {
+  // Convert dB to 0-10 segment scale (-60dB to 0dB)
+  const normalizedLevel = isPlaying ? Math.max(0, Math.min(10, ((level + 60) / 60) * 10)) : 0;
+  const activeSegments = Math.floor(normalizedLevel);
+  
+  return (
+    <div className="flex flex-col-reverse gap-0.5 h-24">
+      {Array.from({ length: 10 }).map((_, i) => {
+        const isActive = i < activeSegments;
+        const segmentIndex = i;
+        
+        // Color based on segment position
+        let bgColor = 'bg-muted/30';
+        let glowColor = '';
+        if (isActive) {
+          if (segmentIndex >= 9) {
+            bgColor = 'bg-red-500';
+            glowColor = 'shadow-[0_0_6px_hsl(0_84%_60%/0.8)]';
+          } else if (segmentIndex >= 7) {
+            bgColor = 'bg-orange-500';
+            glowColor = 'shadow-[0_0_4px_hsl(25_95%_53%/0.6)]';
+          } else if (segmentIndex >= 5) {
+            bgColor = 'bg-yellow-500';
+            glowColor = 'shadow-[0_0_4px_hsl(45_93%_47%/0.5)]';
+          } else {
+            bgColor = 'bg-green-500';
+            glowColor = 'shadow-[0_0_4px_hsl(142_71%_45%/0.5)]';
+          }
+        }
+        
+        return (
+          <div
+            key={i}
+            className={cn(
+              "w-1.5 h-2 rounded-[1px] transition-all duration-75",
+              bgColor,
+              glowColor
+            )}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 interface ChannelProps {
   name: string;
   channelId: string;
@@ -44,6 +91,8 @@ interface ChannelProps {
   onFxBypassToggle?: () => void;
   onGlitchBypassToggle?: () => void;
   showRouting?: boolean;
+  peakLevel?: number;
+  isPlaying?: boolean;
 }
 
 const Channel = ({ 
@@ -59,16 +108,23 @@ const Channel = ({
   onFxBypassToggle,
   onGlitchBypassToggle,
   showRouting = false,
+  peakLevel = -Infinity,
+  isPlaying = false,
 }: ChannelProps) => {
   const volumePercent = volume * 100;
   
   return (
-    <div className="flex flex-col items-center gap-2 px-4 py-3">
+    <div className="flex flex-col items-center gap-2 px-3 py-3">
       {/* Label */}
       <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-widest">{name}</span>
       
-      {/* Fader container with glow effect */}
-      <div className="relative h-28 w-8 flex items-center justify-center">
+      {/* VU Meter + Fader container */}
+      <div className="flex gap-1.5 items-center">
+        {/* VU Meter */}
+        <VUMeter level={muted ? -Infinity : peakLevel} isPlaying={isPlaying} />
+        
+        {/* Fader container with glow effect */}
+        <div className="relative h-28 w-8 flex items-center justify-center">
         {/* Track background with border */}
         <div className="absolute inset-x-0 top-2 bottom-2 w-2 left-1/2 -translate-x-1/2 bg-background/80 rounded-full border border-primary/30 overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
           {/* Level fill with gradient */}
@@ -83,18 +139,19 @@ const Channel = ({
           />
         </div>
         
-        {/* Slider thumb overlay */}
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <Slider
-            orientation="vertical"
-            value={[volume]}
-            min={0}
-            max={1}
-            step={0.01}
-            onValueChange={([val]) => onVolumeChange?.(val)}
-            className="h-24"
-            disabled={muted}
-          />
+          {/* Slider thumb overlay */}
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <Slider
+              orientation="vertical"
+              value={[volume]}
+              min={0}
+              max={1}
+              step={0.01}
+              onValueChange={([val]) => onVolumeChange?.(val)}
+              className="h-24"
+              disabled={muted}
+            />
+          </div>
         </div>
       </div>
       
@@ -341,6 +398,9 @@ export const MixerTab = ({
   onMasterLowpassChange,
   isPlaying = false,
 }: MixerTabProps) => {
+  // Get real-time track levels
+  const trackLevels = useTrackLevels(isPlaying);
+  
   return (
     <div className="flex items-center justify-center h-full gap-2 px-4">
       {/* Channel strips */}
@@ -358,6 +418,8 @@ export const MixerTab = ({
           onFxBypassToggle={() => onRoutingChange?.('drums', { fxBypass: !trackRouting?.drums.fxBypass })}
           onGlitchBypassToggle={() => onRoutingChange?.('drums', { glitchBypass: !trackRouting?.drums.glitchBypass })}
           showRouting={!!trackRouting}
+          peakLevel={trackLevels.drums}
+          isPlaying={isPlaying}
         />
         <div className="w-px h-44 bg-border/30" />
         <Channel 
@@ -373,6 +435,8 @@ export const MixerTab = ({
           onFxBypassToggle={() => onRoutingChange?.('synth', { fxBypass: !trackRouting?.synth.fxBypass })}
           onGlitchBypassToggle={() => onRoutingChange?.('synth', { glitchBypass: !trackRouting?.synth.glitchBypass })}
           showRouting={!!trackRouting}
+          peakLevel={trackLevels.synth}
+          isPlaying={isPlaying}
         />
         <div className="w-px h-44 bg-border/30" />
         <Channel 
@@ -388,6 +452,8 @@ export const MixerTab = ({
           onFxBypassToggle={() => onRoutingChange?.('texture', { fxBypass: !trackRouting?.texture.fxBypass })}
           onGlitchBypassToggle={() => onRoutingChange?.('texture', { glitchBypass: !trackRouting?.texture.glitchBypass })}
           showRouting={!!trackRouting}
+          peakLevel={trackLevels.texture}
+          isPlaying={isPlaying}
         />
         <div className="w-px h-44 bg-border/30" />
         <Channel 
@@ -403,6 +469,8 @@ export const MixerTab = ({
           onFxBypassToggle={() => onRoutingChange?.('sample', { fxBypass: !trackRouting?.sample.fxBypass })}
           onGlitchBypassToggle={() => onRoutingChange?.('sample', { glitchBypass: !trackRouting?.sample.glitchBypass })}
           showRouting={!!trackRouting}
+          peakLevel={trackLevels.sample}
+          isPlaying={isPlaying}
         />
         <div className="w-px h-44 bg-border/50 mx-2" />
         

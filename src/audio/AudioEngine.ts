@@ -27,6 +27,13 @@ class AudioEngine {
   // Peak metering
   private peakAnalyserData: Float32Array<ArrayBuffer> | null = null;
 
+  // Track analysers for per-channel metering
+  private drumsAnalyser: AnalyserNode | null = null;
+  private synthAnalyser: AnalyserNode | null = null;
+  private textureAnalyser: AnalyserNode | null = null;
+  private sampleAnalyser: AnalyserNode | null = null;
+  private trackAnalyserData: Float32Array<ArrayBuffer> | null = null;
+
   private constructor() {}
 
   static getInstance(): AudioEngine {
@@ -56,6 +63,29 @@ class AudioEngine {
     
     this.fxGlitchBus = this.audioContext.createGain();
     this.fxGlitchBus.gain.value = 1;
+    
+    // Create track analysers for per-channel metering (connect after track buses)
+    this.drumsAnalyser = this.audioContext.createAnalyser();
+    this.drumsAnalyser.fftSize = 256;
+    this.drumsAnalyser.smoothingTimeConstant = 0.5;
+    this.drumsGlitchBus.connect(this.drumsAnalyser);
+
+    this.synthAnalyser = this.audioContext.createAnalyser();
+    this.synthAnalyser.fftSize = 256;
+    this.synthAnalyser.smoothingTimeConstant = 0.5;
+    this.synthGlitchBus.connect(this.synthAnalyser);
+
+    this.textureAnalyser = this.audioContext.createAnalyser();
+    this.textureAnalyser.fftSize = 256;
+    this.textureAnalyser.smoothingTimeConstant = 0.5;
+    this.textureGlitchBus.connect(this.textureAnalyser);
+
+    this.sampleAnalyser = this.audioContext.createAnalyser();
+    this.sampleAnalyser.fftSize = 256;
+    this.sampleAnalyser.smoothingTimeConstant = 0.5;
+    this.sampleGlitchBus.connect(this.sampleAnalyser);
+
+    this.trackAnalyserData = new Float32Array(256);
     
     // Create master chain: trackBuses -> masterGain -> limiter -> analyser -> destination
     this.masterGain = this.audioContext.createGain();
@@ -246,6 +276,28 @@ class AudioEngine {
     }
     
     // Convert to dB
+    return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+  }
+
+  // Get peak level for individual track in dB
+  getTrackPeakLevel(track: 'drums' | 'synth' | 'texture' | 'sample'): number {
+    let analyser: AnalyserNode | null = null;
+    switch (track) {
+      case 'drums': analyser = this.drumsAnalyser; break;
+      case 'synth': analyser = this.synthAnalyser; break;
+      case 'texture': analyser = this.textureAnalyser; break;
+      case 'sample': analyser = this.sampleAnalyser; break;
+    }
+    
+    if (!analyser || !this.trackAnalyserData) return -Infinity;
+    
+    analyser.getFloatTimeDomainData(this.trackAnalyserData);
+    let peak = 0;
+    for (let i = 0; i < this.trackAnalyserData.length; i++) {
+      const abs = Math.abs(this.trackAnalyserData[i]);
+      if (abs > peak) peak = abs;
+    }
+    
     return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
   }
 
