@@ -77,6 +77,15 @@ export const SampleProModal = ({
   const [localSliceMarkers, setLocalSliceMarkers] = useState<number[]>(
     customSliceMarkers || []
   );
+  
+  // Selection state for region-based operations
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  
+  const handleSelectionChange = useCallback((start: number | null, end: number | null) => {
+    setSelectionStart(start);
+    setSelectionEnd(end);
+  }, []);
 
   // Generate initial slice markers from params if needed
   useState(() => {
@@ -161,6 +170,7 @@ export const SampleProModal = ({
                 onCustomSliceMarkersChange(markers);
               }}
               onPositionClick={handlePositionClick}
+              onSelectionChange={handleSelectionChange}
             />
             <EnvelopeEditor
               envelope={sliceEnvelope}
@@ -241,6 +251,8 @@ export const SampleProModal = ({
             <ProcessingTools
               buffer={buffer}
               onBufferProcessed={handleBufferProcessed}
+              selectionStart={selectionStart}
+              selectionEnd={selectionEnd}
             />
             <div className="text-xs text-muted-foreground">
               Apply destructive edits to the sample. Changes are applied immediately

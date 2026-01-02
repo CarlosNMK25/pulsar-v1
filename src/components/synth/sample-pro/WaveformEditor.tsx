@@ -10,6 +10,7 @@ interface WaveformEditorProps {
   transientPositions?: number[];
   onSliceMarkersChange: (markers: number[]) => void;
   onPositionClick?: (position: number) => void;
+  onSelectionChange?: (start: number | null, end: number | null) => void;
   showTransients?: boolean;
 }
 
@@ -19,6 +20,7 @@ export const WaveformEditor = ({
   transientPositions = [],
   onSliceMarkersChange,
   onPositionClick,
+  onSelectionChange,
   showTransients = false,
 }: WaveformEditorProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,6 +30,11 @@ export const WaveformEditor = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragMarkerIndex, setDragMarkerIndex] = useState<number | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  
+  // Selection state for region operations
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   // Observe container size
   useEffect(() => {
@@ -118,6 +125,31 @@ export const WaveformEditor = ({
       ctx.setLineDash([]);
     }
 
+    // Draw selection region
+    if (selectionStart !== null && selectionEnd !== null) {
+      const startNorm = Math.min(selectionStart, selectionEnd);
+      const endNorm = Math.max(selectionStart, selectionEnd);
+      
+      if (endNorm >= scrollOffset && startNorm <= scrollOffset + visibleDuration) {
+        const startX = Math.max(0, ((startNorm - scrollOffset) / visibleDuration) * width);
+        const endX = Math.min(width, ((endNorm - scrollOffset) / visibleDuration) * width);
+        
+        // Selection fill
+        ctx.fillStyle = 'hsla(30, 100%, 50%, 0.25)';
+        ctx.fillRect(startX, 0, endX - startX, height);
+        
+        // Selection borders
+        ctx.strokeStyle = 'hsl(30, 100%, 50%)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(startX, 0);
+        ctx.lineTo(startX, height);
+        ctx.moveTo(endX, 0);
+        ctx.lineTo(endX, height);
+        ctx.stroke();
+      }
+    }
+
     // Draw slice markers
     ctx.strokeStyle = 'hsl(142, 76%, 50%)';
     ctx.lineWidth = 2;
@@ -155,9 +187,9 @@ export const WaveformEditor = ({
     ctx.lineTo(width, height / 2);
     ctx.stroke();
 
-  }, [buffer, zoom, scrollOffset, sliceMarkers, transientPositions, showTransients, dimensions]);
+  }, [buffer, zoom, scrollOffset, sliceMarkers, transientPositions, showTransients, dimensions, selectionStart, selectionEnd]);
 
-  // Handle mouse events for dragging markers
+  // Handle mouse events for dragging markers and selection
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!buffer) return;
 
@@ -168,6 +200,21 @@ export const WaveformEditor = ({
     const x = e.clientX - rect.left;
     const visibleDuration = 1 / zoom;
     const clickPosition = scrollOffset + (x / rect.width) * visibleDuration;
+
+    // Shift+click starts region selection
+    if (e.shiftKey) {
+      setSelectionStart(clickPosition);
+      setSelectionEnd(clickPosition);
+      setIsSelecting(true);
+      return;
+    }
+
+    // Clear selection on normal click
+    if (selectionStart !== null || selectionEnd !== null) {
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      onSelectionChange?.(null, null);
+    }
 
     // Check if clicking near a marker
     const markerThreshold = 0.01 / zoom;
@@ -181,29 +228,41 @@ export const WaveformEditor = ({
 
     // Not near a marker, trigger position click
     onPositionClick?.(clickPosition);
-  }, [buffer, zoom, scrollOffset, sliceMarkers, onPositionClick]);
+  }, [buffer, zoom, scrollOffset, sliceMarkers, onPositionClick, selectionStart, selectionEnd, onSelectionChange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || dragMarkerIndex === null || !buffer) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const visibleDuration = 1 / zoom;
-    const newPosition = Math.max(0, Math.min(1, scrollOffset + (x / rect.width) * visibleDuration));
+    const position = Math.max(0, Math.min(1, scrollOffset + (x / rect.width) * visibleDuration));
+
+    // Handle region selection
+    if (isSelecting) {
+      setSelectionEnd(position);
+      return;
+    }
+
+    // Handle marker dragging
+    if (!isDragging || dragMarkerIndex === null || !buffer) return;
 
     const newMarkers = [...sliceMarkers];
-    newMarkers[dragMarkerIndex] = newPosition;
+    newMarkers[dragMarkerIndex] = position;
     newMarkers.sort((a, b) => a - b);
     onSliceMarkersChange(newMarkers);
-  }, [isDragging, dragMarkerIndex, buffer, zoom, scrollOffset, sliceMarkers, onSliceMarkersChange]);
+  }, [isSelecting, isDragging, dragMarkerIndex, buffer, zoom, scrollOffset, sliceMarkers, onSliceMarkersChange]);
 
   const handleMouseUp = useCallback(() => {
+    if (isSelecting && selectionStart !== null && selectionEnd !== null) {
+      // Notify parent of selection change
+      onSelectionChange?.(selectionStart, selectionEnd);
+    }
+    setIsSelecting(false);
     setIsDragging(false);
     setDragMarkerIndex(null);
-  }, []);
+  }, [isSelecting, selectionStart, selectionEnd, onSelectionChange]);
 
   const handleZoomIn = () => setZoom((z) => Math.min(32, z * 2));
   const handleZoomOut = () => {
@@ -251,7 +310,7 @@ export const WaveformEditor = ({
         ref={containerRef}
         className={cn(
           'h-48 rounded-lg border border-border overflow-hidden',
-          isDragging ? 'cursor-ew-resize' : 'cursor-crosshair'
+          isSelecting ? 'cursor-col-resize' : isDragging ? 'cursor-ew-resize' : 'cursor-crosshair'
         )}
       >
         <canvas
@@ -263,6 +322,10 @@ export const WaveformEditor = ({
           onMouseLeave={handleMouseUp}
         />
       </div>
+      
+      <p className="text-xs text-muted-foreground">
+        Click para preview • Shift+Drag para seleccionar región
+      </p>
     </div>
   );
 };
