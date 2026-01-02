@@ -6,6 +6,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 import { SampleParams } from '@/audio/SampleEngine';
 import { GranularParams } from '@/audio/GranularEngine';
 import { SliceEnvelope } from '@/hooks/useSampleState';
@@ -36,6 +39,11 @@ interface SampleProModalProps {
   // Slice envelope
   sliceEnvelope: SliceEnvelope;
   onSliceEnvelopeChange: (envelope: SliceEnvelope) => void;
+  // Crossfade
+  crossfadeMs: number;
+  crossfadeEnabled: boolean;
+  onCrossfadeMsChange: (ms: number) => void;
+  onCrossfadeEnabledChange: (enabled: boolean) => void;
   // Preview callback
   onPreviewPosition: (position: number) => void;
 }
@@ -56,6 +64,10 @@ export const SampleProModal = ({
   onCustomSliceMarkersChange,
   sliceEnvelope,
   onSliceEnvelopeChange,
+  crossfadeMs,
+  crossfadeEnabled,
+  onCrossfadeMsChange,
+  onCrossfadeEnabledChange,
   onPreviewPosition,
 }: SampleProModalProps) => {
   const [transientPositions, setTransientPositions] = useState<number[]>([]);
@@ -154,9 +166,38 @@ export const SampleProModal = ({
               envelope={sliceEnvelope}
               onChange={onSliceEnvelopeChange}
             />
+            
+            {/* Crossfade Controls */}
+            <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="crossfade-enabled"
+                  checked={crossfadeEnabled}
+                  onCheckedChange={onCrossfadeEnabledChange}
+                />
+                <Label htmlFor="crossfade-enabled" className="text-xs">
+                  Crossfade
+                </Label>
+              </div>
+              <div className="flex-1 flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground w-16">
+                  {crossfadeMs}ms
+                </Label>
+                <Slider
+                  value={[crossfadeMs]}
+                  onValueChange={([v]) => onCrossfadeMsChange(v)}
+                  min={0}
+                  max={50}
+                  step={1}
+                  disabled={!crossfadeEnabled}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+            
             <div className="text-xs text-muted-foreground">
               Drag markers to adjust slice points. Click to preview position.
-              Use zoom controls to inspect waveform details.
+              Enable crossfade for smooth transitions between slices.
             </div>
           </TabsContent>
 

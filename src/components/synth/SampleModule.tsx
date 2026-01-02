@@ -34,6 +34,9 @@ interface SampleModuleProps {
   customSliceMarkers: number[] | null;
   // Slice envelope
   sliceEnvelope: SliceEnvelope;
+  // Crossfade
+  crossfadeMs: number;
+  crossfadeEnabled: boolean;
   // Callbacks
   onLoadSample: (buffer: AudioBuffer, name: string) => void;
   onClearSample: () => void;
@@ -54,6 +57,9 @@ interface SampleModuleProps {
   onCustomSliceMarkersChange: (markers: number[] | null) => void;
   // Slice envelope callback
   onSliceEnvelopeChange: (envelope: SliceEnvelope) => void;
+  // Crossfade callbacks
+  onCrossfadeMsChange: (ms: number) => void;
+  onCrossfadeEnabledChange: (enabled: boolean) => void;
   // Preview position callback
   onPreviewPosition: (position: number) => void;
 }
@@ -73,6 +79,8 @@ export const SampleModule = ({
   granularParams,
   customSliceMarkers,
   sliceEnvelope,
+  crossfadeMs,
+  crossfadeEnabled,
   onLoadSample,
   onClearSample,
   onParamsChange,
@@ -89,6 +97,8 @@ export const SampleModule = ({
   onGranularParamsChange,
   onCustomSliceMarkersChange,
   onSliceEnvelopeChange,
+  onCrossfadeMsChange,
+  onCrossfadeEnabledChange,
   onPreviewPosition,
 }: SampleModuleProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -598,6 +608,10 @@ export const SampleModule = ({
           onCustomSliceMarkersChange={onCustomSliceMarkersChange}
           sliceEnvelope={sliceEnvelope}
           onSliceEnvelopeChange={onSliceEnvelopeChange}
+          crossfadeMs={crossfadeMs}
+          crossfadeEnabled={crossfadeEnabled}
+          onCrossfadeMsChange={onCrossfadeMsChange}
+          onCrossfadeEnabledChange={onCrossfadeEnabledChange}
           onPreviewPosition={onPreviewPosition}
         />
       </div>

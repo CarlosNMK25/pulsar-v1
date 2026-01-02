@@ -35,6 +35,12 @@ export class SampleEngine {
   private savedFxLevels = { reverb: 0.35, delay: 0.3 };
   private savedModLevel = 0;
 
+  // Crossfade tracking
+  private previousPlayer: AudioBufferSourceNode | null = null;
+  private previousGain: GainNode | null = null;
+  private crossfadeMs: number = 10;
+  private crossfadeEnabled: boolean = true;
+
   private params: SampleParams = {
     pitch: 1.0,
     startPoint: 0,
@@ -357,6 +363,12 @@ export class SampleEngine {
     };
   }
 
+  // Set crossfade parameters
+  setCrossfade(ms: number, enabled: boolean): void {
+    this.crossfadeMs = Math.max(0, Math.min(50, ms));
+    this.crossfadeEnabled = enabled;
+  }
+
   // Advanced trigger with per-step options (reverse, pitch, volume override) and ADSR envelope
   triggerSliceWithOptions(
     sliceIndex: number, 
@@ -370,6 +382,32 @@ export class SampleEngine {
     if (!this.buffer || !this.reversedBuffer) return;
 
     const ctx = audioEngine.getContext();
+    const now = ctx.currentTime;
+    
+    // Crossfade: fade out previous slice if enabled
+    if (this.crossfadeEnabled && this.previousGain && this.previousPlayer) {
+      const fadeOutDuration = this.crossfadeMs / 1000;
+      try {
+        this.previousGain.gain.cancelScheduledValues(now);
+        this.previousGain.gain.setValueAtTime(this.previousGain.gain.value, now);
+        this.previousGain.gain.linearRampToValueAtTime(0, now + fadeOutDuration);
+        
+        // Schedule cleanup after fade
+        const prevPlayer = this.previousPlayer;
+        const prevGain = this.previousGain;
+        setTimeout(() => {
+          try {
+            prevPlayer.stop();
+            prevPlayer.disconnect();
+            prevGain.disconnect();
+          } catch {
+            // Already stopped
+          }
+        }, fadeOutDuration * 1000 + 10);
+      } catch {
+        // Previous player already ended
+      }
+    }
     
     // Use per-step reverse if provided, otherwise use global reverse
     const useReverse = options.reverse ?? this.params.reverse;
@@ -409,13 +447,13 @@ export class SampleEngine {
 
     // Create a gain node for envelope and volume control
     const triggerGain = ctx.createGain();
-    const now = ctx.currentTime;
     const baseVolume = options.volume ?? 1.0;
+    const fadeInDuration = this.crossfadeMs / 1000;
 
     // Apply ADSR envelope if provided
     if (options.envelope) {
       const { attack, decay, sustain, release } = options.envelope;
-      const attackSec = attack / 1000;
+      const attackSec = Math.max(attack / 1000, this.crossfadeEnabled ? fadeInDuration : 0);
       const decaySec = decay / 1000;
       const releaseSec = release / 1000;
       const sustainLevel = sustain * baseVolume;
@@ -429,7 +467,13 @@ export class SampleEngine {
       triggerGain.gain.setValueAtTime(sustainLevel, now + releaseStart);
       triggerGain.gain.linearRampToValueAtTime(0, now + sliceDuration);
     } else {
-      triggerGain.gain.value = baseVolume;
+      // Apply crossfade fade-in if enabled and no envelope
+      if (this.crossfadeEnabled && this.previousPlayer) {
+        triggerGain.gain.setValueAtTime(0, now);
+        triggerGain.gain.linearRampToValueAtTime(baseVolume, now + fadeInDuration);
+      } else {
+        triggerGain.gain.value = baseVolume;
+      }
     }
 
     // Connect: player -> triggerGain -> outputs
@@ -441,9 +485,16 @@ export class SampleEngine {
 
     player.start(0, sliceStart, sliceDuration);
 
+    // Store for next crossfade
+    this.previousPlayer = player;
+    this.previousGain = triggerGain;
+
     player.onended = () => {
-      player.disconnect();
-      triggerGain.disconnect();
+      // Only disconnect if this is not being used for crossfade
+      if (this.previousPlayer !== player) {
+        player.disconnect();
+        triggerGain.disconnect();
+      }
     };
   }
 

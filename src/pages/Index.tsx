@@ -176,6 +176,8 @@ const Index = () => {
     granularEnabled: sampleState.granularEnabled,
     granularParams: sampleState.granularParams,
     sliceEnvelope: sampleState.sliceEnvelope,
+    crossfadeMs: sampleState.crossfadeMs,
+    crossfadeEnabled: sampleState.crossfadeEnabled,
   });
 
   const handlePlayPause = useCallback(async () => {
@@ -395,6 +397,8 @@ const Index = () => {
                 granularParams={sampleState.granularParams}
                 customSliceMarkers={sampleState.customSliceMarkers}
                 sliceEnvelope={sampleState.sliceEnvelope}
+                crossfadeMs={sampleState.crossfadeMs}
+                crossfadeEnabled={sampleState.crossfadeEnabled}
                 onLoadSample={async (buffer, name) => {
                   if (!isInitialized) {
                     await initAudio();
@@ -417,6 +421,8 @@ const Index = () => {
                 onGranularParamsChange={(params) => sampleState.setGranularParams(prev => ({ ...prev, ...params }))}
                 onCustomSliceMarkersChange={sampleState.setCustomSliceMarkers}
                 onSliceEnvelopeChange={sampleState.setSliceEnvelope}
+                onCrossfadeMsChange={sampleState.setCrossfadeMs}
+                onCrossfadeEnabledChange={sampleState.setCrossfadeEnabled}
                 onPreviewPosition={handlePreviewPosition}
               />
             </div>
