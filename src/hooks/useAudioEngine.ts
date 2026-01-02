@@ -149,6 +149,9 @@ interface UseAudioEngineProps {
   granularParams: GranularParams;
   // Slice envelope ADSR
   sliceEnvelope: SliceEnvelope;
+  // Crossfade between slices
+  crossfadeMs: number;
+  crossfadeEnabled: boolean;
 }
 
 // Evaluate conditional trigger
@@ -227,6 +230,8 @@ export const useAudioEngine = ({
   granularEnabled,
   granularParams,
   sliceEnvelope,
+  crossfadeMs,
+  crossfadeEnabled,
 }: UseAudioEngineProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [analyserData, setAnalyserData] = useState<Uint8Array>(new Uint8Array(128));
@@ -247,6 +252,10 @@ export const useAudioEngine = ({
   
   // Slice envelope ref for callback access
   const sliceEnvelopeRef = useRef<SliceEnvelope>(sliceEnvelope);
+  
+  // Crossfade refs for callback access
+  const crossfadeMsRef = useRef<number>(crossfadeMs);
+  const crossfadeEnabledRef = useRef<boolean>(crossfadeEnabled);
   
   // Track-specific glitch buses
   const drumsGlitchRef = useRef<GlitchBus | null>(null);
@@ -487,6 +496,15 @@ export const useAudioEngine = ({
   useEffect(() => {
     sliceEnvelopeRef.current = sliceEnvelope;
   }, [sliceEnvelope]);
+
+  // Sync crossfade parameters
+  useEffect(() => {
+    crossfadeMsRef.current = crossfadeMs;
+    crossfadeEnabledRef.current = crossfadeEnabled;
+    if (sampleRef.current) {
+      sampleRef.current.setCrossfade(crossfadeMs, crossfadeEnabled);
+    }
+  }, [crossfadeMs, crossfadeEnabled]);
 
   // Update FX parameters
   useEffect(() => {

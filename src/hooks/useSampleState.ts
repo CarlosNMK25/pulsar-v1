@@ -42,6 +42,9 @@ export interface SampleState {
   customSliceMarkers: number[] | null;
   // Slice envelope
   sliceEnvelope: SliceEnvelope;
+  // Crossfade between slices
+  crossfadeMs: number;
+  crossfadeEnabled: boolean;
 }
 
 export const defaultGranularParams: GranularParams = {
@@ -99,6 +102,10 @@ export const useSampleState = () => {
   
   // Slice envelope
   const [sliceEnvelope, setSliceEnvelope] = useState<SliceEnvelope>(defaultSliceEnvelope);
+  
+  // Crossfade between slices
+  const [crossfadeMs, setCrossfadeMs] = useState<number>(10);
+  const [crossfadeEnabled, setCrossfadeEnabled] = useState<boolean>(true);
   
   // Animation refs for slice progress
   const sliceAnimationRef = useRef<number | null>(null);
@@ -206,6 +213,8 @@ export const useSampleState = () => {
     if (state.granularParams !== undefined) setGranularParams(state.granularParams);
     if (state.customSliceMarkers !== undefined) setCustomSliceMarkers(state.customSliceMarkers);
     if (state.sliceEnvelope !== undefined) setSliceEnvelope(state.sliceEnvelope);
+    if (state.crossfadeMs !== undefined) setCrossfadeMs(state.crossfadeMs);
+    if (state.crossfadeEnabled !== undefined) setCrossfadeEnabled(state.crossfadeEnabled);
   }, []);
 
   return {
@@ -241,6 +250,11 @@ export const useSampleState = () => {
     // Slice envelope
     sliceEnvelope,
     setSliceEnvelope,
+    // Crossfade
+    crossfadeMs,
+    setCrossfadeMs,
+    crossfadeEnabled,
+    setCrossfadeEnabled,
   };
 };
 
