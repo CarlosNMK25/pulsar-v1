@@ -14,6 +14,10 @@ interface UseKeyboardShortcutsProps {
   activeScene: string;
   hasClipboard: boolean;
   scenes: Scene[];
+  handleUndo?: () => void;
+  handleRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const useKeyboardShortcuts = ({
@@ -25,6 +29,10 @@ export const useKeyboardShortcuts = ({
   activeScene,
   hasClipboard,
   scenes,
+  handleUndo,
+  handleRedo,
+  canUndo,
+  canRedo,
 }: UseKeyboardShortcutsProps) => {
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -51,9 +59,18 @@ export const useKeyboardShortcuts = ({
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV' && hasClipboard) {
         handleScenePaste(activeScene);
       }
+      // Undo/Redo shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey && handleUndo && canUndo) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ' && handleRedo && canRedo) {
+        e.preventDefault();
+        handleRedo();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePlayPause, handleStop, handleSceneSelect, handleSceneCopy, handleScenePaste, activeScene, hasClipboard, scenes]);
+  }, [handlePlayPause, handleStop, handleSceneSelect, handleSceneCopy, handleScenePaste, activeScene, hasClipboard, scenes, handleUndo, handleRedo, canUndo, canRedo]);
 };

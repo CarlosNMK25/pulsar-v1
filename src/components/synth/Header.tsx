@@ -19,6 +19,11 @@ interface HeaderProps {
   morphTargetName?: string;
   audioState?: string;
   isInitialized?: boolean;
+  // Undo/Redo
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const Header = ({ 
@@ -36,6 +41,10 @@ export const Header = ({
   morphTargetName,
   audioState = 'suspended',
   isInitialized = false,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: HeaderProps) => {
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/95 backdrop-blur-md">
@@ -111,18 +120,30 @@ export const Header = ({
 
       {/* Right section */}
       <div className="flex items-center gap-2">
-        {/* Undo/Redo (disabled placeholders) */}
+        {/* Undo/Redo */}
         <button
-          disabled
-          className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/50 cursor-not-allowed"
-          title="Undo (coming soon)"
+          onClick={onUndo}
+          disabled={!canUndo}
+          className={cn(
+            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
+            canUndo 
+              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              : 'text-muted-foreground/50 cursor-not-allowed'
+          )}
+          title={canUndo ? 'Undo (Ctrl+Z)' : 'Nothing to undo'}
         >
           <Undo2 className="w-4 h-4" />
         </button>
         <button
-          disabled
-          className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/50 cursor-not-allowed"
-          title="Redo (coming soon)"
+          onClick={onRedo}
+          disabled={!canRedo}
+          className={cn(
+            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
+            canRedo 
+              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              : 'text-muted-foreground/50 cursor-not-allowed'
+          )}
+          title={canRedo ? 'Redo (Ctrl+Shift+Z)' : 'Nothing to redo'}
         >
           <Redo2 className="w-4 h-4" />
         </button>

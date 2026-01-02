@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { GlitchTarget } from '@/audio/AudioEngine';
 import { Header } from '@/components/synth/Header';
 import { TransportControls } from '@/components/synth/TransportControls';
@@ -31,6 +31,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMusicalKeyboard } from '@/hooks/useMusicalKeyboard';
 import { useUILayout } from '@/hooks/useUILayout';
 import { useGlitchState, GlitchTrackId } from '@/hooks/useGlitchState';
+import { useHistory, HistorySnapshot } from '@/hooks/useHistory';
 import { SampleModule } from '@/components/synth/SampleModule';
 import { KeyboardTarget } from '@/components/synth/dock/KeyboardTab';
 
@@ -68,9 +69,11 @@ const Index = () => {
   const modulationState = useModulationState();
   const sampleState = useSampleState();
   const glitchState = useGlitchState();
+  const history = useHistory({ maxStackSize: 50, debounceMs: 300 });
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
   const [keyboardTarget, setKeyboardTarget] = useState<KeyboardTarget>('synth');
   const [keyboardOctave, setKeyboardOctave] = useState(3);
+  const isRestoringRef = useRef(false);
 
   // Scene manager
   const sceneManager = useSceneManager({
@@ -198,6 +201,129 @@ const Index = () => {
     audioMacroChange(id, value);
   }, [audioMacroChange, sceneManager]);
 
+  // Capture current state as a snapshot (without AudioBuffer)
+  const captureSnapshot = useCallback((): HistorySnapshot => ({
+    timestamp: Date.now(),
+    drums: {
+      kickSteps: drumState.kickSteps,
+      snareSteps: drumState.snareSteps,
+      hatSteps: drumState.hatSteps,
+      kickLength: drumState.kickLength,
+      snareLength: drumState.snareLength,
+      hatLength: drumState.hatLength,
+      drumParams: drumState.drumParams,
+      drumMuted: drumState.drumMuted,
+    },
+    synth: {
+      synthSteps: synthState.synthSteps,
+      synthLength: synthState.synthLength,
+      synthParams: synthState.synthParams,
+      synthMuted: synthState.synthMuted,
+    },
+    texture: {
+      textureMuted: textureState.textureMuted,
+      textureMode: textureState.textureMode,
+      textureParams: textureState.textureParams,
+    },
+    fx: {
+      reverbParams: fxState.reverbParams,
+      delayParams: fxState.delayParams,
+      masterFilterParams: fxState.masterFilterParams,
+      sendLevels: fxState.sendLevels,
+      fxRoutingMode: fxState.fxRoutingMode,
+      fxTargets: fxState.fxTargets,
+      trackRouting: fxState.trackRouting,
+      fxOffsetsPerTrack: fxState.fxOffsetsPerTrack,
+    },
+    sample: {
+      sampleSteps: sampleState.sampleSteps,
+      sampleParams: sampleState.sampleParams,
+      sampleMuted: sampleState.sampleMuted,
+      granularEnabled: sampleState.granularEnabled,
+      granularParams: sampleState.granularParams,
+      customSliceMarkers: sampleState.customSliceMarkers,
+      sliceEnvelope: sampleState.sliceEnvelope,
+      crossfadeMs: sampleState.crossfadeMs,
+      crossfadeEnabled: sampleState.crossfadeEnabled,
+    },
+    modulation: {
+      chorus: modulationState.chorus,
+      flanger: modulationState.flanger,
+      phaser: modulationState.phaser,
+      tremolo: modulationState.tremolo,
+      ringMod: modulationState.ringMod,
+      autoPan: modulationState.autoPan,
+      bypassed: modulationState.bypassed,
+      modSendLevels: modulationState.modSendLevels,
+      modOffsetsPerTrack: modulationState.modOffsetsPerTrack,
+    },
+    glitch: {
+      paramsPerTrack: glitchState.paramsPerTrack,
+      masterMix: glitchState.masterMix,
+    },
+    transport: { bpm, swing },
+  }), [
+    drumState, synthState, textureState, fxState, sampleState, 
+    modulationState, glitchState, bpm, swing
+  ]);
+
+  // Restore state from snapshot
+  const restoreSnapshot = useCallback((snapshot: HistorySnapshot) => {
+    isRestoringRef.current = true;
+    
+    drumState.setAllDrumState(snapshot.drums);
+    synthState.setAllSynthState(snapshot.synth);
+    textureState.setAllTextureState(snapshot.texture);
+    fxState.setAllFXState(snapshot.fx);
+    sampleState.setAllSampleState(snapshot.sample);
+    modulationState.setAllModulationState(snapshot.modulation);
+    glitchState.setAllParams(snapshot.glitch.paramsPerTrack);
+    glitchState.setMasterMix(snapshot.glitch.masterMix);
+    setBpm(snapshot.transport.bpm);
+    setSwing(snapshot.transport.swing);
+    
+    // Reset flag after a tick to allow state to settle
+    requestAnimationFrame(() => {
+      isRestoringRef.current = false;
+    });
+  }, [drumState, synthState, textureState, fxState, sampleState, modulationState, glitchState]);
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    const snapshot = history.undo(captureSnapshot());
+    if (snapshot) restoreSnapshot(snapshot);
+  }, [history, captureSnapshot, restoreSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    const snapshot = history.redo(captureSnapshot());
+    if (snapshot) restoreSnapshot(snapshot);
+  }, [history, captureSnapshot, restoreSnapshot]);
+
+  // Push state to history on significant changes (debounced)
+  const lastStateHashRef = useRef('');
+  useEffect(() => {
+    if (isRestoringRef.current) return;
+    
+    // Simple hash to detect changes
+    const stateHash = JSON.stringify({
+      drums: drumState.kickSteps.map(s => s.active).join('') + 
+             drumState.snareSteps.map(s => s.active).join('') + 
+             drumState.hatSteps.map(s => s.active).join(''),
+      synth: synthState.synthSteps.map(s => s.active).join(''),
+      sample: sampleState.sampleSteps.map(s => s.active).join(''),
+      bpm, swing,
+    });
+    
+    if (stateHash !== lastStateHashRef.current && lastStateHashRef.current !== '') {
+      history.pushState(captureSnapshot());
+    }
+    lastStateHashRef.current = stateHash;
+  }, [
+    drumState.kickSteps, drumState.snareSteps, drumState.hatSteps,
+    synthState.synthSteps, sampleState.sampleSteps, bpm, swing,
+    history, captureSnapshot
+  ]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     handlePlayPause,
@@ -208,6 +334,10 @@ const Index = () => {
     activeScene: sceneManager.activeScene,
     hasClipboard: sceneManager.hasClipboard,
     scenes: sceneManager.scenes,
+    handleUndo,
+    handleRedo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
   });
 
   // Musical keyboard (global - works in any tab)
@@ -244,6 +374,10 @@ const Index = () => {
           morphTargetName={sceneManager.morphTargetScene ? sceneManager.scenes.find(s => s.id === sceneManager.morphTargetScene)?.name : undefined}
           audioState={audioState}
           isInitialized={isInitialized}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
         />
         <div className="border-b border-border bg-card/95 backdrop-blur-md px-6 py-3 shadow-sm">
           <TransportControls
@@ -609,7 +743,7 @@ const Index = () => {
       {/* Footer hint */}
       <footer className="px-6 py-2 border-t border-border text-xs text-muted-foreground text-center">
         <span className="opacity-50">
-          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Ctrl+C/V: Copy/Paste
+          Space: Play/Pause • Esc: Stop • Shift+1-8: Scenes • Ctrl+C/V: Copy/Paste • Ctrl+Z: Undo • Ctrl+Shift+Z: Redo
         </span>
       </footer>
 
