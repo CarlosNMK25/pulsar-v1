@@ -82,6 +82,15 @@ export const SampleProModal = ({
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   
+  // Clipboard state for copy/paste operations
+  const [clipboard, setClipboard] = useState<Float32Array[] | null>(null);
+  const [clipboardSampleRate, setClipboardSampleRate] = useState<number>(44100);
+  
+  const handleClipboardChange = useCallback((data: Float32Array[] | null, sampleRate: number) => {
+    setClipboard(data);
+    setClipboardSampleRate(sampleRate);
+  }, []);
+  
   const handleSelectionChange = useCallback((start: number | null, end: number | null) => {
     setSelectionStart(start);
     setSelectionEnd(end);
@@ -253,6 +262,9 @@ export const SampleProModal = ({
               onBufferProcessed={handleBufferProcessed}
               selectionStart={selectionStart}
               selectionEnd={selectionEnd}
+              clipboard={clipboard}
+              clipboardSampleRate={clipboardSampleRate}
+              onClipboardChange={handleClipboardChange}
             />
             <div className="text-xs text-muted-foreground">
               Apply destructive edits to the sample. Changes are applied immediately
