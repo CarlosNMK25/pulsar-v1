@@ -35,6 +35,11 @@ export const WaveformEditor = ({
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  
+  // Refs to track selection values in real-time (for callbacks - avoids stale closures)
+  const selectionStartRef = useRef<number | null>(null);
+  const selectionEndRef = useRef<number | null>(null);
+  const isSelectingRef = useRef(false);
 
   // Observe container size
   useEffect(() => {
@@ -203,6 +208,12 @@ export const WaveformEditor = ({
 
     // Shift+click starts region selection
     if (e.shiftKey) {
+      // Update refs immediately for the mouseUp callback
+      selectionStartRef.current = clickPosition;
+      selectionEndRef.current = clickPosition;
+      isSelectingRef.current = true;
+      
+      // Update state for rendering
       setSelectionStart(clickPosition);
       setSelectionEnd(clickPosition);
       setIsSelecting(true);
@@ -211,6 +222,8 @@ export const WaveformEditor = ({
 
     // Clear selection on normal click
     if (selectionStart !== null || selectionEnd !== null) {
+      selectionStartRef.current = null;
+      selectionEndRef.current = null;
       setSelectionStart(null);
       setSelectionEnd(null);
       onSelectionChange?.(null, null);
@@ -241,6 +254,7 @@ export const WaveformEditor = ({
 
     // Handle region selection
     if (isSelecting) {
+      selectionEndRef.current = position;
       setSelectionEnd(position);
       return;
     }
@@ -255,14 +269,17 @@ export const WaveformEditor = ({
   }, [isSelecting, isDragging, dragMarkerIndex, buffer, zoom, scrollOffset, sliceMarkers, onSliceMarkersChange]);
 
   const handleMouseUp = useCallback(() => {
-    if (isSelecting && selectionStart !== null && selectionEnd !== null) {
-      // Notify parent of selection change
-      onSelectionChange?.(selectionStart, selectionEnd);
+    // Use refs instead of state values to avoid stale closures
+    if (isSelectingRef.current && 
+        selectionStartRef.current !== null && 
+        selectionEndRef.current !== null) {
+      onSelectionChange?.(selectionStartRef.current, selectionEndRef.current);
     }
+    isSelectingRef.current = false;
     setIsSelecting(false);
     setIsDragging(false);
     setDragMarkerIndex(null);
-  }, [isSelecting, selectionStart, selectionEnd, onSelectionChange]);
+  }, [onSelectionChange]);
 
   const handleZoomIn = () => setZoom((z) => Math.min(32, z * 2));
   const handleZoomOut = () => {
