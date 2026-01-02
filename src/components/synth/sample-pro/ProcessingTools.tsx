@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 interface ProcessingToolsProps {
   buffer: AudioBuffer | null;
   onBufferProcessed: (buffer: AudioBuffer, name: string) => void;
+  selectionStart?: number | null;
+  selectionEnd?: number | null;
 }
 
 const SAMPLE_RATES = [
@@ -18,8 +20,15 @@ const SAMPLE_RATES = [
   { value: 88200, label: '88200 Hz (+1 oct)' },
 ];
 
-export const ProcessingTools = ({ buffer, onBufferProcessed }: ProcessingToolsProps) => {
+export const ProcessingTools = ({ 
+  buffer, 
+  onBufferProcessed,
+  selectionStart,
+  selectionEnd,
+}: ProcessingToolsProps) => {
   const [targetSampleRate, setTargetSampleRate] = useState(44100);
+  
+  const hasSelection = selectionStart !== null && selectionEnd !== null;
   
   // Normalize audio to peak at 1.0
   const handleNormalize = useCallback(async () => {
@@ -226,6 +235,48 @@ export const ProcessingTools = ({ buffer, onBufferProcessed }: ProcessingToolsPr
     }
   }, [buffer, targetSampleRate, onBufferProcessed]);
 
+  // Reverse only selected region
+  const handleReverseRegion = useCallback(() => {
+    if (!buffer || !hasSelection || selectionStart === null || selectionEnd === null) return;
+
+    const ctx = audioEngine.getContext();
+    const start = Math.min(selectionStart, selectionEnd);
+    const end = Math.max(selectionStart, selectionEnd);
+    
+    const startSample = Math.floor(start * buffer.length);
+    const endSample = Math.floor(end * buffer.length);
+    
+    const newBuffer = ctx.createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      
+      // Copy before selection
+      for (let i = 0; i < startSample; i++) {
+        dest[i] = source[i];
+      }
+      
+      // Reverse selection
+      for (let i = startSample; i < endSample; i++) {
+        dest[i] = source[endSample - 1 - (i - startSample)];
+      }
+      
+      // Copy after selection
+      for (let i = endSample; i < buffer.length; i++) {
+        dest[i] = source[i];
+      }
+    }
+
+    const durationMs = ((endSample - startSample) / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-reversed');
+    toast.success(`Region reversed (${durationMs}ms)`);
+  }, [buffer, hasSelection, selectionStart, selectionEnd, onBufferProcessed]);
+
   const isDisabled = !buffer;
 
   return (
@@ -319,6 +370,24 @@ export const ProcessingTools = ({ buffer, onBufferProcessed }: ProcessingToolsPr
           Resample
         </Button>
       </div>
+      
+      {/* Region-based operations */}
+      {hasSelection && (
+        <div className="pt-2 border-t border-border">
+          <p className="text-xs text-muted-foreground mb-2">
+            Región seleccionada
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReverseRegion}
+            className="gap-1 w-full"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Reverse Selection
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
