@@ -757,10 +757,11 @@ export const useAudioEngine = ({
     }
   }, [sampleIsPlaying, isInitialized]);
 
-  // Scheduler step callback - triggers sounds with precise timing
+  // Unified scheduler control - register callbacks THEN start/stop
   useEffect(() => {
     if (!isInitialized) return;
 
+    // Step callback - triggers sounds with precise timing
     const stepCallback: StepCallback = (step, time) => {
       const { kickSteps, snareSteps, hatSteps, synthSteps, sampleSteps } = stepsRef.current;
       
@@ -1029,14 +1030,7 @@ export const useAudioEngine = ({
       previousStepFired.current = anyFiredThisStep;
     };
 
-    const unsubscribe = scheduler.onStep(stepCallback);
-    return unsubscribe;
-  }, [isInitialized]);
-
-  // Auto-Fill: Trigger FILL automatically every N bars
-  useEffect(() => {
-    if (!isInitialized) return;
-
+    // Auto-Fill bar callback
     const barCallback = (barNumber: number) => {
       const config = autoFillConfigRef.current;
       if (!config?.enabled) return;
@@ -1064,14 +1058,11 @@ export const useAudioEngine = ({
       }
     };
 
-    const unsubscribe = scheduler.onBar(barCallback);
-    return unsubscribe;
-  }, [isInitialized]);
+    // Register callbacks FIRST
+    const unsubscribeStep = scheduler.onStep(stepCallback);
+    const unsubscribeBar = scheduler.onBar(barCallback);
 
-  // Start/stop scheduler based on isPlaying
-  useEffect(() => {
-    if (!isInitialized) return;
-
+    // THEN start/stop based on isPlaying
     if (isPlaying) {
       scheduler.start();
     } else {
@@ -1080,7 +1071,13 @@ export const useAudioEngine = ({
       granularRef.current?.stop();
       setCurrentStep(0);
     }
-  }, [isPlaying, isInitialized]);
+
+    return () => {
+      unsubscribeStep();
+      unsubscribeBar();
+      scheduler.stop();
+    };
+  }, [isInitialized, isPlaying]);
 
   // Analyser animation loop
   useEffect(() => {
