@@ -5,7 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { audioEngine } from '@/audio/AudioEngine';
 import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, Clock, Music, Copy, ClipboardPaste, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { timeStretch, estimateBPMFromDuration } from '@/utils/timeStretch';
+import { timeStretch, estimateBPMFromDuration, calculateBPMStretchRatio } from '@/utils/timeStretch';
 import { pitchShift } from '@/utils/pitchShift';
 
 interface ProcessingToolsProps {
@@ -40,6 +40,8 @@ export const ProcessingTools = ({
   const [pitchSemitones, setPitchSemitones] = useState(0);
   const [pitchCents, setPitchCents] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [targetBPM, setTargetBPM] = useState(120);
+  const [assumedBars, setAssumedBars] = useState(1);
   
   const hasSelection = selectionStart !== null && selectionEnd !== null;
 
@@ -58,11 +60,11 @@ export const ProcessingTools = ({
     };
   }, [buffer, selectionStart, selectionEnd]);
 
-  // Estimate BPM from buffer
+  // Estimate BPM from buffer based on assumed bars
   const estimatedBPM = useMemo(() => {
     if (!buffer) return null;
-    return estimateBPMFromDuration(buffer, 1, 4);
-  }, [buffer]);
+    return estimateBPMFromDuration(buffer, assumedBars, 4);
+  }, [buffer, assumedBars]);
 
   // Helper to get selection sample range
   const getSelectionRange = useCallback(() => {
@@ -449,6 +451,24 @@ export const ProcessingTools = ({
     }
   }, [buffer, stretchRatio, isProcessing, onBufferProcessed]);
 
+  // Stretch to BPM handler
+  const handleStretchToBPM = useCallback(() => {
+    if (!buffer || !estimatedBPM || isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      const ratio = calculateBPMStretchRatio(estimatedBPM, targetBPM);
+      const stretched = timeStretch(buffer, ratio);
+      const newDuration = (stretched.length / stretched.sampleRate).toFixed(2);
+      onBufferProcessed(stretched, `stretched-to-${targetBPM}bpm`);
+      toast.success(`Stretched: ${estimatedBPM.toFixed(1)} → ${targetBPM} BPM (${newDuration}s)`);
+    } catch (err) {
+      toast.error('Stretch to BPM failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [buffer, estimatedBPM, targetBPM, isProcessing, onBufferProcessed]);
+
   // Pitch Shift handler
   const handlePitchShift = useCallback(async () => {
     if (!buffer || isProcessing) return;
@@ -699,9 +719,49 @@ export const ProcessingTools = ({
         </div>
         {estimatedBPM && (
           <p className="text-xs text-muted-foreground">
-            Est. BPM: {estimatedBPM} → {(estimatedBPM / stretchRatio).toFixed(1)}
+            Est. BPM: {estimatedBPM.toFixed(1)} → {(estimatedBPM / stretchRatio).toFixed(1)}
           </p>
         )}
+        
+        {/* Stretch to BPM */}
+        <div className="pt-2 mt-2 border-t border-border/50 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Bars:</span>
+            <Select value={String(assumedBars)} onValueChange={(v) => setAssumedBars(Number(v))}>
+              <SelectTrigger className="w-16 h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 4, 8, 16].map((bars) => (
+                  <SelectItem key={bars} value={String(bars)}>
+                    {bars}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="number"
+              value={targetBPM}
+              onChange={(e) => setTargetBPM(Math.max(20, Math.min(300, Number(e.target.value))))}
+              className="w-16 h-7 text-xs px-2 rounded border border-border bg-background text-center"
+              min={20}
+              max={300}
+              disabled={isDisabled}
+            />
+            <span className="text-xs text-muted-foreground">BPM</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStretchToBPM}
+            disabled={isDisabled || !estimatedBPM}
+            className="w-full gap-1"
+          >
+            <Clock className="w-3 h-3" />
+            Stretch to {targetBPM} BPM
+          </Button>
+        </div>
       </div>
 
       {/* Pitch Shift */}
