@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { audioEngine } from '@/audio/AudioEngine';
-import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, TrendingUp, Clock, Music } from 'lucide-react';
+import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, Clock, Music, Copy, ClipboardPaste, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { timeStretch, estimateBPMFromDuration, calculateBPMStretchRatio } from '@/utils/timeStretch';
+import { timeStretch, estimateBPMFromDuration } from '@/utils/timeStretch';
 import { pitchShift } from '@/utils/pitchShift';
 
 interface ProcessingToolsProps {
@@ -13,6 +13,9 @@ interface ProcessingToolsProps {
   onBufferProcessed: (buffer: AudioBuffer, name: string) => void;
   selectionStart?: number | null;
   selectionEnd?: number | null;
+  clipboard?: Float32Array[] | null;
+  clipboardSampleRate?: number;
+  onClipboardChange?: (data: Float32Array[] | null, sampleRate: number) => void;
 }
 
 const SAMPLE_RATES = [
@@ -28,6 +31,9 @@ export const ProcessingTools = ({
   onBufferProcessed,
   selectionStart,
   selectionEnd,
+  clipboard,
+  clipboardSampleRate = 44100,
+  onClipboardChange,
 }: ProcessingToolsProps) => {
   const [targetSampleRate, setTargetSampleRate] = useState(44100);
   const [stretchRatio, setStretchRatio] = useState(1.0);
@@ -456,11 +462,110 @@ export const ProcessingTools = ({
     } catch (err) {
       toast.error('Pitch shift failed');
     } finally {
-      setIsProcessing(false);
+    setIsProcessing(false);
     }
   }, [buffer, pitchSemitones, pitchCents, isProcessing, onBufferProcessed]);
 
+  // Copy region to clipboard
+  const handleCopyRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range || !onClipboardChange) return;
+
+    const { startSample, endSample } = range;
+    const regionLength = endSample - startSample;
+    const channelData: Float32Array[] = [];
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const data = new Float32Array(regionLength);
+      for (let i = 0; i < regionLength; i++) {
+        data[i] = source[startSample + i];
+      }
+      channelData.push(data);
+    }
+
+    onClipboardChange(channelData, buffer.sampleRate);
+    const durationMs = (regionLength / buffer.sampleRate * 1000).toFixed(0);
+    toast.success(`Copiado ${durationMs}ms al clipboard`);
+  }, [buffer, getSelectionRange, onClipboardChange]);
+
+  // Cut region (copy + mute)
+  const handleCutRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range || !onClipboardChange) return;
+
+    const { startSample, endSample } = range;
+    const regionLength = endSample - startSample;
+    const channelData: Float32Array[] = [];
+
+    // Copy to clipboard first
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const data = new Float32Array(regionLength);
+      for (let i = 0; i < regionLength; i++) {
+        data[i] = source[startSample + i];
+      }
+      channelData.push(data);
+    }
+    onClipboardChange(channelData, buffer.sampleRate);
+
+    // Then mute the region
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      for (let i = startSample; i < endSample; i++) {
+        dest[i] = 0;
+      }
+    }
+
+    const durationMs = (regionLength / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'cut');
+    toast.success(`Cortado ${durationMs}ms`);
+  }, [buffer, getSelectionRange, onClipboardChange, onBufferProcessed]);
+
+  // Paste clipboard at end
+  const handlePaste = useCallback(() => {
+    if (!buffer || !clipboard || clipboard.length === 0) return;
+
+    const ctx = audioEngine.getContext();
+    const clipboardLength = clipboard[0].length;
+    const newLength = buffer.length + clipboardLength;
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      
+      // Copy original buffer
+      dest.set(source);
+      
+      // Append clipboard (use channel 0 if clipboard has fewer channels)
+      const clipCh = Math.min(ch, clipboard.length - 1);
+      for (let i = 0; i < clipboardLength; i++) {
+        dest[buffer.length + i] = clipboard[clipCh][i];
+      }
+    }
+
+    const durationMs = (clipboardLength / clipboardSampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'pasted');
+    toast.success(`Pegado ${durationMs}ms al final`);
+  }, [buffer, clipboard, clipboardSampleRate, onBufferProcessed]);
+
+  // Clear clipboard
+  const handleClearClipboard = useCallback(() => {
+    if (onClipboardChange) {
+      onClipboardChange(null, 44100);
+      toast.success('Clipboard limpiado');
+    }
+  }, [onClipboardChange]);
+
   const isDisabled = !buffer || isProcessing;
+  const hasClipboard = clipboard && clipboard.length > 0 && clipboard[0].length > 0;
+  const clipboardDuration = hasClipboard ? (clipboard[0].length / clipboardSampleRate).toFixed(2) : '0';
 
   return (
     <div className="space-y-4 p-4 bg-card rounded-lg border border-border">
@@ -722,6 +827,59 @@ export const ProcessingTools = ({
             >
               <RotateCcw className="w-3 h-3" />
               Reverse
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyRegion}
+              className="gap-1"
+            >
+              <Copy className="w-3 h-3" />
+              Copy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCutRegion}
+              className="gap-1"
+            >
+              <Scissors className="w-3 h-3" />
+              Cut
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Clipboard section */}
+      {hasClipboard && (
+        <div className="pt-2 border-t border-border">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-primary">
+              Clipboard
+            </p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {clipboardDuration}s copiado
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePaste}
+              disabled={isDisabled}
+              className="flex-1 gap-1"
+            >
+              <ClipboardPaste className="w-3 h-3" />
+              Paste al final
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearClipboard}
+              className="gap-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear
             </Button>
           </div>
         </div>
