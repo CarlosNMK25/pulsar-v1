@@ -1,9 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { audioEngine } from '@/audio/AudioEngine';
-import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, TrendingUp } from 'lucide-react';
+import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, TrendingUp, Clock, Music } from 'lucide-react';
 import { toast } from 'sonner';
+import { timeStretch, estimateBPMFromDuration, calculateBPMStretchRatio } from '@/utils/timeStretch';
+import { pitchShift } from '@/utils/pitchShift';
 
 interface ProcessingToolsProps {
   buffer: AudioBuffer | null;
@@ -27,8 +30,33 @@ export const ProcessingTools = ({
   selectionEnd,
 }: ProcessingToolsProps) => {
   const [targetSampleRate, setTargetSampleRate] = useState(44100);
+  const [stretchRatio, setStretchRatio] = useState(1.0);
+  const [pitchSemitones, setPitchSemitones] = useState(0);
+  const [pitchCents, setPitchCents] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const hasSelection = selectionStart !== null && selectionEnd !== null;
+
+  // Calculate selection info for display
+  const selectionInfo = useMemo(() => {
+    if (!buffer || selectionStart === null || selectionEnd === null) return null;
+    const start = Math.min(selectionStart, selectionEnd);
+    const end = Math.max(selectionStart, selectionEnd);
+    const startTime = (start * buffer.length / buffer.sampleRate);
+    const endTime = (end * buffer.length / buffer.sampleRate);
+    const duration = endTime - startTime;
+    return {
+      startTime: startTime.toFixed(2),
+      endTime: endTime.toFixed(2),
+      duration: duration.toFixed(2),
+    };
+  }, [buffer, selectionStart, selectionEnd]);
+
+  // Estimate BPM from buffer
+  const estimatedBPM = useMemo(() => {
+    if (!buffer) return null;
+    return estimateBPMFromDuration(buffer, 1, 4);
+  }, [buffer]);
 
   // Helper to get selection sample range
   const getSelectionRange = useCallback(() => {
@@ -398,7 +426,41 @@ export const ProcessingTools = ({
     toast.success(`Region boosted +6dB (${durationMs}ms)`);
   }, [buffer, getSelectionRange, onBufferProcessed]);
 
-  const isDisabled = !buffer;
+  // Time Stretch handler
+  const handleTimeStretch = useCallback(() => {
+    if (!buffer || isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      const stretched = timeStretch(buffer, stretchRatio);
+      const newDuration = (stretched.length / stretched.sampleRate).toFixed(2);
+      onBufferProcessed(stretched, `stretched-${stretchRatio.toFixed(2)}x`);
+      toast.success(`Time stretched ${stretchRatio.toFixed(2)}x → ${newDuration}s`);
+    } catch (err) {
+      toast.error('Time stretch failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [buffer, stretchRatio, isProcessing, onBufferProcessed]);
+
+  // Pitch Shift handler
+  const handlePitchShift = useCallback(async () => {
+    if (!buffer || isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      const shifted = await pitchShift(buffer, pitchSemitones, pitchCents);
+      const sign = pitchSemitones >= 0 ? '+' : '';
+      onBufferProcessed(shifted, `pitch-${sign}${pitchSemitones}st`);
+      toast.success(`Pitch shifted ${sign}${pitchSemitones} semitones`);
+    } catch (err) {
+      toast.error('Pitch shift failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [buffer, pitchSemitones, pitchCents, isProcessing, onBufferProcessed]);
+
+  const isDisabled = !buffer || isProcessing;
 
   return (
     <div className="space-y-4 p-4 bg-card rounded-lg border border-border">
@@ -492,12 +554,120 @@ export const ProcessingTools = ({
         </Button>
       </div>
       
-      {/* Region-based operations */}
-      {hasSelection && (
-        <div className="pt-2 border-t border-border">
-          <p className="text-xs text-muted-foreground mb-2">
-            Región seleccionada
+      {/* Time Stretch */}
+      <div className="pt-2 border-t border-border space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Time Stretch
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {stretchRatio.toFixed(2)}x
+          </span>
+        </div>
+        <Slider
+          value={[stretchRatio]}
+          onValueChange={([v]) => setStretchRatio(v)}
+          min={0.5}
+          max={2}
+          step={0.05}
+          disabled={isDisabled}
+        />
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTimeStretch}
+            disabled={isDisabled}
+            className="flex-1 gap-1"
+          >
+            Apply Stretch
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStretchRatio(1)}
+            disabled={isDisabled}
+          >
+            Reset
+          </Button>
+        </div>
+        {estimatedBPM && (
+          <p className="text-xs text-muted-foreground">
+            Est. BPM: {estimatedBPM} → {(estimatedBPM / stretchRatio).toFixed(1)}
           </p>
+        )}
+      </div>
+
+      {/* Pitch Shift */}
+      <div className="pt-2 border-t border-border space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium flex items-center gap-1">
+            <Music className="w-3 h-3" />
+            Pitch Shift
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {pitchSemitones >= 0 ? '+' : ''}{pitchSemitones} st, {pitchCents >= 0 ? '+' : ''}{pitchCents} ct
+          </span>
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground w-8">Semi</span>
+            <Slider
+              value={[pitchSemitones]}
+              onValueChange={([v]) => setPitchSemitones(v)}
+              min={-12}
+              max={12}
+              step={1}
+              disabled={isDisabled}
+              className="flex-1"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground w-8">Cents</span>
+            <Slider
+              value={[pitchCents]}
+              onValueChange={([v]) => setPitchCents(v)}
+              min={-100}
+              max={100}
+              step={5}
+              disabled={isDisabled}
+              className="flex-1"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePitchShift}
+            disabled={isDisabled}
+            className="flex-1 gap-1"
+          >
+            Apply Pitch
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setPitchSemitones(0); setPitchCents(0); }}
+            disabled={isDisabled}
+          >
+            Reset
+          </Button>
+        </div>
+      </div>
+      
+      {/* Region-based operations */}
+      {hasSelection && selectionInfo && (
+        <div className="pt-2 border-t border-border">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-primary">
+              Región seleccionada
+            </p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {selectionInfo.startTime}s - {selectionInfo.endTime}s ({selectionInfo.duration}s)
+            </p>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             <Button
               variant="outline"
