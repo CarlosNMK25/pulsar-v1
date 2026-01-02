@@ -60,23 +60,31 @@ const Channel = ({
   onGlitchBypassToggle,
   showRouting = false,
 }: ChannelProps) => {
+  const volumePercent = volume * 100;
+  
   return (
-    <div className="flex flex-col items-center gap-1.5 px-3 py-2">
+    <div className="flex flex-col items-center gap-2 px-4 py-3">
       {/* Label */}
-      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{name}</span>
+      <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-widest">{name}</span>
       
-      {/* Fader + Meter container */}
-      <div className="relative h-32 w-6 flex items-center justify-center">
-        {/* Level meter background */}
-        <div className="absolute inset-0 w-1.5 left-1/2 -translate-x-1/2 bg-muted/50 rounded-full overflow-hidden">
+      {/* Fader container with glow effect */}
+      <div className="relative h-28 w-8 flex items-center justify-center">
+        {/* Track background with border */}
+        <div className="absolute inset-x-0 top-2 bottom-2 w-2 left-1/2 -translate-x-1/2 bg-background/80 rounded-full border border-primary/30 overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
+          {/* Level fill with gradient */}
           <div 
-            className={cn("absolute bottom-0 w-full rounded-full transition-all duration-75", color)}
-            style={{ height: muted ? '0%' : `${volume * 100}%`, opacity: muted ? 0.3 : 1 }}
+            className="absolute bottom-0 w-full rounded-full transition-all duration-100"
+            style={{ 
+              height: muted ? '0%' : `${volumePercent}%`, 
+              opacity: muted ? 0.3 : 1,
+              background: `linear-gradient(to top, hsl(var(--primary) / 0.6), hsl(var(--primary)))`,
+              boxShadow: !muted && volumePercent > 0 ? '0 0 8px hsl(var(--primary) / 0.5)' : 'none'
+            }}
           />
         </div>
         
-        {/* Slider */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Slider thumb overlay */}
+        <div className="absolute inset-0 flex items-center justify-center z-10">
           <Slider
             orientation="vertical"
             value={[volume]}
@@ -84,29 +92,32 @@ const Channel = ({
             max={1}
             step={0.01}
             onValueChange={([val]) => onVolumeChange?.(val)}
-            className="h-28"
+            className="h-24"
             disabled={muted}
           />
         </div>
       </div>
       
-      {/* Volume value */}
-      <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
-        {Math.round(volume * 100)}
+      {/* Volume value with subtle glow */}
+      <span className={cn(
+        "text-[11px] font-mono tabular-nums transition-colors",
+        muted ? "text-muted-foreground/50" : "text-primary"
+      )}>
+        {Math.round(volumePercent)}
       </span>
       
       {/* Controls row: Routing + Mute */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {/* Routing toggles */}
         {showRouting && (
           <>
             <button
               onClick={onFxBypassToggle}
               className={cn(
-                "w-6 h-6 rounded flex items-center justify-center transition-colors",
+                "w-7 h-7 rounded-md flex items-center justify-center transition-all border",
                 fxBypass 
-                  ? "bg-muted/30 text-muted-foreground/50" 
-                  : "bg-primary/10 text-primary"
+                  ? "bg-muted/20 text-muted-foreground/40 border-muted/30" 
+                  : "bg-primary/10 text-primary border-primary/40 shadow-[0_0_6px_hsl(var(--primary)/0.3)]"
               )}
               title={fxBypass ? "FX bypassed" : "FX active"}
             >
@@ -115,10 +126,10 @@ const Channel = ({
             <button
               onClick={onGlitchBypassToggle}
               className={cn(
-                "w-6 h-6 rounded flex items-center justify-center transition-colors",
+                "w-7 h-7 rounded-md flex items-center justify-center transition-all border",
                 glitchBypass 
-                  ? "bg-muted/30 text-muted-foreground/50" 
-                  : "bg-primary/10 text-primary"
+                  ? "bg-muted/20 text-muted-foreground/40 border-muted/30" 
+                  : "bg-accent/10 text-accent border-accent/40 shadow-[0_0_6px_hsl(var(--accent)/0.3)]"
               )}
               title={glitchBypass ? "Glitch bypassed" : "Glitch active"}
             >
@@ -132,10 +143,10 @@ const Channel = ({
           <button
             onClick={onMuteToggle}
             className={cn(
-              "w-6 h-6 rounded flex items-center justify-center transition-colors",
+              "w-7 h-7 rounded-md flex items-center justify-center transition-all border",
               muted 
-                ? "bg-destructive/20 text-destructive" 
-                : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                ? "bg-destructive/20 text-destructive border-destructive/50 shadow-[0_0_6px_hsl(var(--destructive)/0.4)]" 
+                : "bg-muted/20 text-muted-foreground border-muted/40 hover:border-muted-foreground/50"
             )}
           >
             {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
