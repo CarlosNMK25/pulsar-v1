@@ -218,8 +218,12 @@ const MasterChannel = ({
               onHighpassChange?.(freq);
             }}
             size="sm"
+            showValue={false}
           />
-          <span className="text-[8px] text-muted-foreground mt-0.5">HPF</span>
+          <span className="text-[8px] text-muted-foreground mt-0.5">
+            {highpass >= 1000 ? `${(highpass/1000).toFixed(1)}k` : Math.round(highpass)}
+          </span>
+          <span className="text-[7px] text-muted-foreground/70">HPF</span>
         </div>
         <div className="flex flex-col items-center">
           <Knob
@@ -230,8 +234,12 @@ const MasterChannel = ({
               onLowpassChange?.(freq);
             }}
             size="sm"
+            showValue={false}
           />
-          <span className="text-[8px] text-muted-foreground mt-0.5">LPF</span>
+          <span className="text-[8px] text-muted-foreground mt-0.5">
+            {lowpass >= 1000 ? `${(lowpass/1000).toFixed(1)}k` : Math.round(lowpass)}
+          </span>
+          <span className="text-[7px] text-muted-foreground/70">LPF</span>
         </div>
       </div>
 
@@ -282,7 +290,7 @@ const MasterChannel = ({
           
           {/* dB readout */}
           <span className="text-[9px] font-mono text-muted-foreground tabular-nums w-8 text-center">
-            {formatDb(peakDb)}
+            {isPlaying ? formatDb(peakDb) : '---'}
           </span>
         </div>
       </div>
@@ -293,8 +301,8 @@ const MasterChannel = ({
           GR: {limiterGr < -0.1 ? limiterGr.toFixed(1) : '0'}
         </span>
         <div className={cn(
-          "w-2 h-2 rounded-full transition-colors",
-          isClipping ? "bg-destructive animate-pulse" : "bg-muted/50"
+          "w-3 h-3 rounded-full transition-colors border border-muted-foreground/30",
+          isClipping ? "bg-destructive animate-pulse shadow-[0_0_6px_hsl(var(--destructive))]" : "bg-muted/50"
         )} title="Clip indicator" />
       </div>
     </div>
