@@ -32,8 +32,10 @@ import { useMusicalKeyboard } from '@/hooks/useMusicalKeyboard';
 import { useUILayout } from '@/hooks/useUILayout';
 import { useGlitchState, GlitchTrackId } from '@/hooks/useGlitchState';
 import { useHistory, HistorySnapshot } from '@/hooks/useHistory';
+import { useMasterState } from '@/hooks/useMasterState';
 import { SampleModule } from '@/components/synth/SampleModule';
 import { KeyboardTarget } from '@/components/synth/dock/KeyboardTab';
+import { audioEngine } from '@/audio/AudioEngine';
 
 import { AutoFillConfig } from '@/components/synth/TransportControls';
 
@@ -69,6 +71,7 @@ const Index = () => {
   const modulationState = useModulationState();
   const sampleState = useSampleState();
   const glitchState = useGlitchState();
+  const masterState = useMasterState();
   const history = useHistory({ maxStackSize: 50, debounceMs: 300 });
   const [sampleIsPlaying, setSampleIsPlaying] = useState(false);
   const [keyboardTarget, setKeyboardTarget] = useState<KeyboardTarget>('synth');
@@ -262,9 +265,14 @@ const Index = () => {
       masterMix: glitchState.masterMix,
     },
     transport: { bpm, swing },
+    master: {
+      highpass: masterState.highpass,
+      lowpass: masterState.lowpass,
+      resonance: masterState.resonance,
+    },
   }), [
     drumState, synthState, textureState, fxState, sampleState, 
-    modulationState, glitchState, bpm, swing
+    modulationState, glitchState, masterState, bpm, swing
   ]);
 
   // Restore state from snapshot
@@ -279,6 +287,7 @@ const Index = () => {
     modulationState.setAllModulationState(snapshot.modulation);
     glitchState.setAllParams(snapshot.glitch.paramsPerTrack);
     glitchState.setMasterMix(snapshot.glitch.masterMix);
+    masterState.setAllMasterState(snapshot.master);
     setBpm(snapshot.transport.bpm);
     setSwing(snapshot.transport.swing);
     
@@ -286,7 +295,7 @@ const Index = () => {
     requestAnimationFrame(() => {
       isRestoringRef.current = false;
     });
-  }, [drumState, synthState, textureState, fxState, sampleState, modulationState, glitchState]);
+  }, [drumState, synthState, textureState, fxState, sampleState, modulationState, glitchState, masterState]);
 
   // Undo/Redo handlers
   const handleUndo = useCallback(() => {
@@ -351,6 +360,19 @@ const Index = () => {
     isAudioReady: isInitialized,
     onInitAudio: initAudio,
   });
+
+  // Sync master filters with AudioEngine
+  useEffect(() => {
+    if (isInitialized) {
+      audioEngine.setMasterHighpass(masterState.highpass, masterState.resonance * 10);
+    }
+  }, [masterState.highpass, masterState.resonance, isInitialized]);
+
+  useEffect(() => {
+    if (isInitialized) {
+      audioEngine.setMasterLowpass(masterState.lowpass);
+    }
+  }, [masterState.lowpass, isInitialized]);
 
   // Calculate main content padding based on dock state
   const dockHeight = DOCK_HEIGHTS[uiLayout.dockState];
@@ -780,6 +802,11 @@ const Index = () => {
         onRoutingChange={fxState.updateTrackRouting}
         sendLevels={fxState.sendLevels}
         onSendChange={fxState.updateSendLevel}
+        masterHighpass={masterState.highpass}
+        masterLowpass={masterState.lowpass}
+        onMasterHighpassChange={masterState.setHighpass}
+        onMasterLowpassChange={masterState.setLowpass}
+        isPlaying={isPlaying}
       />
 
       {/* Performance Panel (Left) */}

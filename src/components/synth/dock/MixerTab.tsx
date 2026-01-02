@@ -3,6 +3,9 @@ import { Volume2, VolumeX, Sparkles, Waves } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { TrackName, TrackRoutingState, TrackSendLevels } from '@/hooks/useFXState';
 import { SendMatrix } from '../SendMatrix';
+import { Knob } from '../Knob';
+import { useState, useEffect, useRef } from 'react';
+import { audioEngine } from '@/audio/AudioEngine';
 
 interface MixerTabProps {
   drumMuted?: boolean;
@@ -20,6 +23,12 @@ interface MixerTabProps {
   // Send levels
   sendLevels?: TrackSendLevels;
   onSendChange?: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
+  // Master filter controls
+  masterHighpass?: number;
+  masterLowpass?: number;
+  onMasterHighpassChange?: (value: number) => void;
+  onMasterLowpassChange?: (value: number) => void;
+  isPlaying?: boolean;
 }
 
 interface ChannelProps {
@@ -137,6 +146,161 @@ const Channel = ({
   );
 };
 
+// Extended Master Channel with filters and metering
+interface MasterChannelProps {
+  volume: number;
+  onVolumeChange?: (value: number) => void;
+  highpass: number;
+  lowpass: number;
+  onHighpassChange?: (value: number) => void;
+  onLowpassChange?: (value: number) => void;
+  isPlaying?: boolean;
+}
+
+const MasterChannel = ({
+  volume,
+  onVolumeChange,
+  highpass,
+  lowpass,
+  onHighpassChange,
+  onLowpassChange,
+  isPlaying = false,
+}: MasterChannelProps) => {
+  const [peakDb, setPeakDb] = useState(-Infinity);
+  const [limiterGr, setLimiterGr] = useState(0);
+  const [isClipping, setIsClipping] = useState(false);
+  const animFrameRef = useRef<number>(0);
+
+  // Animate peak meter and limiter GR
+  useEffect(() => {
+    if (!isPlaying) {
+      setPeakDb(-Infinity);
+      setLimiterGr(0);
+      setIsClipping(false);
+      return;
+    }
+
+    const update = () => {
+      const peak = audioEngine.getPeakLevel();
+      const gr = audioEngine.getLimiterReduction();
+      setPeakDb(peak);
+      setLimiterGr(gr);
+      setIsClipping(peak > -0.5);
+      animFrameRef.current = requestAnimationFrame(update);
+    };
+    update();
+
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [isPlaying]);
+
+  // Convert dB to percentage for meter display (-60dB to 0dB range)
+  const peakPercent = Math.max(0, Math.min(100, ((peakDb + 60) / 60) * 100));
+  
+  // Format dB for display
+  const formatDb = (db: number) => {
+    if (db === -Infinity || db < -60) return '-∞';
+    return db.toFixed(1);
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-1.5 px-3 py-2">
+      {/* Label */}
+      <span className="text-[10px] font-medium text-foreground uppercase tracking-wider">Master</span>
+      
+      {/* HPF / LPF Knobs */}
+      <div className="flex gap-2 mb-1">
+        <div className="flex flex-col items-center">
+          <Knob
+            label=""
+            value={Math.log10(highpass / 20) / Math.log10(100) * 100}
+            onChange={(v) => {
+              const freq = 20 * Math.pow(100, v / 100);
+              onHighpassChange?.(freq);
+            }}
+            size="sm"
+          />
+          <span className="text-[8px] text-muted-foreground mt-0.5">HPF</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <Knob
+            label=""
+            value={Math.log10(lowpass / 200) / Math.log10(100) * 100}
+            onChange={(v) => {
+              const freq = 200 * Math.pow(100, v / 100);
+              onLowpassChange?.(freq);
+            }}
+            size="sm"
+          />
+          <span className="text-[8px] text-muted-foreground mt-0.5">LPF</span>
+        </div>
+      </div>
+
+      {/* Fader + Real Peak Meter */}
+      <div className="flex gap-2">
+        {/* Volume Fader */}
+        <div className="relative h-24 w-6 flex items-center justify-center">
+          <div className="absolute inset-0 w-1.5 left-1/2 -translate-x-1/2 bg-muted/50 rounded-full overflow-hidden">
+            <div 
+              className="absolute bottom-0 w-full rounded-full transition-all duration-75 bg-foreground/70"
+              style={{ height: `${volume * 100}%` }}
+            />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Slider
+              orientation="vertical"
+              value={[volume]}
+              min={0}
+              max={1}
+              step={0.01}
+              onValueChange={([val]) => onVolumeChange?.(val)}
+              className="h-20"
+            />
+          </div>
+        </div>
+
+        {/* Peak Meter */}
+        <div className="flex flex-col items-center gap-1">
+          <div className="relative h-24 w-3 bg-muted/30 rounded overflow-hidden">
+            {/* Gradient meter */}
+            <div 
+              className="absolute bottom-0 w-full transition-all duration-75"
+              style={{ 
+                height: `${peakPercent}%`,
+                background: peakPercent > 90 
+                  ? 'linear-gradient(to top, hsl(var(--primary)), hsl(var(--destructive)))' 
+                  : peakPercent > 70 
+                    ? 'linear-gradient(to top, hsl(var(--primary)), hsl(45 100% 50%))' 
+                    : 'hsl(var(--primary))'
+              }}
+            />
+            {/* Clip indicator line at top */}
+            <div className={cn(
+              "absolute top-0 left-0 right-0 h-0.5 transition-colors",
+              isClipping ? "bg-destructive animate-pulse" : "bg-muted-foreground/20"
+            )} />
+          </div>
+          
+          {/* dB readout */}
+          <span className="text-[9px] font-mono text-muted-foreground tabular-nums w-8 text-center">
+            {formatDb(peakDb)}
+          </span>
+        </div>
+      </div>
+
+      {/* Limiter GR and Clip */}
+      <div className="flex items-center gap-2 mt-0.5">
+        <span className="text-[8px] text-muted-foreground">
+          GR: {limiterGr < -0.1 ? limiterGr.toFixed(1) : '0'}
+        </span>
+        <div className={cn(
+          "w-2 h-2 rounded-full transition-colors",
+          isClipping ? "bg-destructive animate-pulse" : "bg-muted/50"
+        )} title="Clip indicator" />
+      </div>
+    </div>
+  );
+};
+
 export const MixerTab = ({
   drumMuted = false,
   synthMuted = false,
@@ -152,6 +316,11 @@ export const MixerTab = ({
   onRoutingChange,
   sendLevels,
   onSendChange,
+  masterHighpass = 20,
+  masterLowpass = 20000,
+  onMasterHighpassChange,
+  onMasterLowpassChange,
+  isPlaying = false,
 }: MixerTabProps) => {
   return (
     <div className="flex items-center justify-center h-full gap-2 px-4">
@@ -217,14 +386,16 @@ export const MixerTab = ({
           showRouting={!!trackRouting}
         />
         <div className="w-px h-44 bg-border/50 mx-2" />
-        <Channel 
-          name="Master" 
-          channelId="master"
-          muted={false} 
+        
+        {/* Enhanced Master Channel */}
+        <MasterChannel
           volume={volumes.master ?? 0.8}
           onVolumeChange={(v) => onVolumeChange?.('master', v)}
-          color="bg-foreground/70"
-          showRouting={false}
+          highpass={masterHighpass}
+          lowpass={masterLowpass}
+          onHighpassChange={onMasterHighpassChange}
+          onLowpassChange={onMasterLowpassChange}
+          isPlaying={isPlaying}
         />
       </div>
 

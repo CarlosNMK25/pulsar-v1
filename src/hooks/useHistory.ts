@@ -5,6 +5,7 @@ import type { TextureState } from './useTextureState';
 import type { FXState } from './useFXState';
 import type { ModulationState } from './useModulationState';
 import type { GlitchParamsPerTrack } from './useGlitchState';
+import type { MasterState } from './useMasterState';
 
 // Snapshot without heavy data like AudioBuffer
 export interface HistorySnapshot {
@@ -33,6 +34,7 @@ export interface HistorySnapshot {
     bpm: number;
     swing: number;
   };
+  master: MasterState;
 }
 
 interface UseHistoryOptions {

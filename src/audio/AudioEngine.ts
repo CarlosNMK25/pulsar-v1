@@ -20,6 +20,13 @@ class AudioEngine {
   private sampleGlitchBus: GainNode | null = null;
   private fxGlitchBus: GainNode | null = null;
 
+  // Master filters
+  private masterHighpass: BiquadFilterNode | null = null;
+  private masterLowpass: BiquadFilterNode | null = null;
+
+  // Peak metering
+  private peakAnalyserData: Float32Array<ArrayBuffer> | null = null;
+
   private constructor() {}
 
   static getInstance(): AudioEngine {
@@ -72,6 +79,17 @@ class AudioEngine {
     // Connect modulation output to master gain (wet path from modulationSends)
     modOutput.connect(this.masterGain);
 
+    // Master filters (HPF -> LPF)
+    this.masterHighpass = this.audioContext.createBiquadFilter();
+    this.masterHighpass.type = 'highpass';
+    this.masterHighpass.frequency.value = 20;
+    this.masterHighpass.Q.value = 0.707;
+
+    this.masterLowpass = this.audioContext.createBiquadFilter();
+    this.masterLowpass.type = 'lowpass';
+    this.masterLowpass.frequency.value = 20000;
+    this.masterLowpass.Q.value = 0.707;
+
     // Limiter to prevent clipping
     this.masterLimiter = this.audioContext.createDynamicsCompressor();
     this.masterLimiter.threshold.value = -3;
@@ -84,9 +102,12 @@ class AudioEngine {
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.8;
+    this.peakAnalyserData = new Float32Array(this.analyser.fftSize);
 
-    // Connect master chain
-    this.masterGain.connect(this.masterLimiter);
+    // Connect master chain: masterGain -> HPF -> LPF -> limiter -> analyser -> destination
+    this.masterGain.connect(this.masterHighpass);
+    this.masterHighpass.connect(this.masterLowpass);
+    this.masterLowpass.connect(this.masterLimiter);
     this.masterLimiter.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
 
@@ -193,6 +214,39 @@ class AudioEngine {
         0.01
       );
     }
+  }
+
+  setMasterHighpass(freq: number, q: number = 0.707): void {
+    if (this.masterHighpass && this.audioContext) {
+      const clampedFreq = Math.max(20, Math.min(2000, freq));
+      this.masterHighpass.frequency.setTargetAtTime(clampedFreq, this.audioContext.currentTime, 0.01);
+      this.masterHighpass.Q.setTargetAtTime(Math.max(0.1, Math.min(10, q)), this.audioContext.currentTime, 0.01);
+    }
+  }
+
+  setMasterLowpass(freq: number): void {
+    if (this.masterLowpass && this.audioContext) {
+      const clampedFreq = Math.max(200, Math.min(20000, freq));
+      this.masterLowpass.frequency.setTargetAtTime(clampedFreq, this.audioContext.currentTime, 0.01);
+    }
+  }
+
+  getLimiterReduction(): number {
+    return this.masterLimiter?.reduction ?? 0;
+  }
+
+  getPeakLevel(): number {
+    if (!this.analyser || !this.peakAnalyserData) return -Infinity;
+    
+    this.analyser.getFloatTimeDomainData(this.peakAnalyserData);
+    let peak = 0;
+    for (let i = 0; i < this.peakAnalyserData.length; i++) {
+      const abs = Math.abs(this.peakAnalyserData[i]);
+      if (abs > peak) peak = abs;
+    }
+    
+    // Convert to dB
+    return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
   }
 
   async resume(): Promise<void> {

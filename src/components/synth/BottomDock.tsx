@@ -45,6 +45,12 @@ interface BottomDockProps {
   // Send levels
   sendLevels?: TrackSendLevels;
   onSendChange?: (track: TrackName, effect: 'reverb' | 'delay', value: number) => void;
+  // Master filter controls
+  masterHighpass?: number;
+  masterLowpass?: number;
+  onMasterHighpassChange?: (value: number) => void;
+  onMasterLowpassChange?: (value: number) => void;
+  isPlaying?: boolean;
 }
 
 const tabs = [
@@ -92,6 +98,11 @@ export const BottomDock = ({
   onRoutingChange,
   sendLevels,
   onSendChange,
+  masterHighpass = 20,
+  masterLowpass = 20000,
+  onMasterHighpassChange,
+  onMasterLowpassChange,
+  isPlaying = false,
 }: BottomDockProps) => {
   const height = DOCK_HEIGHTS[state];
   const isVisible = state !== 'hidden';
@@ -196,6 +207,11 @@ export const BottomDock = ({
               onRoutingChange={onRoutingChange}
               sendLevels={sendLevels}
               onSendChange={onSendChange}
+              masterHighpass={masterHighpass}
+              masterLowpass={masterLowpass}
+              onMasterHighpassChange={onMasterHighpassChange}
+              onMasterLowpassChange={onMasterLowpassChange}
+              isPlaying={isPlaying}
             />
           )}
           {activeTab === 'scope' && <ScopeTab analyserData={analyserData} />}
