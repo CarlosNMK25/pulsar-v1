@@ -66,6 +66,21 @@ export const ProcessingTools = ({
     return estimateBPMFromDuration(buffer, assumedBars, 4);
   }, [buffer, assumedBars]);
 
+  // Preview duration after stretch to BPM
+  const stretchToBPMPreview = useMemo(() => {
+    if (!buffer || !estimatedBPM) return null;
+    
+    const currentDuration = buffer.length / buffer.sampleRate;
+    const ratio = calculateBPMStretchRatio(estimatedBPM, targetBPM);
+    const clampedRatio = Math.max(0.25, Math.min(4, ratio));
+    const newDuration = currentDuration / clampedRatio;
+    
+    return {
+      current: currentDuration.toFixed(2),
+      new: newDuration.toFixed(2),
+    };
+  }, [buffer, estimatedBPM, targetBPM]);
+
   // Helper to get selection sample range
   const getSelectionRange = useCallback(() => {
     if (!buffer || selectionStart === null || selectionEnd === null) return null;
@@ -751,6 +766,14 @@ export const ProcessingTools = ({
             />
             <span className="text-xs text-muted-foreground">BPM</span>
           </div>
+          {stretchToBPMPreview && (
+            <p className="text-xs text-center">
+              <span className="text-muted-foreground">Duración: </span>
+              <span className="text-foreground">{stretchToBPMPreview.current}s</span>
+              <span className="text-muted-foreground"> → </span>
+              <span className="text-primary font-medium">{stretchToBPMPreview.new}s</span>
+            </p>
+          )}
           <Button
             variant="outline"
             size="sm"
