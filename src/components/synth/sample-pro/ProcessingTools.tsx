@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { audioEngine } from '@/audio/AudioEngine';
-import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw } from 'lucide-react';
+import { Maximize, Scissors, RotateCcw, ArrowRightFromLine, ArrowLeftFromLine, RefreshCw, Volume2, VolumeX, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProcessingToolsProps {
@@ -29,6 +29,17 @@ export const ProcessingTools = ({
   const [targetSampleRate, setTargetSampleRate] = useState(44100);
   
   const hasSelection = selectionStart !== null && selectionEnd !== null;
+
+  // Helper to get selection sample range
+  const getSelectionRange = useCallback(() => {
+    if (!buffer || selectionStart === null || selectionEnd === null) return null;
+    const start = Math.min(selectionStart, selectionEnd);
+    const end = Math.max(selectionStart, selectionEnd);
+    return {
+      startSample: Math.floor(start * buffer.length),
+      endSample: Math.floor(end * buffer.length),
+    };
+  }, [buffer, selectionStart, selectionEnd]);
   
   // Normalize audio to peak at 1.0
   const handleNormalize = useCallback(async () => {
@@ -43,7 +54,6 @@ export const ProcessingTools = ({
 
     let maxPeak = 0;
     
-    // Find max peak across all channels
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       const data = buffer.getChannelData(ch);
       for (let i = 0; i < data.length; i++) {
@@ -58,7 +68,6 @@ export const ProcessingTools = ({
 
     const gain = 1.0 / maxPeak;
 
-    // Apply normalization
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       const source = buffer.getChannelData(ch);
       const dest = newBuffer.getChannelData(ch);
@@ -71,7 +80,6 @@ export const ProcessingTools = ({
     toast.success(`Normalized by ${(gain).toFixed(2)}x`);
   }, [buffer, onBufferProcessed]);
 
-  // Trim silence from start and end
   const handleTrim = useCallback(() => {
     if (!buffer) return;
 
@@ -82,15 +90,13 @@ export const ProcessingTools = ({
     let startSample = 0;
     let endSample = data.length - 1;
 
-    // Find first non-silent sample
     for (let i = 0; i < data.length; i++) {
       if (Math.abs(data[i]) > threshold) {
-        startSample = Math.max(0, i - 100); // Keep tiny buffer
+        startSample = Math.max(0, i - 100);
         break;
       }
     }
 
-    // Find last non-silent sample
     for (let i = data.length - 1; i >= 0; i--) {
       if (Math.abs(data[i]) > threshold) {
         endSample = Math.min(data.length - 1, i + 100);
@@ -124,7 +130,6 @@ export const ProcessingTools = ({
     toast.success(`Trimmed ${trimmedMs}ms of silence`);
   }, [buffer, onBufferProcessed]);
 
-  // Reverse entire buffer
   const handleReverse = useCallback(() => {
     if (!buffer) return;
 
@@ -147,12 +152,11 @@ export const ProcessingTools = ({
     toast.success('Audio reversed');
   }, [buffer, onBufferProcessed]);
 
-  // Apply fade in
   const handleFadeIn = useCallback(() => {
     if (!buffer) return;
 
     const ctx = audioEngine.getContext();
-    const fadeLength = Math.min(buffer.length, Math.floor(buffer.sampleRate * 0.1)); // 100ms fade
+    const fadeLength = Math.min(buffer.length, Math.floor(buffer.sampleRate * 0.1));
     
     const newBuffer = ctx.createBuffer(
       buffer.numberOfChannels,
@@ -177,12 +181,11 @@ export const ProcessingTools = ({
     toast.success('Fade in applied');
   }, [buffer, onBufferProcessed]);
 
-  // Apply fade out
   const handleFadeOut = useCallback(() => {
     if (!buffer) return;
 
     const ctx = audioEngine.getContext();
-    const fadeLength = Math.min(buffer.length, Math.floor(buffer.sampleRate * 0.1)); // 100ms fade
+    const fadeLength = Math.min(buffer.length, Math.floor(buffer.sampleRate * 0.1));
     
     const newBuffer = ctx.createBuffer(
       buffer.numberOfChannels,
@@ -208,7 +211,6 @@ export const ProcessingTools = ({
     toast.success('Fade out applied');
   }, [buffer, onBufferProcessed]);
 
-  // Resample to target sample rate
   const handleResample = useCallback(async () => {
     if (!buffer) return;
     
@@ -235,47 +237,166 @@ export const ProcessingTools = ({
     }
   }, [buffer, targetSampleRate, onBufferProcessed]);
 
-  // Reverse only selected region
+  // Region operations
   const handleReverseRegion = useCallback(() => {
-    if (!buffer || !hasSelection || selectionStart === null || selectionEnd === null) return;
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
 
+    const { startSample, endSample } = range;
     const ctx = audioEngine.getContext();
-    const start = Math.min(selectionStart, selectionEnd);
-    const end = Math.max(selectionStart, selectionEnd);
-    
-    const startSample = Math.floor(start * buffer.length);
-    const endSample = Math.floor(end * buffer.length);
-    
-    const newBuffer = ctx.createBuffer(
-      buffer.numberOfChannels,
-      buffer.length,
-      buffer.sampleRate
-    );
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
 
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       const source = buffer.getChannelData(ch);
       const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
       
-      // Copy before selection
-      for (let i = 0; i < startSample; i++) {
-        dest[i] = source[i];
-      }
-      
-      // Reverse selection
       for (let i = startSample; i < endSample; i++) {
         dest[i] = source[endSample - 1 - (i - startSample)];
-      }
-      
-      // Copy after selection
-      for (let i = endSample; i < buffer.length; i++) {
-        dest[i] = source[i];
       }
     }
 
     const durationMs = ((endSample - startSample) / buffer.sampleRate * 1000).toFixed(0);
     onBufferProcessed(newBuffer, 'region-reversed');
     toast.success(`Region reversed (${durationMs}ms)`);
-  }, [buffer, hasSelection, selectionStart, selectionEnd, onBufferProcessed]);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
+
+  const handleFadeInRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
+
+    const { startSample, endSample } = range;
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const regionLength = endSample - startSample;
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      
+      for (let i = startSample; i < endSample; i++) {
+        const progress = (i - startSample) / regionLength;
+        dest[i] = source[i] * progress;
+      }
+    }
+
+    const durationMs = (regionLength / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-fade-in');
+    toast.success(`Fade in applied (${durationMs}ms)`);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
+
+  const handleFadeOutRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
+
+    const { startSample, endSample } = range;
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const regionLength = endSample - startSample;
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      
+      for (let i = startSample; i < endSample; i++) {
+        const progress = 1 - (i - startSample) / regionLength;
+        dest[i] = source[i] * progress;
+      }
+    }
+
+    const durationMs = (regionLength / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-fade-out');
+    toast.success(`Fade out applied (${durationMs}ms)`);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
+
+  const handleNormalizeRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
+
+    const { startSample, endSample } = range;
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+
+    let maxPeak = 0;
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = startSample; i < endSample; i++) {
+        maxPeak = Math.max(maxPeak, Math.abs(data[i]));
+      }
+    }
+
+    if (maxPeak === 0) {
+      toast.error('Region is silent');
+      return;
+    }
+
+    const gain = 1.0 / maxPeak;
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      
+      for (let i = startSample; i < endSample; i++) {
+        dest[i] = source[i] * gain;
+      }
+    }
+
+    const durationMs = ((endSample - startSample) / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-normalized');
+    toast.success(`Region normalized ${gain.toFixed(2)}x (${durationMs}ms)`);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
+
+  const handleMuteRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
+
+    const { startSample, endSample } = range;
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      
+      for (let i = startSample; i < endSample; i++) {
+        dest[i] = 0;
+      }
+    }
+
+    const durationMs = ((endSample - startSample) / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-muted');
+    toast.success(`Region muted (${durationMs}ms)`);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
+
+  const handleBoostRegion = useCallback(() => {
+    const range = getSelectionRange();
+    if (!buffer || !range) return;
+
+    const { startSample, endSample } = range;
+    const ctx = audioEngine.getContext();
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const boostGain = 2; // +6dB
+
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const source = buffer.getChannelData(ch);
+      const dest = newBuffer.getChannelData(ch);
+      dest.set(source);
+      
+      for (let i = startSample; i < endSample; i++) {
+        const boosted = source[i] * boostGain;
+        // Soft clip if exceeds 1.0
+        dest[i] = Math.abs(boosted) > 1 ? Math.sign(boosted) * (1 - Math.exp(-Math.abs(boosted))) : boosted;
+      }
+    }
+
+    const durationMs = ((endSample - startSample) / buffer.sampleRate * 1000).toFixed(0);
+    onBufferProcessed(newBuffer, 'region-boosted');
+    toast.success(`Region boosted +6dB (${durationMs}ms)`);
+  }, [buffer, getSelectionRange, onBufferProcessed]);
 
   const isDisabled = !buffer;
 
@@ -377,15 +498,62 @@ export const ProcessingTools = ({
           <p className="text-xs text-muted-foreground mb-2">
             Región seleccionada
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReverseRegion}
-            className="gap-1 w-full"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Reverse Selection
-          </Button>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFadeInRegion}
+              className="gap-1"
+            >
+              <ArrowRightFromLine className="w-3 h-3" />
+              Fade In
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFadeOutRegion}
+              className="gap-1"
+            >
+              <ArrowLeftFromLine className="w-3 h-3" />
+              Fade Out
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNormalizeRegion}
+              className="gap-1"
+            >
+              <Maximize className="w-3 h-3" />
+              Normalize
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMuteRegion}
+              className="gap-1"
+            >
+              <VolumeX className="w-3 h-3" />
+              Mute
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBoostRegion}
+              className="gap-1"
+            >
+              <Volume2 className="w-3 h-3" />
+              Boost
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReverseRegion}
+              className="gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reverse
+            </Button>
+          </div>
         </div>
       )}
     </div>
